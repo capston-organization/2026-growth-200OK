@@ -2,6 +2,7 @@ package growth._OK.backend.game.dto.ResponseDto;
 
 import growth._OK.backend.game.domain.Game;
 import growth._OK.backend.game.domain.GameType;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -15,7 +16,8 @@ public class GameResponseDto {
     private final GameType type;
     private final String title;
     private final String description;
-    private final boolean liked;
+    private final int likeCount;
+    private final boolean isLiked;
     private final boolean isPublic;
 
     public static GameResponseDto from(Game game) {
@@ -25,19 +27,21 @@ public class GameResponseDto {
                 .type(game.getType())
                 .title(game.getTitle())
                 .description(game.getDescription())
-                .liked(false)
+                .likeCount(game.getLikeCount())
+                .isLiked(false)
                 .isPublic(game.isPublic())
                 .build();
     }
 
-    public static GameResponseDto from(Game game, boolean liked) {
+    public static GameResponseDto from(Game game, boolean isLiked) {
         return GameResponseDto.builder()
                 .id(game.getId())
                 .ownerId(game.getOwner().getUserId())
                 .type(game.getType())
                 .title(game.getTitle())
                 .description(game.getDescription())
-                .liked(liked)
+                .likeCount(game.getLikeCount())
+                .isLiked(isLiked)
                 .isPublic(game.isPublic())
                 .build();
     }

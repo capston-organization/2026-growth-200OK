@@ -13,7 +13,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import growth._OK.backend.game.domain.GameType;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -46,6 +45,9 @@ public class Game extends BaseEntity {
     @Column(name = "is_public", nullable = false)
     private boolean isPublic;
 
+    @Column(nullable = false)
+    private int likeCount;
+
     @Builder
     public Game(User owner, GameType type, String title, String description, boolean isPublic) {
         this.owner = owner;
@@ -53,5 +55,16 @@ public class Game extends BaseEntity {
         this.title = title;
         this.description = description;
         this.isPublic = isPublic;
+        this.likeCount = 0;
+    }
+
+    public void increaseLikeCount() {
+        this.likeCount++;
+    }
+
+    public void decreaseLikeCount() {
+        if (this.likeCount > 0) {
+            this.likeCount--;
+        }
     }
 }
