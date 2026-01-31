@@ -82,10 +82,12 @@ public class GameService {
         boolean liked = gameLikeRepository.findByGameAndUser(game, user)
                 .map(existing -> {
                     gameLikeRepository.delete(existing);
+                    game.decreaseLikeCount();
                     return false;
                 })
                 .orElseGet(() -> {
                     gameLikeRepository.save(GameLike.builder().game(game).user(user).build());
+                    game.increaseLikeCount();
                     return true;
                 });
 
