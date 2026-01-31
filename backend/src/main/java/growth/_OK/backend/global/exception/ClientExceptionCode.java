@@ -13,4 +13,7 @@ public enum ClientExceptionCode {
     AUTH_TOKEN_INVALID,
     AUTH_TOKEN_MISMATCH,
     USER_NOT_FOUND,
+
+    // 게임
+    GAME_NOT_FOUND,
 }
