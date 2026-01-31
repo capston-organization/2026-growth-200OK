@@ -139,11 +139,13 @@ class GameServiceTest {
 
         GameResponseDto liked = gameService.toggleLike(10L, principal);
         assertThat(liked.isLiked()).isTrue();
+        assertThat(liked.getLikeCount()).isEqualTo(1);
 
         given(gameLikeRepository.findByGameAndUser(game, user)).willReturn(Optional.of(GameLike.builder().game(game).user(user).build()));
 
         GameResponseDto unliked = gameService.toggleLike(10L, principal);
         assertThat(unliked.isLiked()).isFalse();
+        assertThat(unliked.getLikeCount()).isEqualTo(0);
     }
 
     @Test
