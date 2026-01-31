@@ -88,7 +88,7 @@ class GameControllerIntegrationTest {
                 .andExpect(header().string("Location", containsString("/api/games/")))
                 .andExpect(jsonPath("$.title", is("title")))
                 .andExpect(jsonPath("$.type", is("GRAMMAR")))
-                .andExpect(jsonPath("$.liked", is(false)));
+                .andExpect(jsonPath("$.likeCount", is(0)));
     }
 
     @Test
@@ -121,7 +121,7 @@ class GameControllerIntegrationTest {
                         .with(SecurityMockMvcRequestPostProcessors.user(principal)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.games", hasSize(1)))
-                .andExpect(jsonPath("$.games[0].liked", is(true)));
+                .andExpect(jsonPath("$.games[0].isLiked", is(true)));
     }
 
     @Test
@@ -139,12 +139,14 @@ class GameControllerIntegrationTest {
         mockMvc.perform(post("/api/games/{id}/like", game.getId())
                         .with(SecurityMockMvcRequestPostProcessors.user(principal)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.liked", is(true)));
+                .andExpect(jsonPath("$.isLiked", is(true)))
+                .andExpect(jsonPath("$.likeCount", is(1)));
 
         mockMvc.perform(post("/api/games/{id}/like", game.getId())
                         .with(SecurityMockMvcRequestPostProcessors.user(principal)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.liked", is(false)));
+                .andExpect(jsonPath("$.isLiked", is(false)))
+                .andExpect(jsonPath("$.likeCount", is(0)));
     }
 
     @Test
@@ -164,7 +166,7 @@ class GameControllerIntegrationTest {
                         .with(SecurityMockMvcRequestPostProcessors.user(principal)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.games", hasSize(1)))
-                .andExpect(jsonPath("$.games[0].liked", is(true)))
+                .andExpect(jsonPath("$.games[0].isLiked", is(true)))
                 .andExpect(jsonPath("$.games[0].title", is("grammar liked")));
     }
 }
