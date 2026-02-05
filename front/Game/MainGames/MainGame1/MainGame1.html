@@ -14,36 +14,45 @@
     </style>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
 
-    <script src="../../MiniGames/MultiChoiceGames/MiniGame1/MiniGame1.js"></script>
+    <script src="../../MiniGames/ShortAnswerGames/MiniGame1/MiniShortGame1.js"></script>
+    <script src="../../MiniGames/MultiChoiceGames/MiniGame1/MiniMultiGame1.js"></script>
+    <script src="../../MiniGames/OXGames/MiniGame1/MiniOXGame1.js"></script>
   </head>
   <body>
     <script>
       /**
-       * MainScene: 게임의 매니저 역할을 하는 메인 장면
-       * 점수 관리, 생명 관리, 미니게임 호출 등을 담당합니다.
+       * [MainScene 클래스]
+       * 게임의 전체적인 흐름을 관리하는 매니저(Manager) 역할입니다.
+       * - 점수(Score), 생명(Lives), 스피드(Speed) 상태 관리
+       * - 미니게임을 랜덤으로 실행하고, 결과를 받아서 성공/실패 처리
+       * - UI(점수판, 하트, 메시지 등) 표시
        */
       class MainScene extends Phaser.Scene {
         constructor() {
-          super({ key: "MainScene" }); // 씬의 고유 키 설정
+          super({ key: "MainScene" }); // 이 씬의 고유 식별자(Key) 설정
         }
 
+        /**
+         * 1. create(): 게임이 처음 시작될 때 한 번 실행되는 함수
+         * 변수 초기화 및 화면의 UI 요소들을 배치합니다.
+         */
         create() {
-          // --- 1. 게임 상태 변수 초기화 ---
-          this.lives = 3; // 생명 (하트)
+          // --- [A] 게임 상태 변수 초기화 ---
+          this.lives = 3; // 생명 (하트 3개)
           this.score = 0; // 현재 점수
-          this.consecutiveWins = 0; // 연속 성공 횟수 (스피드업 체크용)
-          this.speedLevel = 1; // 게임 속도 레벨 (1~5)
-          this.isGameRunning = true; // 게임 오버 여부 체크
+          this.consecutiveWins = 0; // 연속 성공 횟수 (5번 성공 시 스피드 업)
+          this.speedLevel = 1; // 게임 속도 레벨 (1~5단계)
+          this.isGameRunning = true; // 게임 진행 중 여부 (Game Over 체크용)
 
-          // --- 2. UI 및 화면 요소 배치 ---
-          const { width, height } = this.scale;
+          // --- [B] UI 및 화면 요소 배치 ---
+          const { width, height } = this.scale; // 현재 화면 크기 가져오기
           const centerX = width * 0.5;
           const centerY = height * 0.45;
 
           // 배경색 설정 (흰색)
           this.cameras.main.setBackgroundColor("#FFFFFF");
 
-          // [왼쪽] 점수판 텍스트 (000 형식)
+          // 1. 점수판 텍스트 (왼쪽, 000 형식)
           this.scoreText = this.add
             .text(width * 0.1, centerY, "000", {
               fontSize: "64px",
@@ -53,7 +62,7 @@
             })
             .setOrigin(0.5);
 
-          // [중앙] 게임 박스 (미니게임이 표시될 영역의 테두리)
+          // 2. 게임 박스 (중앙, 미니게임이 실행될 영역 표시용 테두리)
           this.gameBox = this.add.rectangle(
             centerX,
             centerY,
@@ -63,7 +72,7 @@
           );
           this.gameBox.setStrokeStyle(4, 0x000000); // 검은 테두리 4px
 
-          // [중앙] 상태 메시지 (Ready, Success, Failed 등)
+          // 3. 상태 메시지 (중앙, Ready/Success/Failed 표시)
           this.statusText = this.add
             .text(centerX, centerY, "Ready", {
               fontSize: "32px",
@@ -72,7 +81,7 @@
             })
             .setOrigin(0.5);
 
-          // [우상단] 현재 스피드 레벨 표시
+          // 4. 스피드 레벨 표시 (우측 상단)
           this.speedText = this.add
             .text(width - 20, 20, "SPEED: 1", {
               fontSize: "24px",
@@ -80,54 +89,70 @@
             })
             .setOrigin(1, 0);
 
-          // [하단] 하트(생명) 아이콘 생성 (3개)
+          // 5. 하트(생명) 아이콘 생성 (반복문으로 3개 배치)
           this.hearts = [];
-          const heartY = centerY + 220;
+          const heartY = centerY + 220; // 박스 아래쪽에 배치
           for (let i = 0; i < 3; i++) {
             let heart = this.add.graphics();
-            heart.x = centerX - 60 + i * 60; // 간격 60px 배치
+            heart.x = centerX - 60 + i * 60; // 간격 60px로 나란히 배치
             heart.y = heartY;
-            this.drawHeart(heart, 0xff69b4); // 핑크색 하트 그리기
-            this.hearts.push(heart);
+            this.drawHeart(heart, 0xff69b4); // 핑크색 하트 그리기 함수 호출
+            this.hearts.push(heart); // 배열에 저장 (나중에 색 바꿀 때 사용)
           }
 
-          // --- 3. 게임 루프 시작 ---
-          // 2초 대기 후 첫 번째 미니게임을 시작합니다.
+          // --- [C] 게임 루프 시작 ---
+          // 2초 대기(delayedCall) 후 첫 번째 미니게임을 시작(startMiniGame)합니다.
           this.time.delayedCall(2000, this.startMiniGame, [], this);
 
-          // 창 크기가 변경되면 UI 위치를 재조정하는 이벤트 연결
+          // 화면 크기가 변경되면 UI 위치를 재조정하는 이벤트 연결 (반응형)
           this.scale.on("resize", this.resize, this);
         }
 
-        // [그래픽 헬퍼] 하트 모양을 그리는 함수
+        /**
+         * [보조 함수] 하트 모양을 그려주는 그래픽 함수
+         * @param {Phaser.GameObjects.Graphics} graphics - 그리기 도구
+         * @param {number} color - 하트 색상 (Hex 코드)
+         */
         drawHeart(graphics, color) {
           graphics.clear();
           graphics.fillStyle(color, 1);
+          // 하트 모양을 그리기 위해 원 2개와 삼각형 1개를 조합
           graphics.fillCircle(-10, -10, 15);
           graphics.fillCircle(10, -10, 15);
           graphics.fillTriangle(-23, -5, 23, -5, 0, 25);
         }
 
-        // [핵심 로직] 미니게임을 실행(Launch)하는 함수
+        /**
+         * 2. startMiniGame(): 미니게임을 실제로 실행하는 핵심 함수
+         * - 대기 상태 텍스트를 지우고, 랜덤한 게임을 골라 실행합니다.
+         */
         startMiniGame() {
           if (!this.isGameRunning) return; // 게임 오버 상태면 실행 안 함
 
-          // 대기 문구("Ready") 지우기
-          this.statusText.setText("");
+          this.statusText.setText(""); // 'Ready' 글자 지움
 
-          // ★ 다른 파일에 있는 'MiniGame1' 씬을 실행합니다.
-          // launch: 기존 MainScene을 끄지 않고 그 위에 겹쳐서 실행
-          // data: 미니게임에 현재 스피드와 MainScene의 참조(this)를 전달
-          this.scene.launch("MiniGame1", {
-            speedLevel: this.speedLevel,
-            parent: this,
+          // ★ 실행할 미니게임들의 Key 목록 ★
+          // 만들었던 게임들(OX, 객관식, 단답형)의 Key를 모두 여기에 적어야 랜덤으로 나옵니다.
+          const games = ["MiniShortGame1", "MiniOXGame1", "MiniMultiGame1"];
+
+          // 배열에서 랜덤으로 하나 선택
+          const randomKey = Phaser.Math.RND.pick(games);
+
+          // 선택된 미니게임 씬(Scene) 실행 (launch)
+          // launch는 MainScene을 끄지 않고 위에 겹쳐서 실행합니다.
+          this.scene.launch(randomKey, {
+            speedLevel: this.speedLevel, // 현재 스피드 정보를 넘겨줌
+            parent: this, // ★ 중요: MainScene 자신을 넘겨줘서 미니게임이 결과를 보고할 수 있게 함
           });
 
-          console.log(`MiniGame Launched! Speed: ${this.speedLevel}`);
+          console.log(`Launched: ${randomKey}, Speed: ${this.speedLevel}`);
         }
 
-        // [콜백 함수] 미니게임이 끝나면 결과를 받아 처리하는 함수
-        // MiniGame1.js에서 이 함수를 호출해줍니다.
+        /**
+         * 3. handleMiniGameResult(): 미니게임 결과 처리 함수
+         * - 미니게임(MiniGame1.js 등)에서 게임이 끝나면 이 함수를 호출합니다.
+         * @param {boolean} isSuccess - 성공(true) / 실패(false)
+         */
         handleMiniGameResult(isSuccess) {
           if (isSuccess) {
             this.handleSuccess();
@@ -136,69 +161,82 @@
           }
         }
 
-        // 성공 처리 로직
+        /**
+         * 4. handleSuccess(): 성공했을 때의 로직
+         */
         handleSuccess() {
-          this.consecutiveWins++; // 연속 성공 증가
-          if (this.score < 999) this.score++; // 점수 증가 (최대 999)
+          this.consecutiveWins++; // 연속 성공 횟수 증가
+          if (this.score < 999) this.score++; // 점수 1점 증가 (최대 999)
 
-          this.updateScoreUI();
-          this.gameBox.setFillStyle(0xffff00); // 박스 노란색 (성공 피드백)
+          this.updateScoreUI(); // 점수판 업데이트
+
+          // 시각적 피드백: 박스 노란색, SUCCESS 텍스트
+          this.gameBox.setFillStyle(0xffff00);
           this.statusText.setText("SUCCESS");
           this.statusText.setColor("#000000");
 
-          // 스피드 업 조건 체크 (5연승 시)
+          // [스피드 업 체크] 5번 연속 성공하면 레벨 업
           if (this.consecutiveWins >= 5) {
-            this.consecutiveWins = 0;
+            this.consecutiveWins = 0; // 카운트 초기화
             if (this.speedLevel < 5) {
-              this.speedLevel++;
-              this.speedText.setText(`SPEED: ${this.speedLevel}`);
+              this.speedLevel++; // 속도 레벨 증가
+              this.speedText.setText(`SPEED: ${this.speedLevel}`); // UI 갱신
             }
           }
 
-          // 2초 대기 후 다음 게임 준비 (resetAndNext)
-          this.time.delayedCall(2000, this.resetAndNext, [], this);
+          // 5초 대기 후 다음 라운드 준비 (resetAndNext 호출)
+          this.time.delayedCall(5000, this.resetAndNext, [], this);
         }
 
-        // 실패 처리 로직
+        /**
+         * 5. handleFail(): 실패했을 때의 로직
+         */
         handleFail() {
-          this.lives--; // 생명 감소
-          this.consecutiveWins = 0; // 연속 성공 초기화
+          this.lives--; // 생명 1 감소
+          this.consecutiveWins = 0; // 연속 성공 기록 초기화
 
-          this.gameBox.setFillStyle(0x0000ff); // 박스 파란색 (실패 피드백)
+          // 시각적 피드백: 박스 파란색, FAILED 텍스트
+          this.gameBox.setFillStyle(0x0000ff);
           this.statusText.setText("FAILED");
           this.statusText.setColor("#FFFFFF");
 
-          // 깎인 하트를 검은색으로 변경
+          // 깎인 하트(맨 오른쪽부터)를 검은색으로 변경
           const deadHeartIdx = 3 - this.lives - 1;
           if (deadHeartIdx >= 0 && deadHeartIdx < 3) {
             this.drawHeart(this.hearts[deadHeartIdx], 0x000000);
           }
 
-          // 생명이 0이면 게임 오버, 아니면 다음 판 진행
+          // 생명이 0 이하면 Game Over, 아니면 다음 판 진행
           if (this.lives <= 0) {
-            this.time.delayedCall(2000, this.gameOver, [], this);
+            this.time.delayedCall(5000, this.gameOver, [], this);
           } else {
-            this.time.delayedCall(2000, this.resetAndNext, [], this);
+            this.time.delayedCall(5000, this.resetAndNext, [], this);
           }
         }
 
-        // 다음 게임을 위한 상태 리셋 함수
+        /**
+         * 6. resetAndNext(): 다음 판을 위해 화면을 정리하는 함수
+         */
         resetAndNext() {
-          this.gameBox.setFillStyle(0xffffff); // 박스 다시 흰색
-          this.statusText.setText("Ready...");
+          this.gameBox.setFillStyle(0xffffff); // 박스 다시 흰색으로
+          this.statusText.setText("Ready..."); // Ready 텍스트 표시
           this.statusText.setColor("#000000");
 
-          // 1초 대기 후 다시 미니게임 실행
-          this.time.delayedCall(1000, this.startMiniGame, [], this);
+          // 2초 대기 후 다시 미니게임 랜덤 실행
+          this.time.delayedCall(2000, this.startMiniGame, [], this);
         }
 
-        // 점수 UI 업데이트 (001, 010 형태 유지)
+        /**
+         * [UI 업데이트] 점수를 001, 010 형태로 변환하여 표시
+         */
         updateScoreUI() {
           const scoreStr = String(this.score).padStart(3, "0");
           this.scoreText.setText(scoreStr);
         }
 
-        // 게임 오버 처리
+        /**
+         * 7. gameOver(): 게임 오버 처리
+         */
         gameOver() {
           this.isGameRunning = false;
           this.gameBox.setFillStyle(0xffffff);
@@ -206,7 +244,9 @@
           this.statusText.setColor("#FF0000"); // 빨간 글씨
         }
 
-        // 화면 크기 변경 시 UI 재배치 (반응형)
+        /**
+         * [반응형 처리] 브라우저 크기가 바뀌면 UI 위치를 다시 잡아주는 함수
+         */
         resize(gameSize) {
           const width = gameSize.width;
           const height = gameSize.height;
@@ -215,7 +255,7 @@
           const centerX = width * 0.5;
           const centerY = height * 0.45;
 
-          // 각 요소 위치 업데이트
+          // 각 UI 요소 위치 업데이트
           this.scoreText.setPosition(width * 0.1, centerY);
           this.gameBox.setPosition(centerX, centerY);
           this.statusText.setPosition(centerX, centerY);
@@ -229,22 +269,22 @@
         }
       }
 
-      // Phaser 설정 객체
+      // --- [Phaser 게임 설정 객체] ---
       const config = {
-        type: Phaser.AUTO,
+        type: Phaser.AUTO, // 웹브라우저 환경에 맞춰 렌더러 자동 선택 (WebGL or Canvas)
         width: window.innerWidth,
         height: window.innerHeight,
         backgroundColor: "#FFFFFF",
         scale: {
-          mode: Phaser.Scale.RESIZE,
+          mode: Phaser.Scale.RESIZE, // 창 크기에 맞춰 게임 크기 자동 조절
           autoCenter: Phaser.Scale.CENTER_BOTH,
         },
-        // [중요] 사용할 Scene 목록 등록
-        // MainScene이 0번 인덱스이므로 먼저 실행되고, MiniGame1은 필요할 때 호출됨
-        scene: [MainScene, MiniGame1],
+        // ★ [중요] 게임에 사용할 모든 Scene을 여기에 등록해야 합니다 ★
+        // MainScene이 배열의 0번이므로 가장 먼저 실행됩니다.
+        scene: [MainScene, MiniMultiGame1, MiniOXGame1, MiniShortGame1],
       };
 
-      // 게임 인스턴스 생성
+      // 게임 인스턴스 생성 (여기서 게임이 시작됩니다)
       const game = new Phaser.Game(config);
     </script>
   </body>

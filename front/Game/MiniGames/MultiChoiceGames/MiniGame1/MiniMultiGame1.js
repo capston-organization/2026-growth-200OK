@@ -2,9 +2,9 @@
  * MiniGame1: 영어 단어 맞추기 (객관식)
  * 화면에 문제와 여러 개의 과녁(단어)을 띄우고 제한시간 내에 맞추는 게임
  */
-class MiniGame1 extends Phaser.Scene {
+class MiniMultiGame1 extends Phaser.Scene {
   constructor() {
-    super({ key: "MiniGame1" }); // 이 씬의 고유 키
+    super({ key: "MiniMultiGame1" }); // 이 씬의 고유 키
   }
 
   // init: MainScene에서 scene.launch로 넘겨준 데이터를 받는 곳
@@ -28,8 +28,8 @@ class MiniGame1 extends Phaser.Scene {
     this.background.setDepth(0); // 가장 뒤쪽에 배치
 
     // 3. 타이머 설정 (스피드 레벨에 따라 시간 단축)
-    // Lv1: 8초, Lv2: 7초 ... Lv5: 4초 (최소 4초 보장)
-    let durationSec = 8 - (this.speedLevel - 1);
+    // Lv1: 7초, Lv2: 6초 ... Lv5: 4초 (최소 4초 보장)
+    let durationSec = 7 - (this.speedLevel - 1);
     if (durationSec < 4) durationSec = 4;
 
     this.totalTime = durationSec * 1000; // 밀리초 변환
