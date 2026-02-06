@@ -1,411 +1,481 @@
 /**
- * MiniOXGame1: 와리오웨어 스타일의 문법 OX 퀴즈 미니게임
- * * [게임 규칙]
- * 1. 화면 중앙 상단 검은 박스(컨베이어 벨트)에서 흰색 직사각형들이 지나갑니다.
- * 2. 특정 타이밍에 '영어 문장'이 적힌 직사각형이 지나갑니다.
- * 3. 플레이어는 문법이 맞으면 O, 틀리면 X 버튼을 누릅니다.
- * 4. 정답/오답 여부를 선택해도 게임은 멈추지 않고 타이머가 0이 될 때까지 진행됩니다.
- * 5. 타이머가 종료되면 메인 씬(MainScene)으로 결과를 반환하고 종료합니다.
+ * MiniOXGame1.js
+ * -------------------------------------------------------------------------
+ * [게임 설명]
+ * - 우주선 창문 밖으로 패널들이 흘러가는 OX 퀴즈 게임입니다.
+ * - 정해진 시간 내에 문법에 맞는 문장인지 판단하여 O/X 버튼을 눌러야 합니다.
+ *
+ * [주요 로직]
+ * 1. Layer 시스템: 배경(우주) -> 패널(문제) -> 배경(창틀) -> UI 순서로 겹쳐 보입니다.
+ * 2. Spawn 로직: 일반 패널(장식)이 나오다가 특정 확률이나 시간 임박 시 문제(Sentence)가 나옵니다.
+ * 3. 반응형 로직: 화면 크기가 변하면 'resize' 이벤트가 발생하여 모든 요소의 위치와 크기를 재조정합니다.
+ * -------------------------------------------------------------------------
  */
-
 class MiniOXGame1 extends Phaser.Scene {
   constructor() {
     super({ key: "MiniOXGame1" });
   }
 
-  /**
-   * init: 장면이 시작되기 전 데이터를 받아오는 단계
-   * @param {object} data - MainScene에서 전달받은 데이터 (speedLevel, parent 등)
-   */
+  // =================================================================
+  // [Init] 데이터 및 초기 설정
+  // =================================================================
   init(data) {
-    this.mainScene = data.parent; // 결과를 보고할 메인 씬 참조
-    this.speedLevel = data.speedLevel || 1; // 난이도 조절용 속도 값
+    // 부모 씬(메인 게임)과의 연동 데이터
+    this.mainScene = data.parent;
+    this.speedLevel = data.speedLevel || 1;
+
+    // ★ [반응형 기준점]
+    // 1280x720 해상도에서 작업한 수치들이 1.0 스케일이라고 가정합니다.
+    this.baseWidth = 1280;
+    this.baseHeight = 720;
+    this.globalScale = 1; // 화면 크기에 따라 변하는 비율 값
   }
 
-  /**
-   * create: 화면의 시각적 요소(배경, 버튼, 박스 등)를 배치하고 초기화하는 단계
-   */
+  // =================================================================
+  // [Preload] 이미지 리소스 로드
+  // =================================================================
+  preload() {
+    this.load.setPath("../../MiniGames/OXGames/MiniGame1/assets/");
+
+    // 1. 타이머 UI (게이지 바, 아이콘)
+    this.load.image("timerIcon", "Timer.png");
+    this.load.image("timerBarFrame", "TimerBar.png");
+
+    // 2. 배경 (우주 배경, 창틀 프레임)
+    this.load.image("background1", "Background1.png");
+    this.load.image("background2", "Background2.png");
+
+    // 3. 장식용 그래픽 (좌우 기계 장치, 상태 표시등)
+    this.load.image("leftGraphic", "LeftGraphic.png");
+    this.load.image("rightGraphic", "RightGraphicDefault.png");
+    this.load.image("lightGraphic", "Light.png");
+
+    // 4. 상태 변화 그래픽 (성공/실패 시 변경될 이미지들)
+    this.load.image("blueLightGraphic", "BlueLight.png"); // 정답 시 파란불
+    this.load.image("redLightGraphic", "RedLight.png"); // 오답 시 빨간불
+    this.load.image("rightGraphicSuccess", "RightGraphicSuccess.png");
+    this.load.image("rightGraphicFailed", "RightGraphicFailed.png");
+
+    // 5. 결과 팝업 (성공/실패 화면)
+    this.load.image("screenSuccess", "ScreenSuccess.png");
+    this.load.image("screenFailed", "ScreenFailed.png");
+
+    // 6. 컨트롤 버튼 (O / X 및 눌린 상태)
+    this.load.image("btnO", "OButton.png");
+    this.load.image("btnOPushed", "OButtonPushed.png");
+    this.load.image("btnX", "XButton.png");
+    this.load.image("btnXPushed", "XButtonPushed.png");
+
+    // 7. 지나가는 패널 (장식용 1~5번)
+    for (let i = 1; i <= 5; i++) {
+      this.load.image(`panel${i}`, `Panel${i}.png`);
+    }
+  }
+
+  // =================================================================
+  // [Create] 화면 객체 생성 및 배치
+  // =================================================================
   create() {
     const { width, height } = this.scale;
 
-    // ----------------------------------------------------------------
-    // 1. 기본 배경 및 타이머 설정
-    // ----------------------------------------------------------------
-    this.background = this.add.rectangle(
+    // 1. 배경 레이어 (Layer 0) - 흐르는 우주 배경
+    this.bg1 = this.add.tileSprite(
       width / 2,
       height / 2,
       width,
       height,
-      0xffffff, // 흰색 배경
+      "background1",
     );
-    this.background.setDepth(0); // 가장 뒤쪽에 배치
+    this.bg1.setDepth(0);
 
-    // 난이도(speedLevel)에 따른 제한 시간 설정 (레벨이 높을수록 시간이 짧아짐)
+    // 2. 게임 오브젝트 컨테이너 (Layer 1) - 패널과 문제가 지나가는 공간
+    // 창틀 뒤에 있어야 하므로 창틀보다 Depth가 낮아야 합니다.
+    this.gameContainer = this.add.container(0, 0);
+    this.gameContainer.setDepth(1);
+
+    // 3. 결과 화면 (Layer 1.5) - 창틀 뒤, 아이템보다는 앞
+    this.screenSuccess = this.add
+      .image(0, 0, "screenSuccess")
+      .setDepth(1.5)
+      .setVisible(false); // 처음엔 숨김
+    this.screenFailed = this.add
+      .image(0, 0, "screenFailed")
+      .setDepth(1.5)
+      .setVisible(false); // 처음엔 숨김
+
+    // 4. 창틀 프레임 (Layer 2) - 가장 앞에 있는 배경 요소
+    this.bg2 = this.add.image(width / 2, height / 2, "background2");
+    this.bg2.setDepth(2);
+
+    // 5. HUD 장식 (Layer 3) - 기계 장치들
+    this.lightGraphic = this.add.image(0, 0, "lightGraphic").setDepth(3);
+    this.leftGraphic = this.add.image(0, 0, "leftGraphic").setDepth(3);
+    this.rightGraphic = this.add.image(0, 0, "rightGraphic").setDepth(3);
+
+    // 6. 게임 로직 변수 설정
+    // 레벨에 따라 제한시간 설정 (최소 4초 보장)
     let durationSec = 8 - (this.speedLevel - 1);
-    if (durationSec < 4) durationSec = 4; // 최소 4초는 보장
+    if (durationSec < 4) durationSec = 4;
     this.totalTime = durationSec * 1000;
     this.timeLeft = this.totalTime;
 
-    // ----------------------------------------------------------------
-    // 2. 게임 상태 플래그 (Flag) 변수들
-    // ----------------------------------------------------------------
-    this.isGameActive = true; // true일 때만 update 루프가 동작함
-    this.isResolved = false; // 사용자가 O/X 버튼을 눌렀는지 여부 (중복 클릭 방지)
-    this.gameResult = false; // 최종 성공/실패 여부 저장
+    this.isGameActive = true; // 게임 진행 중 여부
+    this.isResolved = false; // 정답 제출 여부
+    this.gameResult = false; // 최종 결과 (성공/실패)
 
-    // ----------------------------------------------------------------
-    // 3. UI 레이아웃 구성
-    // ----------------------------------------------------------------
+    this.movingItems = []; // 현재 화면에 떠다니는 아이템 배열
+    this.isWaitingForNextSpawn = false; // 스폰 딜레이 체크
+    this.problemData = this.getProblem(); // 이번 판에 쓸 문제 가져오기
+    this.hasSentenceSpawned = false; // 문제가 이미 출제되었는지 체크
+
+    // 7. 조작 버튼 생성 (O/X)
+    this.createControlButtons();
+
+    // 8. 타이머 UI 생성 (Depth 100 - 최상단)
     this.uiContainer = this.add.container(0, 0);
-    this.uiContainer.setDepth(1);
+    this.uiContainer.setDepth(100);
+    this.createTimerUI();
 
-    // --- [중요] 중앙 상단 '컨베이어 벨트' 영역 (검은 박스) ---
-    const boxWidth = width * 0.85;
-    const boxHeight = height * 0.4;
-    const boxY = height * 0.35;
+    // 9. ★ 반응형 이벤트 등록
+    // 화면 크기가 바뀔 때마다 refreshLayout을 호출해 크기와 위치를 다시 잡습니다.
+    this.scale.on("resize", this.refreshLayout, this);
+    this.refreshLayout(); // 초기 실행으로 현재 화면에 맞춤
 
-    // [마스크(Mask) 생성]
-    // 이 마스크 영역 밖으로 나가는 아이템(흰색 직사각형)은 화면에 보이지 않게 잘라냅니다.
-    // 즉, 검은 박스 안에서만 아이템이 보이는 효과를 줍니다.
-    this.maskShape = this.make.graphics();
-    this.maskShape.fillStyle(0xffffff);
-    this.maskShape.fillRect(
-      width / 2 - boxWidth / 2,
-      boxY - boxHeight / 2,
-      boxWidth,
-      boxHeight,
-    );
-    const mask = this.maskShape.createGeometryMask();
-
-    // 검은색 배경 박스 그리기
-    this.conveyorBg = this.add.rectangle(
-      width / 2,
-      boxY,
-      boxWidth,
-      boxHeight,
-      0x000000,
-    );
-    this.conveyorBg.setDepth(10);
-
-    // 중앙의 흰색 기둥 (시각적 장식)
-    this.pillar = this.add.rectangle(width / 2, boxY, 20, boxHeight, 0xffffff);
-    this.pillar.setDepth(30);
-
-    // --- [아이템 관리 변수] ---
-    this.movingItems = []; // 현재 화면에 떠다니는 아이템들을 담을 배열
-    this.conveyorY = boxY;
-    this.conveyorBoxSize = { w: boxWidth, h: boxHeight }; // 나중에 아이템 크기 계산용
-    this.itemMask = mask; // 아이템 생성 시 적용할 마스크
-
-    // 문제 데이터 준비
-    this.problemData = this.getProblem();
-    this.hasSentenceSpawned = false; // "문제가 적힌 박스"가 이미 나왔는지 체크
-
-    // 아이템 순차 생성 제어용 플래그
-    this.isWaitingForNextSpawn = false;
-
-    // 게임 시작 시 첫 번째 아이템 바로 생성
+    // 첫 번째 아이템(패널) 생성 시작
     this.spawnConveyorItem();
-
-    // ----------------------------------------------------------------
-    // 4. 하단 컨트롤러 (O / X 버튼)
-    // ----------------------------------------------------------------
-    const btnY = height * 0.75;
-    const btnGap = width * 0.2;
-
-    // O 버튼 (파란색)
-    this.btnO = this.add.circle(width / 2 - btnGap, btnY, 50, 0x0000ff);
-    this.btnO.setDepth(10);
-    this.btnO.setInteractive(); // 클릭 가능하게 설정
-    this.textO = this.add
-      .text(this.btnO.x, this.btnO.y, "O", {
-        fontSize: "40px",
-        color: "#fff",
-        fontStyle: "bold",
-      })
-      .setOrigin(0.5)
-      .setDepth(11);
-
-    // X 버튼 (빨간색)
-    this.btnX = this.add.circle(width / 2 + btnGap, btnY, 50, 0xff0000);
-    this.btnX.setDepth(10);
-    this.btnX.setInteractive();
-    this.textX = this.add
-      .text(this.btnX.x, this.btnX.y, "X", {
-        fontSize: "40px",
-        color: "#fff",
-        fontStyle: "bold",
-      })
-      .setOrigin(0.5)
-      .setDepth(11);
-
-    // 클릭 이벤트 연결
-    this.btnO.on("pointerdown", () => this.handleAnswer(true));
-    this.btnX.on("pointerdown", () => this.handleAnswer(false));
-
-    // ----------------------------------------------------------------
-    // 5. 하단 타이머 바 (남은 시간 표시)
-    // ----------------------------------------------------------------
-    this.timerBarBg = this.add
-      .rectangle(width * 0.5, height * 0.95, width * 0.9, 20, 0xcccccc)
-      .setOrigin(0.5);
-    this.timerBarFill = this.add
-      .rectangle(width * 0.05, height * 0.95, width * 0.9, 20, 0xff0000)
-      .setOrigin(0, 0.5);
-
-    // 화면 크기가 변하면 resize 함수 호출
-    this.scale.on("resize", this.resize, this);
   }
 
-  /**
-   * update: 매 프레임마다 실행되는 게임 루프
-   * @param {number} time - 현재 시간
-   * @param {number} delta - 이전 프레임과의 시간 차이(ms)
-   */
+  // O, X 버튼 생성 및 이벤트 연결
+  createControlButtons() {
+    this.btnO = this.add.sprite(0, 0, "btnO").setInteractive().setDepth(50);
+    this.btnX = this.add.sprite(0, 0, "btnX").setInteractive().setDepth(50);
+
+    this.btnO.on("pointerdown", () => this.handleAnswer(true));
+    this.btnX.on("pointerdown", () => this.handleAnswer(false));
+  }
+
+  // 상단 타이머 바 생성
+  createTimerUI() {
+    this.timerBarFrame = this.add.image(0, 0, "timerBarFrame");
+    this.timerFillContainer = this.add.container(0, 0);
+
+    // 빨간색 게이지 바
+    this.timerBarFill = this.add
+      .rectangle(0, 0, 100, 10, 0xff0000)
+      .setOrigin(0, 0.5); // 왼쪽 정렬
+    this.timerFillContainer.add(this.timerBarFill);
+
+    this.timerIcon = this.add.image(0, 0, "timerIcon");
+    this.timerText = this.add
+      .text(0, 0, "", {
+        fontSize: "40px",
+        color: "#ffffff",
+        fontFamily: "Nunito",
+        fontWeight: "bold",
+      })
+      .setOrigin(0.55, 0.55);
+
+    // 컨테이너에 묶어서 관리
+    this.uiContainer.add([
+      this.timerBarFrame,
+      this.timerFillContainer,
+      this.timerIcon,
+      this.timerText,
+    ]);
+  }
+
+  // =================================================================
+  // [Update] 매 프레임 실행 (게임 루프)
+  // =================================================================
   update(time, delta) {
-    // 1. 게임 종료 상태라면 아무것도 하지 않음 (안전장치)
     if (!this.isGameActive) return;
 
-    // 2. 타이머 감소 로직 (버튼을 눌렀어도 시간은 계속 흐릅니다!)
+    // 1. 우주 배경 스크롤 (왼쪽으로 흐름)
+    this.bg1.tilePositionX -= 0.5;
+
+    // 2. 타이머 차감 및 UI 업데이트
     this.timeLeft -= delta;
-
-    // 타이머 바 길이 시각화 (비율 계산)
     const ratio = Math.max(0, this.timeLeft / this.totalTime);
-    this.timerBarFill.width = this.scale.width * 0.9 * ratio;
+    this.timerBarFill.width = this.timerBarFill.maxWidth * ratio; // 게이지 길이 조절
 
-    // 3. 시간이 다 됐을 때 처리 (게임 종료)
+    const secondsLeft = Math.ceil(this.timeLeft / 1000);
+    this.timerText.setText(secondsLeft);
+    this.updateTimerColor(secondsLeft); // 3초 이하면 색상 변경
+
+    // 3. 시간 종료 처리
     if (this.timeLeft <= 0) {
       this.timeLeft = 0;
-      this.finishGame(); // 여기서 메인 게임으로 결과를 보내고 종료
+      this.timerText.setText(0);
+      if (!this.isResolved) this.gameResult = false; // 시간 내 못 풀면 실패
+      this.finishGame();
       return;
     }
 
-    // 4. 아이템 이동 및 화면 밖 삭제 로직
-    const moveSpeed = this.scale.width * 0.8 * (delta / 1000); // 이동 속도
+    // 4. 아이템 이동 (패널/문제)
+    // 반응형 대응: 화면 너비에 비례한 속도로 이동
+    const moveSpeed = this.scale.width * 0.5 * (delta / 1000);
 
-    // 배열을 역순으로 순회합니다 (삭제 시 인덱스 오류 방지)
+    // 배열 역순회 (삭제 시 인덱스 오류 방지)
     for (let i = this.movingItems.length - 1; i >= 0; i--) {
       let item = this.movingItems[i];
       item.x += moveSpeed;
 
-      // ★ [핵심] 자연스러운 삭제 조건
-      // 아이템의 중심점(x)에서 절반 너비(halfWidth)를 뺀 값, 즉 '왼쪽 꼬리'가
-      // 화면 오른쪽 끝을 완전히 넘어갔을 때만 삭제합니다.
-      // 이렇게 해야 긴 문장 박스가 툭 하고 사라지지 않고 부드럽게 퇴장합니다.
-      if (item.x - item.halfWidth > this.scale.width + 100) {
-        item.destroy(); // 화면에서 객체 제거
-        this.movingItems.splice(i, 1); // 배열에서 데이터 제거
+      // 화면 오른쪽 끝을 벗어나면 삭제
+      if (item.x - (item.width * item.scaleX) / 2 > this.scale.width + 100) {
+        item.destroy();
+        this.movingItems.splice(i, 1);
       }
     }
 
-    // 5. 다음 아이템 생성 관리 (순차적 생성)
-    // 화면에 움직이는 아이템이 하나도 없고, 생성 대기 중도 아니라면?
+    // 5. 다음 아이템 스폰 관리
     if (this.movingItems.length === 0 && !this.isWaitingForNextSpawn) {
       this.isWaitingForNextSpawn = true;
-
-      // 랜덤 딜레이 후 생성 (0.8 ~ 1.8초)
-      const randomDelay = Phaser.Math.Between(600, 1200);
+      const randomDelay = Phaser.Math.Between(500, 1000);
 
       this.time.delayedCall(randomDelay, () => {
         if (this.isGameActive) {
-          this.spawnConveyorItem(); // 새 아이템 생성
-          this.isWaitingForNextSpawn = false; // 대기 해제
+          this.spawnConveyorItem();
+          this.isWaitingForNextSpawn = false;
         }
       });
     }
   }
 
-  /**
-   * spawnConveyorItem: 컨베이어 벨트에 새로운 흰색 직사각형(아이템)을 생성
-   */
+  // 남은 시간에 따라 타이머 텍스트 색상 변경
+  updateTimerColor(seconds) {
+    if (seconds <= 1)
+      this.timerText.setColor("#ff0000"); // 빨강
+    else if (seconds === 2)
+      this.timerText.setColor("#ffa500"); // 주황
+    else if (seconds === 3)
+      this.timerText.setColor("#ffff00"); // 노랑
+    else this.timerText.setColor("#ffffff"); // 흰색
+  }
+
+  // =================================================================
+  // [Logic] 아이템(패널/문제) 생성 로직
+  // =================================================================
   spawnConveyorItem() {
     let isProblem = false;
 
-    // --- 문제 출제 여부 결정 로직 ---
-    // 1. 아직 문제를 안 냈는데 시간이 4.5초 이하로 남았다면? -> 강제 출제 (무조건 나옴)
-    if (!this.hasSentenceSpawned && this.timeLeft <= 4500) {
+    // 조건 1: 시간이 4.5초 이하로 남았는데 아직 문제가 안 나왔으면 강제 출제
+    if (!this.hasSentenceSpawned && this.timeLeft <= 4500) isProblem = true;
+    // 조건 2: 40% 확률로 문제 출제
+    else if (!this.hasSentenceSpawned && Phaser.Math.Between(0, 100) < 40)
       isProblem = true;
-    }
-    // 2. 아직 문제를 안 냈고, 랜덤 확률(40%)에 당첨됐다면? -> 출제
-    else if (!this.hasSentenceSpawned && Phaser.Math.Between(0, 100) < 40) {
-      isProblem = true;
-    }
 
-    // 아이템 기본 크기 설정
-    let itemWidth = this.conveyorBoxSize.w * 0.55;
-    const itemHeight = this.conveyorBoxSize.h * 0.7;
+    const { width, height } = this.scale;
+    const boxY = height * 0.35; // 화면 높이의 35% 지점에 배치
 
-    let textObj = null;
+    // 화면 왼쪽 바깥에서 시작
+    const container = this.add.container(-300, boxY);
 
-    // 이번에 문제를 낼 차례라면?
+    // ★ [반응형 적용] 컨테이너에 scale을 적용하면 내부 자식들도 함께 커짐
+    container.setScale(this.globalScale);
+
     if (isProblem) {
-      this.hasSentenceSpawned = true; // "문제 냈음" 체크
+      // [경우 A] 퀴즈 문제 출제
+      this.hasSentenceSpawned = true;
 
-      // 텍스트 객체 미리 생성 (길이 측정을 위해)
-      const fontSizeVal = Math.floor(itemHeight * 0.4);
-      textObj = this.add
+      // 텍스트 너비 측정을 위한 임시 객체
+      const tempText = this.add
         .text(0, 0, this.problemData.sentence, {
-          fontSize: `${fontSizeVal}px`,
+          fontSize: "32px",
           color: "#000",
-          fontFamily: "Arial",
-          fontStyle: "bold",
+          fontWeight: "bold",
+        })
+        .setVisible(false);
+
+      const itemWidth = tempText.width + 60; // 여백 포함 너비
+      const itemHeight = 100;
+      tempText.destroy();
+
+      // 흰색 배경 박스
+      const bg = this.add.rectangle(0, 0, itemWidth, itemHeight, 0xffffff);
+      bg.setStrokeStyle(2, 0x000000);
+
+      // 실제 텍스트
+      const text = this.add
+        .text(0, 0, this.problemData.sentence, {
+          fontSize: "32px",
+          color: "#000",
+          fontWeight: "bold",
+          fontFamily: "Nunito",
         })
         .setOrigin(0.5);
 
-      // 만약 텍스트가 기본 박스보다 길다면, 박스 크기를 텍스트에 맞춰 늘림
-      if (textObj.width + 60 > itemWidth) {
-        itemWidth = textObj.width + 60;
-      }
+      container.add([bg, text]);
+      container.width = itemWidth; // 원본 너비 저장 (충돌 체크용)
+    } else {
+      // [경우 B] 단순 장식용 패널 생성
+      const panelKey = `panel${Phaser.Math.Between(1, 5)}`;
+      const panelImg = this.add.image(0, 0, panelKey);
+
+      // 패널은 원래 이미지보다 작게(0.4배) 표시
+      panelImg.setScale(0.4);
+
+      container.add(panelImg);
+      container.width = panelImg.width * 0.3;
     }
 
-    // 시작 위치: 화면 왼쪽 바깥 (너비만큼 뒤에서 시작해야 자연스럽게 등장)
-    const startX = -itemWidth;
-    const startY = this.conveyorY;
-
-    // [Container 사용] 박스(Rect)와 텍스트(Text)를 하나의 그룹으로 묶음
-    const container = this.add.container(startX, startY);
-    container.setDepth(20);
-    container.setMask(this.itemMask); // 마스크 적용 (검은 박스 안에서만 보임)
-
-    // ★ [삭제 로직을 위한 핵심 데이터 저장]
-    // 나중에 update에서 '왼쪽 꼬리' 위치를 계산하기 위해 절반 너비를 저장해둡니다.
-    container.halfWidth = itemWidth / 2;
-
-    // 흰색 배경 사각형 추가
-    const rect = this.add.rectangle(0, 0, itemWidth, itemHeight, 0xffffff);
-    container.add(rect);
-
-    // 텍스트가 있다면 컨테이너에 추가
-    if (textObj) {
-      container.add(textObj);
-    }
-
-    // 씬에 추가하고 관리 배열에 등록
-    this.add.existing(container);
+    this.gameContainer.add(container);
     this.movingItems.push(container);
   }
 
-  /**
-   * getProblem: 랜덤한 문제 데이터 하나를 반환
-   */
+  // 랜덤한 문제 데이터 반환
   getProblem() {
     const problems = [
-      { sentence: "She were happy because she are a girls.", isCorrect: false },
-      {
-        sentence: "He want to play basketball.",
-        isCorrect: true, // (참고: 문법적으로 틀린 문장이지만 코드 원본 데이터 유지)
-      },
-      {
-        sentence: "They runs fastly but they can't walking.",
-        isCorrect: false,
-      },
+      { sentence: "She were happy.", isCorrect: false },
       { sentence: "I am a boy.", isCorrect: true },
-      { sentence: "Cat can't fly.", isCorrect: false },
-      { sentence: "Sun is very hot.", isCorrect: true },
+      { sentence: "They runs fast.", isCorrect: false },
+      { sentence: "Cat can't fly.", isCorrect: true },
+      { sentence: "He don't like it.", isCorrect: false },
     ];
     return Phaser.Utils.Array.GetRandom(problems);
   }
 
-  /**
-   * handleAnswer: 사용자가 O 또는 X 버튼을 눌렀을 때 처리
-   * @param {boolean} userChoseO - 사용자가 O를 눌렀으면 true, X면 false
-   */
+  // =================================================================
+  // [Interaction] 정답 버튼 처리
+  // =================================================================
   handleAnswer(userChoseO) {
-    // 1. 이미 답을 골랐거나(isResolved), 게임이 끝났다면 무시 (중복 클릭 방지)
     if (this.isResolved || !this.isGameActive) return;
 
-    this.isResolved = true; // "답변 완료" 상태로 변경
-
-    // 2. 버튼 클릭 시각 효과 (선택한 버튼 색을 진하게 변경)
-    if (userChoseO) this.btnO.setFillStyle(0x000088);
-    else this.btnX.setFillStyle(0x880000);
-
-    // 3. 정답 판별
+    this.isResolved = true; // 중복 클릭 방지
     const isCorrect = userChoseO === this.problemData.isCorrect;
 
-    // 4. 결과에 따른 배경색 변경 (성공/실패 피드백)
-    // ★ 주의: 여기서 게임을 멈추지 않습니다! 배경색만 바꾸고 시간은 계속 흐르게 둡니다.
+    // 버튼 눌림 시각 효과 (이미지 교체 및 회색 틴트)
+    if (userChoseO) this.btnO.setTexture("btnOPushed").setTint(0xaaaaaa);
+    else this.btnX.setTexture("btnXPushed").setTint(0xaaaaaa);
+
     if (isCorrect) {
-      this.gameResult = true; // 결과: 성공
-      this.background.setFillStyle(0xffff00); // 노란 배경
+      // 정답 처리
+      this.gameResult = true;
+      this.screenSuccess.setVisible(true); // 성공 화면 표시
+      this.lightGraphic.setTexture("blueLightGraphic"); // 파란불
+      this.rightGraphic.setTexture("rightGraphicSuccess"); // 성공 장식
     } else {
-      this.gameResult = false; // 결과: 실패
-      this.background.setFillStyle(0xff0000); // 붉은 배경
+      // 오답 처리
+      this.gameResult = false;
+      this.screenFailed.setVisible(true); // 실패 화면 표시
+      this.lightGraphic.setTexture("redLightGraphic"); // 빨간불
+      this.rightGraphic.setTexture("rightGraphicFailed"); // 실패 장식
     }
   }
 
-  /**
-   * finishGame: 시간이 완전히 종료(0초)되었을 때 호출
-   */
+  // 게임 종료 및 결과 전송
   finishGame() {
-    this.isGameActive = false; // 게임 루프 정지
+    this.isGameActive = false;
+    this.scale.off("resize", this.refreshLayout, this); // 리사이즈 리스너 해제
 
-    // 만약 시간이 다 될 때까지 버튼을 한 번도 안 눌렀다면? -> 실패 처리
     if (!this.isResolved) {
-      this.gameResult = false;
-      this.background.setFillStyle(0xff0000); // 실패 피드백 (붉은색)
+      this.gameResult = false; // 타임아웃 등 미해결 시 실패 처리
     }
 
-    // 리사이즈 이벤트 리스너 해제 (메모리 누수 방지)
-    this.scale.off("resize", this.resize, this);
-
-    // MainScene에 최종 결과(true/false)를 보고하고 씬을 종료
+    // 메인 씬으로 결과 전달
     if (this.mainScene && this.mainScene.handleMiniGameResult) {
       this.mainScene.handleMiniGameResult(this.gameResult);
     }
     this.scene.stop();
   }
 
-  /**
-   * resize: 브라우저 창 크기가 바뀔 때 UI 요소들의 위치/크기를 재조정 (반응형)
-   */
-  resize(gameSize) {
-    const width = gameSize.width;
-    const height = gameSize.height;
+  // =================================================================
+  // [System] 반응형 레이아웃 재계산 (핵심)
+  // =================================================================
+  refreshLayout() {
+    const width = this.scale.width;
+    const height = this.scale.height;
 
-    // 배경 크기 재조정
-    this.background.setSize(width, height);
-    this.background.setPosition(width / 2, height / 2);
+    // 1. 스케일 비율 계산
+    // baseWidth(1280) 대비 현재 너비, baseHeight(720) 대비 현재 높이 중
+    // '더 작은 쪽' 비율을 선택(Math.min)하여 화면이 잘리지 않도록(Fit) 함
+    const scaleX = width / this.baseWidth;
+    const scaleY = height / this.baseHeight;
+    this.globalScale = Math.min(scaleX, scaleY);
 
-    // 검은 박스 크기 및 위치 재계산
-    const boxWidth = width * 0.85;
-    const boxHeight = height * 0.4;
-    const boxY = height * 0.35;
+    // 2. 배경(우주) 및 창틀(Background2) 크기 조정
+    // setSize: 타일 스프라이트 영역 크기 변경
+    this.bg1.setSize(width, height);
+    this.bg1.setPosition(width / 2, height / 2);
 
-    this.conveyorBoxSize = { w: boxWidth, h: boxHeight };
+    // setDisplaySize: 이미지를 강제로 화면 크기에 맞춤 (비율 무시하고 꽉 채움)
+    this.bg2.setDisplaySize(width, height);
+    this.bg2.setPosition(width / 2, height / 2);
 
-    this.conveyorBg.setPosition(width / 2, boxY);
-    this.conveyorBg.setSize(boxWidth, boxHeight);
-    this.conveyorY = boxY;
+    // 3. 결과 화면 (고정 수치 0.4 * 반응형 비율)
+    const resultScale = 0.4 * this.globalScale;
+    this.screenSuccess
+      .setPosition(width / 1.95, height / 2.5)
+      .setScale(resultScale);
+    this.screenFailed
+      .setPosition(width / 1.95, height / 2.5)
+      .setScale(resultScale);
 
-    this.pillar.setPosition(width / 2, boxY);
-    this.pillar.setSize(20, boxHeight);
+    // 4. 장식용 HUD (고정 수치 0.3 * 반응형 비율)
+    const decoScale = 0.3 * this.globalScale;
 
-    // 마스크 영역 재설정
-    if (this.maskShape) {
-      this.maskShape.clear();
-      this.maskShape.fillStyle(0xffffff);
-      this.maskShape.fillRect(
-        width / 2 - boxWidth / 2,
-        boxY - boxHeight / 2,
-        boxWidth,
-        boxHeight,
+    // 위치는 화면 비율(%)을 사용하여 배치
+    this.lightGraphic
+      .setPosition(width / 1.95, height * 0.05)
+      .setScale(decoScale);
+    this.leftGraphic
+      .setPosition(width * 0.08, height * 0.4)
+      .setScale(decoScale);
+    this.rightGraphic
+      .setPosition(width * 0.92, height * 0.5)
+      .setScale(decoScale);
+
+    // 5. 버튼 배치 (고정 수치 0.35 * 반응형 비율)
+    const btnScale = 0.35 * this.globalScale;
+    const btnY = height * 0.78; // 하단 78% 위치
+    const btnGap = width * 0.15; // 중앙에서 좌우로 15% 떨어짐
+
+    this.btnO.setPosition(width / 2 - btnGap, btnY).setScale(btnScale);
+    this.btnX.setPosition(width / 2 + btnGap, btnY).setScale(btnScale);
+
+    // 6. 타이머 UI 조정
+    const timerY = height * 0.92;
+    const timerBarWidth = width * 0.6; // 화면 너비의 60% 사용
+    const timerBarHeight = 60 * this.globalScale; // 높이도 비율에 맞춰 조절
+
+    this.timerBarFrame
+      .setPosition(width / 2 + 40 * this.globalScale, timerY)
+      .setDisplaySize(
+        timerBarWidth + 20 * this.globalScale,
+        timerBarHeight + 60 * this.globalScale,
       );
-    }
 
-    // 버튼 위치 재조정
-    const btnY = height * 0.75;
-    const btnGap = width * 0.2;
+    this.timerFillContainer.setPosition(
+      width / 2 + 40 * this.globalScale - timerBarWidth / 2,
+      timerY,
+    );
+    this.timerBarFill.setPosition(0, 0);
+    this.timerBarFill.setSize(
+      timerBarWidth,
+      timerBarHeight - 10 * this.globalScale,
+    );
+    this.timerBarFill.maxWidth = timerBarWidth; // 게이지 계산용 최대 너비 저장
 
-    this.btnO.setPosition(width / 2 - btnGap, btnY);
-    this.textO.setPosition(width / 2 - btnGap, btnY);
+    const iconX = width / 2 - timerBarWidth / 2 - 2 * this.globalScale;
+    const iconY = timerY - 3 * this.globalScale;
 
-    this.btnX.setPosition(width / 2 + btnGap, btnY);
-    this.textX.setPosition(width / 2 + btnGap, btnY);
+    this.timerIcon
+      .setPosition(
+        width / 2 - timerBarWidth / 2,
+        timerY - 20 * this.globalScale,
+      )
+      .setDisplaySize(118 * this.globalScale, 142 * this.globalScale);
 
-    // 타이머 바 재조정
-    this.timerBarBg.setPosition(width * 0.5, height * 0.95);
-    this.timerBarBg.setSize(width * 0.9, 20);
-    this.timerBarFill.setPosition(width * 0.05, height * 0.95);
+    this.timerText
+      .setPosition(iconX, iconY)
+      .setFontSize(`${40 * this.globalScale}px`);
+
+    // 7. [중요] 생성된 아이템들도 리사이즈 시 크기/위치 업데이트
+    this.movingItems.forEach((item) => {
+      // 아이템도 globalScale을 따라가도록 재설정
+      item.setScale(this.globalScale);
+
+      // 높이 위치도 화면 높이 비율에 맞게 재조정
+      item.y = height * 0.35;
+    });
   }
 }
