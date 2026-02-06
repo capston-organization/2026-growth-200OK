@@ -11,6 +11,12 @@
         overflow: hidden;
         background-color: white;
       }
+
+      @font-face {
+        font-family: "Nunito";
+        /* 경로가 정확한지 꼭 확인해주세요 */
+        src: url("../../common/Fonts/Nunito/static/Nunito-SemiBold.ttf");
+      }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
 
@@ -19,6 +25,16 @@
     <script src="../../MiniGames/OXGames/MiniGame1/MiniOXGame1.js"></script>
   </head>
   <body>
+    <div
+      style="
+        font-family: &quot;Nunito&quot;;
+        opacity: 0;
+        position: absolute;
+        pointer-events: none;
+      "
+    >
+      .
+    </div>
     <script>
       /**
        * [MainScene 클래스]
@@ -133,7 +149,7 @@
 
           // ★ 실행할 미니게임들의 Key 목록 ★
           // 만들었던 게임들(OX, 객관식, 단답형)의 Key를 모두 여기에 적어야 랜덤으로 나옵니다.
-          const games = ["MiniShortGame1", "MiniOXGame1", "MiniMultiGame1"];
+          const games = ["MiniShortGame1"];
 
           // 배열에서 랜덤으로 하나 선택
           const randomKey = Phaser.Math.RND.pick(games);
@@ -275,6 +291,7 @@
         width: window.innerWidth,
         height: window.innerHeight,
         backgroundColor: "#FFFFFF",
+        resolution: window.devicePixelRatio,
         scale: {
           mode: Phaser.Scale.RESIZE, // 창 크기에 맞춰 게임 크기 자동 조절
           autoCenter: Phaser.Scale.CENTER_BOTH,

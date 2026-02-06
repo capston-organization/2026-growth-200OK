@@ -1,235 +1,186 @@
 /**
  * [MiniShortGame1 클래스]
- * - 컨셉: 스마트폰 채팅 앱 스타일의 영어 단답형 퀴즈
- * - 흐름: 상대방이 질문(말풍선) -> 내가 빈칸이 뚫린 대답(말풍선) -> 키보드로 타이핑 -> 전송
- * - 특징: MainScene에서 호출되며, 성공/실패 여부를 다시 MainScene으로 보고함.
+ * -------------------------------------------------------------------------
+ * - 컨셉: 스마트폰 채팅 앱 스타일의 영어 단답형 퀴즈 게임
+ * - 흐름: 문제 표시 -> 타이머 진행 -> 정답 입력 -> (로딩 애니메이션) -> 결과 판정
+ * - 주요 특징:
+ * 1. 오답 시 빈칸을 '?'로 표시
+ * 2. 타이머 아이콘 위에 남은 초(Second) 표시 및 색상 변화 (흰->노->주->빨)
+ * 3. 결과 판정 전 '로딩 중' 애니메이션 연출 후 이모지 출력
+ * -------------------------------------------------------------------------
  */
 class MiniShortGame1 extends Phaser.Scene {
   constructor() {
-    // Scene의 고유 키(ID)를 설정합니다. MainScene에서 이 키로 호출합니다.
     super({ key: "MiniShortGame1" });
   }
 
-  /**
-   * [init: 데이터 수신]
-   * scene.launch('MiniShortGame1', data)를 통해 전달받은 데이터를 처리합니다.
-   * @param {object} data - { parent: MainScene인스턴스, speedLevel: 현재레벨 }
-   */
+  // [초기화] 상위 씬에서 전달받은 데이터(난이도 등) 처리
   init(data) {
-    this.mainScene = data.parent; // 결과 보고를 위해 부모 씬 저장
-    this.speedLevel = data.speedLevel || 1; // 레벨이 없으면 기본 1
+    this.mainScene = data.parent;
+    this.speedLevel = data.speedLevel || 1; // 기본 속도 레벨 1
   }
 
-  /**
-   * [create: 화면 구성 및 로직 초기화]
-   * 게임이 시작될 때 실행되는 메인 함수입니다.
-   */
+  // [에셋 로드] 게임에 필요한 이미지 리소스 불러오기
+  preload() {
+    this.load.setPath("../../MiniGames/ShortAnswerGames/MiniGame1/assets/");
+
+    // 기본 UI 이미지
+    this.load.image("background", "Background1.png");
+    this.load.image("smartScreen", "SmartScreen.png");
+    this.load.image("questionBubble", "Question.png");
+    this.load.image("answerBubble", "Answer.png");
+    this.load.image("emoBubble", "Emo.png");
+    this.load.image("inputBox", "InputBox.png");
+    this.load.image("submitButton", "SubmitButton.png");
+    this.load.image("timerIcon", "Timer.png");
+    this.load.image("timerBarFrame", "TimerBar.png");
+
+    // ★ [추가] 애니메이션 및 결과 이모지 리소스
+    this.load.image("loading1", "Loading1.png");
+    this.load.image("loading2", "Loading2.png");
+    this.load.image("loading3", "Loading3.png");
+    this.load.image("successEmo", "SuccessEmo.png");
+    this.load.image("failedEmo", "FailedEmo.png");
+  }
+
+  // [게임 생성] 화면 구성 및 로직 초기화
   create() {
-    const { width, height } = this.scale; // 현재 화면 크기
+    const { width, height } = this.scale;
 
-    // 1. 배경 설정 (성공: 노랑, 실패: 빨강으로 바뀌는 역할)
-    this.background = this.add.rectangle(
-      width / 2,
-      height / 2,
-      width,
-      height,
-      0xffffff, // 기본 흰색
-    );
-    this.background.setDepth(0); // 가장 뒤쪽에 배치
+    // 텍스트 폰트 설정 (기본 스타일)
+    this.inputTextDisplay = this.add
+      .text(0, 0, "", {
+        fontSize: "28px",
+        color: "#000000",
+        fontFamily: "Nunito",
+        fontWeight: "bold",
+      })
+      .setOrigin(0.5);
 
-    // 2. 타이머(제한시간) 설정
-    // 기본 8초에서 레벨당 1초씩 줄어듦 (최소 4초 보장)
+    // 1. 배경 설정
+    this.background = this.add.image(width / 2, height / 2, "background");
+    this.background.setDepth(-1); // 맨 뒤로 보냄
+
+    // 2. 타이머 로직 설정 (난이도에 따라 시간 조절)
     let durationSec = 8 - (this.speedLevel - 1);
-    if (durationSec < 4) durationSec = 4;
-    this.totalTime = durationSec * 1000; // 밀리초(ms) 단위 변환
+    if (durationSec < 4) durationSec = 4; // 최소 4초 보장
+    this.totalTime = durationSec * 1000;
     this.timeLeft = this.totalTime;
 
     // 게임 상태 플래그
-    this.isGameActive = true; // 타임오버 체크용
-    this.isResolved = false; // 이미 답을 제출했는지 체크
-    this.gameResult = false; // 최종 성공 여부
+    this.isGameActive = true; // 게임 진행 중 여부
+    this.isResolved = false; // 정답 제출 완료 여부
+    this.gameResult = false; // 최종 성공/실패 여부
 
-    // 문제 데이터 가져오기 (랜덤 선택)
+    // 문제 데이터 가져오기 & 입력 변수 초기화
     this.problemData = this.getProblem();
-    this.userInputValue = ""; // 사용자가 입력 중인 문자열
+    this.userInputValue = "";
 
-    // --- UI 컨테이너 생성 ---
-    // UI 요소들을 그룹으로 묶기 위해 컨테이너 사용 (좌표 0,0 기준)
+    // UI 컨테이너 (타이머 등을 담을 레이어 - 맨 위)
     this.uiContainer = this.add.container(0, 0);
+    this.uiContainer.setDepth(10);
 
-    // 3. 스마트폰 본체 그리기 (화면 중앙)
-    // 화면 크기에 따라 폰 크기도 반응형으로 조절
-    this.phoneWidth = width * 0.5;
-    if (this.phoneWidth < 300) this.phoneWidth = 300; // 너무 작아지지 않게 방지
-    this.phoneHeight = height * 0.7;
-
-    this.phoneX = width / 2;
-    this.phoneY = height * 0.45;
-
-    // 폰 배경 (회색빛) 및 테두리
-    this.phoneBody = this.add.rectangle(
-      0,
-      0,
-      this.phoneWidth,
-      this.phoneHeight,
-      0xe0e0eb,
-    );
-    this.phoneBody.setStrokeStyle(20, 0x000000); // 두꺼운 검은 테두리
-
-    // 폰 내부 요소들을 담을 컨테이너 (폰의 중심 좌표를 기준점(0,0)으로 삼음)
-    this.phoneContainer = this.add.container(this.phoneX, this.phoneY);
+    // 3. 스마트폰 본체 이미지 배치
+    this.phoneBody = this.add.image(0, 0, "smartScreen");
+    this.phoneContainer = this.add.container(0, 0);
     this.phoneContainer.add(this.phoneBody);
 
-    // 4. 채팅 말풍선 UI 생성 (질문 & 답변)
+    // ★ [추가] 로딩 애니메이션 정의 (0.6초간 3프레임 재생)
+    if (!this.anims.exists("loading_anim")) {
+      this.anims.create({
+        key: "loading_anim",
+        frames: [{ key: "loading1" }, { key: "loading2" }, { key: "loading3" }],
+        frameRate: 5, // 초당 5프레임
+        repeat: 1, // 1회 재생 + 1회 반복 = 총 2회 재생
+      });
+    }
+
+    // 4. 채팅 말풍선 UI 생성
     this.createChatBubbles();
 
-    // 5. 입력창 UI 생성 (텍스트 박스 & 전송 버튼)
+    // 5. 입력창 UI 생성
     this.createInputUI();
 
-    // 6. 타이머 바 생성 (화면 하단 붉은 게이지)
-    this.timerBarBg = this.add
-      .rectangle(width * 0.5, height * 0.95, width * 0.9, 20, 0xcccccc)
-      .setOrigin(0.5);
-    this.timerBarFill = this.add
-      .rectangle(width * 0.05, height * 0.95, width * 0.9, 20, 0xff0000)
-      .setOrigin(0, 0.5); // 왼쪽 정렬(Scale 조절을 위해)
+    // 6. 타이머 UI 생성 (바 + 아이콘 + 텍스트)
+    this.createTimerUI();
 
-    // 7. 키보드 입력 이벤트 연결
+    // 7. 키보드 입력 리스너 등록
     this.setupInputListener();
 
-    // 브라우저 크기 변경 시 UI 재배치 이벤트 연결
-    this.scale.on("resize", this.resize, this);
+    // 8. 레이아웃 배치 (반응형 대응)
+    this.refreshLayout();
+    this.scale.on("resize", this.refreshLayout, this);
   }
 
-  /**
-   * [UI] 말풍선(Chat Bubble) 생성
-   * - 상대방(질문): 좌측 상단, 흰색 배경
-   * - 나(답변): 우측 중단, 노란색 배경 (빈칸 포함)
-   */
+  // [UI] 채팅 말풍선 및 결과/로딩 이미지 생성
   createChatBubbles() {
-    // 말풍선 크기 및 위치 계산 (폰 크기 기준 상대 좌표)
-    const bubbleWidth = this.phoneWidth * 0.8;
-    const bubbleHeight = this.phoneHeight * 0.15;
-    const otherX = -this.phoneWidth / 2 + 20 + bubbleWidth / 2; // 왼쪽 정렬
-    const otherY = -this.phoneHeight / 3; // 위쪽 배치
-
-    // 상대방 말풍선 (흰색)
-    const otherBubbleBg = this.add.rectangle(
-      otherX,
-      otherY,
-      bubbleWidth,
-      bubbleHeight,
-      0xffffff,
-    );
-    otherBubbleBg.setStrokeStyle(2, 0x000000);
-
-    // 상대방 텍스트 (질문)
-    const otherText = this.add
-      .text(otherX, otherY, this.problemData.question, {
-        fontSize: "20px",
+    // 상대방 말풍선 (질문)
+    this.otherBubbleBg = this.add.image(0, 0, "questionBubble");
+    this.otherText = this.add
+      .text(0, 0, this.problemData.question, {
+        fontSize: "24px",
         color: "#000000",
-        fontFamily: "Arial",
+        fontFamily: "Nunito",
         align: "left",
-        wordWrap: { width: bubbleWidth - 20 }, // 자동 줄바꿈
+        wordWrap: { width: 100 },
       })
       .setOrigin(0.5);
 
-    // 내 말풍선 위치 계산
-    const myX = this.phoneWidth / 2 - 20 - bubbleWidth / 2; // 오른쪽 정렬
-    const myY = 0; // 중앙 배치
-
-    // 내 말풍선 (노란색)
-    const myBubbleBg = this.add.rectangle(
-      myX,
-      myY,
-      bubbleWidth,
-      bubbleHeight,
-      0xffff00,
-    );
-    myBubbleBg.setStrokeStyle(2, 0x000000);
-
-    // 내 텍스트 (빈칸이 뚫려있는 문장)
+    // 내 말풍선 (답변 빈칸 포함)
+    this.myBubbleBg = this.add.image(0, 0, "answerBubble");
     this.myTextObj = this.add
-      .text(myX, myY, this.problemData.displaySentence, {
-        fontSize: "20px",
+      .text(0, 0, this.problemData.displaySentence, {
+        fontSize: "24px",
         color: "#000000",
-        fontFamily: "Arial",
+        fontFamily: "Nunito",
         fontStyle: "bold",
         align: "right",
-        wordWrap: { width: bubbleWidth - 20 },
+        wordWrap: { width: 100 },
       })
       .setOrigin(0.5);
 
-    // 폰 컨테이너에 추가 (폰이 움직이면 같이 움직임)
+    // 결과/로딩용 말풍선 배경 (초기엔 숨김)
+    this.emoBubbleBg = this.add.image(0, 0, "emoBubble").setVisible(false);
+
+    // ★ [추가] 로딩 애니메이션 스프라이트 (초기엔 숨김)
+    this.loadingSprite = this.add.sprite(0, 0, "loading1").setVisible(false);
+
+    // ★ [추가] 성공/실패 이모지 이미지 (초기엔 숨김)
+    this.successEmo = this.add.image(0, 0, "successEmo").setVisible(false);
+    this.failedEmo = this.add.image(0, 0, "failedEmo").setVisible(false);
+
+    // 폰 컨테이너에 일괄 추가
     this.phoneContainer.add([
-      otherBubbleBg,
-      otherText,
-      myBubbleBg,
+      this.otherBubbleBg,
+      this.otherText,
+      this.myBubbleBg,
       this.myTextObj,
+      this.emoBubbleBg,
+      this.loadingSprite, // 로딩
+      this.successEmo, // 성공
+      this.failedEmo, // 실패
     ]);
   }
 
-  /**
-   * [UI] 입력창(Input UI) 생성
-   * - 흰색 텍스트 박스, 깜빡이는 커서, 전송 버튼
-   */
+  // [UI] 입력창, 커서, 전송 버튼 생성
   createInputUI() {
-    const inputAreaY = this.phoneHeight / 2 - 40; // 폰 하단부
-    const inputWidth = this.phoneWidth * 0.7;
-    const inputHeight = 40;
-    const inputX = -this.phoneWidth / 2 + 20 + inputWidth / 2;
-
-    // 입력창 배경
-    this.inputBg = this.add.rectangle(
-      inputX,
-      inputAreaY,
-      inputWidth,
-      inputHeight,
-      0xffffff,
-    );
-    this.inputBg.setStrokeStyle(2, 0x000000);
-
-    // 실제 입력된 텍스트가 표시될 객체
+    this.inputBg = this.add.image(0, 0, "inputBox");
     this.inputTextDisplay = this.add
-      .text(inputX, inputAreaY, "", {
-        fontSize: "24px",
+      .text(0, 0, "", {
+        fontSize: "28px",
         color: "#000000",
-        fontFamily: "Courier", // 코딩 폰트 (고정폭) 사용
+        fontFamily: "Nunito",
       })
       .setOrigin(0.5);
 
-    // 커서 (| 모양) - 깜빡임 효과용
+    // 커서 ('|' 모양)
     this.cursor = this.add
-      .text(inputX, inputAreaY, "|", {
-        fontSize: "24px",
-        color: "#000000",
-      })
+      .text(0, 0, "|", { fontSize: "28px", color: "#000000" })
       .setOrigin(0.5);
-    this.cursorTimer = 0;
+    this.cursorTimer = 0; // 커서 깜빡임 타이머
 
-    // 전송 버튼
-    const btnSize = 40;
-    const btnX = inputX + inputWidth / 2 + 10 + btnSize / 2;
-
-    this.sendBtnBg = this.add.rectangle(
-      btnX,
-      inputAreaY,
-      btnSize,
-      btnSize,
-      0xdddddd,
-    );
-    this.sendBtnBg.setStrokeStyle(2, 0x000000);
-
-    // 전송 아이콘 (▲)
-    this.sendIcon = this.add
-      .text(btnX, inputAreaY, "▲", {
-        fontSize: "20px",
-        color: "#000000",
-      })
-      .setOrigin(0.5);
-
-    // 마우스 클릭 이벤트 (전송 버튼 누름)
-    this.sendBtnBg.setInteractive();
+    // 전송 버튼 (클릭 시 정답 체크)
+    this.sendBtnBg = this.add.image(0, 0, "submitButton").setInteractive();
     this.sendBtnBg.on("pointerdown", () => this.checkAnswer());
 
     this.phoneContainer.add([
@@ -237,33 +188,58 @@ class MiniShortGame1 extends Phaser.Scene {
       this.inputTextDisplay,
       this.cursor,
       this.sendBtnBg,
-      this.sendIcon,
     ]);
   }
 
-  /**
-   * [Event] 키보드 입력 처리
-   * - Phaser의 input.keyboard 이벤트를 사용
-   */
+  // [UI] 타이머 바, 아이콘, 남은 시간 텍스트 생성
+  createTimerUI() {
+    this.timerBarFrame = this.add.image(0, 0, "timerBarFrame");
+    this.timerFillContainer = this.add.container(0, 0);
+
+    // 빨간색 게이지 바
+    this.timerBarFill = this.add
+      .rectangle(0, 0, 100, 10, 0xff0000)
+      .setOrigin(0, 0.5);
+    this.timerFillContainer.add(this.timerBarFill);
+
+    // 타이머 아이콘
+    this.timerIcon = this.add.image(0, 0, "timerIcon");
+
+    // ★ [추가] 타이머 텍스트 (아이콘 위에 초 표시)
+    this.timerText = this.add
+      .text(0, 0, "", {
+        fontSize: "40px",
+        color: "#ffffff",
+        fontFamily: "Nunito",
+      })
+      .setOrigin(0.55, 0.55);
+
+    // UI 컨테이너에 추가
+    this.uiContainer.add([
+      this.timerBarFrame,
+      this.timerFillContainer,
+      this.timerIcon,
+      this.timerText,
+    ]);
+  }
+
+  // [이벤트] 키보드 입력 처리
   setupInputListener() {
     this.input.keyboard.on("keydown", (event) => {
-      // 이미 끝났거나(Resolved) 타임오버면 입력 차단
+      // 게임 종료 상태면 입력 무시
       if (this.isResolved || !this.isGameActive) return;
 
-      // 1. Enter 키: 정답 제출
       if (event.key === "Enter") {
-        this.checkAnswer();
-      }
-      // 2. Backspace 키: 글자 지우기
-      else if (event.key === "Backspace") {
+        this.checkAnswer(); // 엔터키로 제출
+      } else if (event.key === "Backspace") {
+        // 백스페이스: 글자 지우기
         if (this.userInputValue.length > 0) {
           this.userInputValue = this.userInputValue.slice(0, -1);
           this.updateInputDisplay();
         }
-      }
-      // 3. 일반 문자 입력 (영문, 숫자만 허용)
-      else if (event.key.length === 1 && this.userInputValue.length < 15) {
-        const regex = /^[a-zA-Z0-9]$/; // 정규식: 알파벳 또는 숫자
+      } else if (event.key.length === 1 && this.userInputValue.length < 15) {
+        // 일반 문자 입력 (영문/숫자만 허용, 최대 15자)
+        const regex = /^[a-zA-Z0-9]$/;
         if (regex.test(event.key)) {
           this.userInputValue += event.key;
           this.updateInputDisplay();
@@ -272,60 +248,71 @@ class MiniShortGame1 extends Phaser.Scene {
     });
   }
 
-  /**
-   * [UI] 입력값 화면 갱신 및 커서 이동
-   */
+  // [UI] 입력된 텍스트 화면 갱신 및 커서 이동
   updateInputDisplay() {
     this.inputTextDisplay.setText(this.userInputValue);
-    // 텍스트 길이에 맞춰 커서를 글자 오른쪽 끝으로 이동
     const textWidth = this.inputTextDisplay.width;
+    // 커서를 텍스트 끝으로 이동
     this.cursor.x = this.inputTextDisplay.x + textWidth / 2 + 5;
   }
 
-  /**
-   * [Update Loop] 매 프레임마다 실행되는 함수
-   * @param {number} time - 현재 시간
-   * @param {number} delta - 이전 프레임과의 시간 차이(ms)
-   */
+  // [게임 루프] 매 프레임 실행
   update(time, delta) {
     if (!this.isGameActive) return;
 
-    // 1. 타이머 감소 로직
+    // 1. 타이머 시간 감소
     this.timeLeft -= delta;
-    const ratio = Math.max(0, this.timeLeft / this.totalTime); // 남은 비율 계산
-    this.timerBarFill.width = this.scale.width * 0.9 * ratio; // 게이지 바 너비 줄임
 
-    // 2. 시간 초과(Game Over) 체크
+    // 2. 게이지 바 길이 업데이트
+    const ratio = Math.max(0, this.timeLeft / this.totalTime);
+    this.timerBarFill.width = this.timerBarFill.maxWidth * ratio;
+
+    // ★ 3. 남은 시간 텍스트 및 색상 업데이트
+    const secondsLeft = Math.ceil(this.timeLeft / 1000);
+    this.timerText.setText(secondsLeft);
+    this.updateTimerColor(secondsLeft);
+
+    // 4. 시간 초과 체크
     if (this.timeLeft <= 0) {
       this.timeLeft = 0;
+      this.timerText.setText(0); // 0초로 고정
+
       if (!this.isResolved) {
-        // 아직 답을 못 냈는데 시간이 다 됨 -> 실패
-        this.handleFail();
+        this.gameResult = false; // 미제출 시 실패 처리
       }
       this.finishGame();
       return;
     }
 
-    // 3. 커서 깜빡임 효과 (0.5초 간격)
+    // 5. 커서 깜빡임 효과 (0.5초 주기)
     if (!this.isResolved) {
       this.cursorTimer += delta;
       if (this.cursorTimer > 500) {
-        this.cursor.setVisible(!this.cursor.visible); // 보였다 안 보였다 토글
+        this.cursor.setVisible(!this.cursor.visible);
         this.cursorTimer = 0;
       }
     } else {
-      this.cursor.setVisible(false); // 게임 끝나면 커서 숨김
+      this.cursor.setVisible(false); // 제출 후엔 커서 숨김
     }
   }
 
-  /**
-   * [Logic] 정답 체크 로직
-   */
-  checkAnswer() {
-    if (this.isResolved) return; // 중복 제출 방지
+  // ★ [헬퍼] 남은 초에 따라 타이머 글씨 색 변경 (흰->노->주->빨)
+  updateTimerColor(seconds) {
+    if (seconds <= 1)
+      this.timerText.setColor("#ff0000"); // 1초 이하: 빨강
+    else if (seconds === 2)
+      this.timerText.setColor("#ffa500"); // 2초: 주황
+    else if (seconds === 3)
+      this.timerText.setColor("#ffff00"); // 3초: 노랑
+    else this.timerText.setColor("#ffffff"); // 그 외: 흰색
+  }
 
-    this.isResolved = true; // 제출 완료 플래그
-    const userAnswer = this.userInputValue.trim().toLowerCase(); // 소문자로 변환하여 비교
+  // [로직] 정답 체크
+  checkAnswer() {
+    if (this.isResolved) return; // 이미 제출했으면 무시
+
+    this.isResolved = true;
+    const userAnswer = this.userInputValue.trim().toLowerCase();
     const correctAnswer = this.problemData.answer.toLowerCase();
 
     if (userAnswer === correctAnswer) {
@@ -335,114 +322,240 @@ class MiniShortGame1 extends Phaser.Scene {
     }
   }
 
-  /**
-   * [Result] 성공 처리
-   */
+  // [결과] 정답 처리
   handleSuccess() {
     this.gameResult = true;
-    this.background.setFillStyle(0xffff00); // 배경 노란색 (성공 피드백)
 
-    // ★ [핵심] 정규표현식 /_+/ 을 사용하여 빈칸 채우기
-    // 밑줄(_)이 하나 이상 연속된 부분을 찾아 사용자가 입력한 값으로 교체
-    // 예: "I need __ umbrella" -> "I need an umbrella"
+    // 배경색 변경 (DarkBlue)
+    this.background.setTint(0x00008b);
+
+    // 말풍선 빈칸을 입력한 단어로 채움
     const completedSentence = this.problemData.displaySentence.replace(
       /_+/,
       this.userInputValue,
     );
+    this.myTextObj.setText(completedSentence);
+    this.myTextObj.setColor("#0000ff"); // 파란색 텍스트
 
-    this.myTextObj.setText(completedSentence); // 완성된 문장 보여주기
-    this.myTextObj.setColor("#0000ff"); // 파란색 텍스트로 강조
+    // 버튼 비활성화
+    this.sendBtnBg.setTint(0xaaaaaa);
 
-    // 입력창 UI 흐리게 처리 (비활성화 느낌)
-    this.inputBg.setFillStyle(0xeeeeee);
-    this.sendBtnBg.setFillStyle(0xaaaaaa);
+    // ★ 성공 연출 시퀀스 실행
+    this.playResultSequence(true);
   }
 
-  /**
-   * [Result] 실패 처리
-   */
+  // [결과] 오답 처리
   handleFail() {
     this.gameResult = false;
-    this.background.setFillStyle(0xff0000); // 배경 붉은색 (실패 피드백)
 
-    // 입력창 UI 흐리게 처리
-    this.inputBg.setFillStyle(0xeeeeee);
-    this.sendBtnBg.setFillStyle(0xaaaaaa);
+    // 버튼 비활성화
+    this.sendBtnBg.setTint(0xaaaaaa);
+
+    // 배경색 변경 (Red)
+    this.background.setTint(0xff0000);
+
+    // ★ [핵심] 오답 시 빈칸을 '?'로 변경하여 표시
+    const failedSentence = this.problemData.displaySentence.replace(/_+/, "?");
+    this.myTextObj.setText(failedSentence);
+    this.myTextObj.setColor("#ff0000"); // 빨간색 텍스트
+
+    // ★ 실패 연출 시퀀스 실행
+    this.playResultSequence(false);
   }
 
   /**
-   * [System] 게임 종료 및 결과 보고
+   * ★ [연출] 결과 처리 애니메이션 함수
+   * 1. 결과 말풍선 표시
+   * 2. 로딩 애니메이션 재생 (약 1.2초)
+   * 3. 종료 후 성공/실패 이모지 표시
    */
+  playResultSequence(isSuccess) {
+    // 1. 말풍선 및 로딩 스프라이트 표시
+    this.emoBubbleBg.setVisible(true);
+    this.loadingSprite.setVisible(true);
+
+    // 2. 애니메이션 재생
+    this.loadingSprite.play("loading_anim");
+
+    // 3. 애니메이션 완료(2회 반복 후) 이벤트 리스너
+    this.loadingSprite.once("animationcomplete", () => {
+      // 씬이 파괴되었으면 실행 안 함
+      if (!this.scene.isActive()) return;
+
+      this.loadingSprite.setVisible(false); // 로딩 숨김
+
+      if (isSuccess) {
+        this.successEmo.setVisible(true); // 성공 이모지
+      } else {
+        this.failedEmo.setVisible(true); // 실패 이모지
+      }
+    });
+  }
+
+  // [종료] 게임 마무리 및 상위 씬 통지
   finishGame() {
     this.isGameActive = false;
-    this.scale.off("resize", this.resize, this); // 리사이즈 이벤트 제거 (메모리 누수 방지)
+    this.scale.off("resize", this.refreshLayout, this);
 
-    // MainScene에 결과 전달 (성공/실패)
+    // 실행 중인 애니메이션 정지
+    if (this.loadingSprite && this.loadingSprite.anims) {
+      this.loadingSprite.stop();
+    }
+
+    // 결과 전달
     if (this.mainScene && this.mainScene.handleMiniGameResult) {
       this.mainScene.handleMiniGameResult(this.gameResult);
     }
-    this.scene.stop(); // 현재 씬 종료
+    this.scene.stop();
   }
 
-  /**
-   * [Data] 문제 데이터 생성기
-   * - 실제로는 DB나 JSON 파일에서 가져올 수도 있음
-   */
+  // [데이터] 문제 은행 (랜덤 반환)
   getProblem() {
     const problems = [
       {
-        question: "I will go to a hospital.",
-        displaySentence: "Do you want to go ___ me?",
+        question: "I will go to a hospital.\nI can't go alone.",
+        displaySentence: "Do you want to go ____ me?",
         answer: "with",
       },
       {
-        question: "Look at the sky! It's raining.",
-        displaySentence: "I need __ umbrella.", // 밑줄 2개
+        question: "Look at the sky!\nIt's raining.",
+        displaySentence: "I need __ umbrella.",
         answer: "an",
       },
       {
-        question: "I am very hungry now.",
-        displaySentence: "___'s eat some pizza.", // 밑줄 3개
+        question: "I am very hungry now.\nWhat should we do?",
+        displaySentence: "___'s eat some pizza.",
         answer: "Let",
       },
       {
-        question: "Is this your pencil?",
-        displaySentence: "__, it is not.", // 밑줄 2개
+        question: "Is this your pencil?\nI don't think so.",
+        displaySentence: "__, it is not.",
         answer: "No",
       },
       {
-        question: "She runs very fast.",
-        displaySentence: "I ___'t catch her.", // 밑줄 3개
+        question: "She runs very fast.\nI can't keep up with her.",
+        displaySentence: "I ___'t catch her.",
         answer: "can",
       },
     ];
-    return Phaser.Utils.Array.GetRandom(problems); // 배열 중 하나 랜덤 반환
+    return Phaser.Utils.Array.GetRandom(problems);
   }
 
-  /**
-   * [System] 반응형 처리 (창 크기 조절 시)
-   */
-  resize(gameSize) {
-    const width = gameSize.width;
-    const height = gameSize.height;
+  // [레이아웃] 화면 크기에 따른 오브젝트 위치/크기 재조정
+  refreshLayout() {
+    const width = this.scale.width;
+    const height = this.scale.height;
 
-    // 배경 크기 재설정
-    this.background.setPosition(width / 2, height / 2);
-    this.background.setSize(width, height);
+    // 1. 배경
+    this.background
+      .setPosition(width / 2, height / 2)
+      .setDisplaySize(width, height);
 
-    // 폰 위치/크기 재설정
-    this.phoneWidth = width * 0.5;
-    if (this.phoneWidth < 300) this.phoneWidth = 300;
-    this.phoneHeight = height * 0.7;
-    this.phoneX = width / 2;
-    this.phoneY = height * 0.45;
+    // 2. 스마트폰 본체
+    const phoneWidth = width * 0.6;
+    const phoneHeight = height * 1.2;
+    const phoneX = width / 2;
+    const phoneY = height * 0.45;
 
-    this.phoneContainer.setPosition(this.phoneX, this.phoneY);
-    this.phoneBody.setSize(this.phoneWidth, this.phoneHeight);
+    this.phoneContainer.setPosition(phoneX, phoneY);
+    this.phoneBody.setDisplaySize(phoneWidth, phoneHeight);
 
-    // 타이머 바 위치 재설정
-    this.timerBarBg.setPosition(width * 0.5, height * 0.95);
-    this.timerBarBg.setSize(width * 0.9, 20);
-    this.timerBarFill.setPosition(width * 0.05, height * 0.95);
+    // 3. 말풍선 배치 계산
+    const bubbleWidth = phoneWidth * 0.6;
+    const bubbleHeight = phoneHeight * 0.18;
+    const padding = 20;
+
+    // 상대방 말풍선 (상단)
+    const otherX = -phoneWidth / 2.3 + padding + bubbleWidth / 2;
+    const otherY = -phoneHeight / 4;
+    this.otherBubbleBg
+      .setPosition(otherX, otherY)
+      .setDisplaySize(bubbleWidth, bubbleHeight);
+    this.otherText
+      .setPosition(otherX, otherY * 1.075)
+      .setWordWrapWidth(bubbleWidth - padding * 2);
+
+    // 내 말풍선 (중단)
+    const myX = phoneWidth / 2.3 - padding - bubbleWidth / 2;
+    const myY = otherY + bubbleHeight + padding;
+    this.myBubbleBg
+      .setPosition(myX, myY)
+      .setDisplaySize(bubbleWidth, bubbleHeight);
+    this.myTextObj
+      .setPosition(myX, myY * 1.4)
+      .setWordWrapWidth(bubbleWidth - padding * 2);
+
+    // 결과 이모지 말풍선 (하단)
+    const emoWidth = bubbleWidth * 0.5;
+    const emoHeight = bubbleHeight;
+    const emoX = -phoneWidth / 1.75 + padding + bubbleWidth / 2;
+    const emoY = myY + bubbleHeight + padding;
+
+    this.emoBubbleBg
+      .setPosition(emoX, emoY)
+      .setDisplaySize(emoWidth, emoHeight);
+
+    // ★ 로딩/성공/실패 이미지 위치 및 크기 조정
+    const iconXSize = emoWidth * 0.5;
+    const iconYSize = emoHeight * 0.18;
+    const emoXSize = emoWidth * 0.55;
+    const emoYSize = emoHeight * 0.6;
+
+    this.loadingSprite
+      .setPosition(emoX, emoY / 1.1)
+      .setDisplaySize(iconXSize, iconYSize);
+    this.successEmo
+      .setPosition(emoX, emoY / 1.1)
+      .setDisplaySize(emoXSize, emoYSize);
+    this.failedEmo
+      .setPosition(emoX, emoY / 1.1)
+      .setDisplaySize(emoXSize, emoYSize);
+
+    // 4. 입력창 및 버튼 (폰 하단)
+    const inputAreaY = phoneHeight / 3.3;
+    const inputWidth = phoneWidth * 0.75;
+    const inputHeight = 70;
+    const btnSize = inputHeight;
+    const inputX = -phoneWidth / 2 + padding + inputWidth / 1.8;
+
+    this.inputBg
+      .setPosition(inputX, inputAreaY)
+      .setDisplaySize(inputWidth, inputHeight);
+    this.inputTextDisplay.setPosition(inputX, inputAreaY);
+    this.cursor.setPosition(inputX, inputAreaY);
+    this.updateInputDisplay();
+
+    const btnX = inputX + inputWidth / 2 + padding + btnSize / 3;
+    this.sendBtnBg
+      .setPosition(btnX, inputAreaY)
+      .setDisplaySize(btnSize, btnSize);
+
+    // 5. 타이머 UI (화면 하단)
+    const timerY = height * 0.9;
+    const timerBarWidth = width * 0.7;
+    const timerBarHeight = 40;
+
+    this.timerBarFrame
+      .setPosition(width / 2 + 40, timerY)
+      .setDisplaySize(timerBarWidth + 20, timerBarHeight + 30);
+
+    this.timerFillContainer.setPosition(
+      width / 2 + 40 - timerBarWidth / 2,
+      timerY,
+    );
+    this.timerBarFill.setPosition(0, 0);
+    this.timerBarFill.setSize(timerBarWidth, timerBarHeight - 10);
+    this.timerBarFill.maxWidth = timerBarWidth;
+
+    this.timerIcon
+      .setPosition(width / 2 - timerBarWidth / 2, timerY - 20)
+      .setDisplaySize(94 + 24, 114 + 28);
+
+    // [수정] 아이콘 및 텍스트 위치 정의 (중앙 정렬 보정)
+    const iconX = width / 2 - timerBarWidth / 2 - 2;
+    const iconY = timerY - 3;
+
+    // 타이머 텍스트도 아이콘 위로 이동
+    this.timerText.setPosition(iconX, iconY);
   }
 }
