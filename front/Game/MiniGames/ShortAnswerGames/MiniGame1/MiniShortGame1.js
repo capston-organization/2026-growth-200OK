@@ -7,6 +7,8 @@
  * 1. 오답 시 빈칸을 '?'로 표시
  * 2. 타이머 아이콘 위에 남은 초(Second) 표시 및 색상 변화 (흰->노->주->빨)
  * 3. 결과 판정 전 '로딩 중' 애니메이션 연출 후 이모지 출력
+ * * [수정 사항: 반응형 적용]
+ * - MiniOXGame1과 동일한 기준 해상도(1280x720) 기반의 globalScale 적용
  * -------------------------------------------------------------------------
  */
 class MiniShortGame1 extends Phaser.Scene {
@@ -18,6 +20,11 @@ class MiniShortGame1 extends Phaser.Scene {
   init(data) {
     this.mainScene = data.parent;
     this.speedLevel = data.speedLevel || 1; // 기본 속도 레벨 1
+
+    // ★ [반응형 기준점] 1280x720 해상도 기준
+    this.baseWidth = 1280;
+    this.baseHeight = 720;
+    this.globalScale = 1;
   }
 
   // [에셋 로드] 게임에 필요한 이미지 리소스 불러오기
@@ -58,6 +65,7 @@ class MiniShortGame1 extends Phaser.Scene {
       .setOrigin(0.5);
 
     // 1. 배경 설정
+    // 위치와 크기는 refreshLayout에서 잡음
     this.background = this.add.image(width / 2, height / 2, "background");
     this.background.setDepth(-1); // 맨 뒤로 보냄
 
@@ -108,8 +116,9 @@ class MiniShortGame1 extends Phaser.Scene {
     this.setupInputListener();
 
     // 8. 레이아웃 배치 (반응형 대응)
-    this.refreshLayout();
+    // ★ 반응형 이벤트 등록
     this.scale.on("resize", this.refreshLayout, this);
+    this.refreshLayout(); // 초기 실행
   }
 
   // [UI] 채팅 말풍선 및 결과/로딩 이미지 생성
@@ -211,6 +220,7 @@ class MiniShortGame1 extends Phaser.Scene {
         fontSize: "40px",
         color: "#ffffff",
         fontFamily: "Nunito",
+        fontWeight: "bold",
       })
       .setOrigin(0.55, 0.55);
 
@@ -252,8 +262,10 @@ class MiniShortGame1 extends Phaser.Scene {
   updateInputDisplay() {
     this.inputTextDisplay.setText(this.userInputValue);
     const textWidth = this.inputTextDisplay.width;
-    // 커서를 텍스트 끝으로 이동
-    this.cursor.x = this.inputTextDisplay.x + textWidth / 2 + 5;
+    // 커서를 텍스트 끝으로 이동 (globalScale 적용 필요 시 보정)
+    // 여기서는 textWidth가 이미 스케일된 폰트 크기를 반영하므로, 간격만 스케일 적용
+    this.cursor.x =
+      this.inputTextDisplay.x + textWidth / 2 + 5 * this.globalScale;
   }
 
   // [게임 루프] 매 프레임 실행
@@ -265,7 +277,11 @@ class MiniShortGame1 extends Phaser.Scene {
 
     // 2. 게이지 바 길이 업데이트
     const ratio = Math.max(0, this.timeLeft / this.totalTime);
-    this.timerBarFill.width = this.timerBarFill.maxWidth * ratio;
+
+    // maxWidth는 refreshLayout에서 설정됨
+    if (this.timerBarFill.maxWidth) {
+      this.timerBarFill.width = this.timerBarFill.maxWidth * ratio;
+    }
 
     // ★ 3. 남은 시간 텍스트 및 색상 업데이트
     const secondsLeft = Math.ceil(this.timeLeft / 1000);
@@ -441,51 +457,71 @@ class MiniShortGame1 extends Phaser.Scene {
     return Phaser.Utils.Array.GetRandom(problems);
   }
 
-  // [레이아웃] 화면 크기에 따른 오브젝트 위치/크기 재조정
+  // =================================================================
+  // [System] 반응형 레이아웃 재계산 (핵심 수정)
+  // =================================================================
   refreshLayout() {
     const width = this.scale.width;
     const height = this.scale.height;
 
-    // 1. 배경
+    // 1. globalScale 계산 (MiniOXGame1 방식)
+    const scaleX = width / this.baseWidth;
+    const scaleY = height / this.baseHeight;
+    this.globalScale = Math.min(scaleX, scaleY);
+
+    // 2. 배경 (꽉 채우기)
     this.background
       .setPosition(width / 2, height / 2)
       .setDisplaySize(width, height);
 
-    // 2. 스마트폰 본체
-    const phoneWidth = width * 0.6;
-    const phoneHeight = height * 1.2;
+    // 3. 스마트폰 본체
+    // 기존 width * 0.6 대신, 고정 비율(예: 1280x720 기준 적정 크기)에 globalScale 적용
+    const phoneBaseW = 900; // 1280의 약 60%
+    const phoneBaseH = 864; // 720의 약 120%
+    const phoneWidth = phoneBaseW * this.globalScale;
+    const phoneHeight = phoneBaseH * this.globalScale;
+
     const phoneX = width / 2;
     const phoneY = height * 0.45;
 
     this.phoneContainer.setPosition(phoneX, phoneY);
     this.phoneBody.setDisplaySize(phoneWidth, phoneHeight);
 
-    // 3. 말풍선 배치 계산
+    // 4. 내부 요소 크기 및 폰트 계산
     const bubbleWidth = phoneWidth * 0.6;
     const bubbleHeight = phoneHeight * 0.18;
-    const padding = 20;
+    const padding = 20 * this.globalScale; // 패딩도 스케일 적용
 
-    // 상대방 말풍선 (상단)
+    const fontSizeMain = `${28 * this.globalScale}px`;
+    const fontSizeInput = `${28 * this.globalScale}px`;
+
+    // (1) 상대방 말풍선 (상단)
     const otherX = -phoneWidth / 2.3 + padding + bubbleWidth / 2;
     const otherY = -phoneHeight / 4;
+
     this.otherBubbleBg
       .setPosition(otherX, otherY)
       .setDisplaySize(bubbleWidth, bubbleHeight);
+
     this.otherText
       .setPosition(otherX, otherY * 1.075)
+      .setFontSize(fontSizeMain)
       .setWordWrapWidth(bubbleWidth - padding * 2);
 
-    // 내 말풍선 (중단)
+    // (2) 내 말풍선 (중단)
     const myX = phoneWidth / 2.3 - padding - bubbleWidth / 2;
     const myY = otherY + bubbleHeight + padding;
+
     this.myBubbleBg
       .setPosition(myX, myY)
       .setDisplaySize(bubbleWidth, bubbleHeight);
+
     this.myTextObj
       .setPosition(myX, myY * 1.4)
+      .setFontSize(fontSizeMain)
       .setWordWrapWidth(bubbleWidth - padding * 2);
 
-    // 결과 이모지 말풍선 (하단)
+    // (3) 결과 이모지 말풍선 (하단)
     const emoWidth = bubbleWidth * 0.5;
     const emoHeight = bubbleHeight;
     const emoX = -phoneWidth / 1.75 + padding + bubbleWidth / 2;
@@ -495,7 +531,7 @@ class MiniShortGame1 extends Phaser.Scene {
       .setPosition(emoX, emoY)
       .setDisplaySize(emoWidth, emoHeight);
 
-    // ★ 로딩/성공/실패 이미지 위치 및 크기 조정
+    // 로딩/성공/실패 아이콘
     const iconXSize = emoWidth * 0.5;
     const iconYSize = emoHeight * 0.18;
     const emoXSize = emoWidth * 0.55;
@@ -511,18 +547,24 @@ class MiniShortGame1 extends Phaser.Scene {
       .setPosition(emoX, emoY / 1.1)
       .setDisplaySize(emoXSize, emoYSize);
 
-    // 4. 입력창 및 버튼 (폰 하단)
+    // (4) 입력창 및 버튼 (폰 하단)
     const inputAreaY = phoneHeight / 3.3;
     const inputWidth = phoneWidth * 0.75;
-    const inputHeight = 70;
+    const inputHeight = 85 * this.globalScale;
     const btnSize = inputHeight;
     const inputX = -phoneWidth / 2 + padding + inputWidth / 1.8;
 
     this.inputBg
       .setPosition(inputX, inputAreaY)
       .setDisplaySize(inputWidth, inputHeight);
-    this.inputTextDisplay.setPosition(inputX, inputAreaY);
-    this.cursor.setPosition(inputX, inputAreaY);
+
+    this.inputTextDisplay
+      .setPosition(inputX, inputAreaY)
+      .setFontSize(fontSizeInput);
+
+    this.cursor.setPosition(inputX, inputAreaY).setFontSize(fontSizeInput);
+
+    // 커서 위치 재조정
     this.updateInputDisplay();
 
     const btnX = inputX + inputWidth / 2 + padding + btnSize / 3;
@@ -530,32 +572,41 @@ class MiniShortGame1 extends Phaser.Scene {
       .setPosition(btnX, inputAreaY)
       .setDisplaySize(btnSize, btnSize);
 
-    // 5. 타이머 UI (화면 하단)
-    const timerY = height * 0.9;
-    const timerBarWidth = width * 0.7;
-    const timerBarHeight = 40;
+    // 6. 타이머 UI 조정
+    const timerY = height * 0.92;
+    const timerBarWidth = width * 0.6; // 화면 너비의 60% 사용
+    const timerBarHeight = 60 * this.globalScale; // 높이도 비율에 맞춰 조절
 
     this.timerBarFrame
-      .setPosition(width / 2 + 40, timerY)
-      .setDisplaySize(timerBarWidth + 20, timerBarHeight + 30);
+      .setPosition(width / 2 + 40 * this.globalScale, timerY)
+      .setDisplaySize(
+        timerBarWidth + 20 * this.globalScale,
+        timerBarHeight + 60 * this.globalScale,
+      );
 
     this.timerFillContainer.setPosition(
-      width / 2 + 40 - timerBarWidth / 2,
+      width / 2 + 40 * this.globalScale - timerBarWidth / 2,
       timerY,
     );
     this.timerBarFill.setPosition(0, 0);
-    this.timerBarFill.setSize(timerBarWidth, timerBarHeight - 10);
-    this.timerBarFill.maxWidth = timerBarWidth;
+    this.timerBarFill.setSize(
+      timerBarWidth,
+      timerBarHeight - 10 * this.globalScale,
+    );
+    this.timerBarFill.maxWidth = timerBarWidth; // 게이지 계산용 최대 너비 저장
+
+    const iconX = width / 2 - timerBarWidth / 2 - 2 * this.globalScale;
+    const iconY = timerY - 3 * this.globalScale;
 
     this.timerIcon
-      .setPosition(width / 2 - timerBarWidth / 2, timerY - 20)
-      .setDisplaySize(94 + 24, 114 + 28);
+      .setPosition(
+        width / 2 - timerBarWidth / 2,
+        timerY - 20 * this.globalScale,
+      )
+      .setDisplaySize(118 * this.globalScale, 142 * this.globalScale);
 
-    // [수정] 아이콘 및 텍스트 위치 정의 (중앙 정렬 보정)
-    const iconX = width / 2 - timerBarWidth / 2 - 2;
-    const iconY = timerY - 3;
-
-    // 타이머 텍스트도 아이콘 위로 이동
-    this.timerText.setPosition(iconX, iconY);
+    this.timerText
+      .setPosition(iconX, iconY)
+      .setFontSize(`${40 * this.globalScale}px`);
   }
 }
