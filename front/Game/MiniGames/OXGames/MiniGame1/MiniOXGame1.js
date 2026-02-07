@@ -213,7 +213,29 @@ class MiniOXGame1 extends Phaser.Scene {
 
     // 4. 아이템 이동 (패널/문제)
     // 반응형 대응: 화면 너비에 비례한 속도로 이동
-    const moveSpeed = this.scale.width * 0.5 * (delta / 1000);
+
+    switch (this.speedLevel) {
+      case 1:
+        this.moveSpeedFactor = 1;
+        break;
+      case 2:
+        this.moveSpeedFactor = 1.2;
+        break;
+      case 3:
+        this.moveSpeedFactor = 1.4;
+        break;
+      case 4:
+        this.moveSpeedFactor = 1.6;
+        break;
+      case 5:
+        this.moveSpeedFactor = 1.8;
+        break;
+      default:
+        this.moveSpeedFactor = 0.5;
+    }
+
+    const moveSpeed =
+      this.scale.width * 0.5 * (delta / 1000) * this.moveSpeedFactor;
 
     // 배열 역순회 (삭제 시 인덱스 오류 방지)
     for (let i = this.movingItems.length - 1; i >= 0; i--) {
@@ -404,10 +426,10 @@ class MiniOXGame1 extends Phaser.Scene {
     // 3. 결과 화면 (고정 수치 0.4 * 반응형 비율)
     const resultScale = 0.4 * this.globalScale;
     this.screenSuccess
-      .setPosition(width / 1.95, height / 2.5)
+      .setPosition(width / 2, height / 2.5)
       .setScale(resultScale);
     this.screenFailed
-      .setPosition(width / 1.95, height / 2.5)
+      .setPosition(width / 2, height / 2.5)
       .setScale(resultScale);
 
     // 4. 장식용 HUD (고정 수치 0.3 * 반응형 비율)
