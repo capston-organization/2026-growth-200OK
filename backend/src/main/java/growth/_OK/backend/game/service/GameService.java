@@ -6,8 +6,10 @@ import growth._OK.backend.game.domain.GameLike;
 import growth._OK.backend.game.dto.ResponseDto.GameListResponseDto;
 import growth._OK.backend.game.dto.ResponseDto.GameResponseDto;
 import growth._OK.backend.game.dto.requestDto.GameCreateRequestDto;
+import growth._OK.backend.game.domain.GameSource;
 import growth._OK.backend.game.repository.GameLikeRepository;
 import growth._OK.backend.game.repository.GameRepository;
+import growth._OK.backend.game.repository.GameSourceRepository;
 import growth._OK.backend.global.exception.CapstonException;
 import growth._OK.backend.global.exception.ExceptionCode;
 import growth._OK.backend.user.domain.User;
@@ -25,19 +27,35 @@ public class GameService {
 
     private final GameRepository gameRepository;
     private final GameLikeRepository gameLikeRepository;
+    private final GameSourceRepository gameSourceRepository;
     private final UserRepository userRepository;
 
     // 게임 생성
     public GameResponseDto createGame(GameCreateRequestDto request, CustomUserDetails userDetails) {
-
         User owner = findUser(userDetails);
+        int problemCount = (request.getProblemCount() == null || request.getProblemCount() <= 0)
+                ? 10
+                : request.getProblemCount();
+
+        GameSource source = null;
+        if (request.getSourceId() != null) {
+            source = gameSourceRepository.findById(request.getSourceId())
+                    .orElseThrow(() -> new CapstonException(ExceptionCode.GAME_SOURCE_NOT_FOUND));
+            if (!source.getOwner().getUserId().equals(owner.getUserId())) {
+                throw new CapstonException(ExceptionCode.GAME_SOURCE_NOT_FOUND);
+            }
+        }
 
         Game game = Game.builder()
                 .owner(owner)
                 .type(request.getType())
                 .title(request.getTitle())
                 .description(request.getDescription())
+                .learningObjectives(request.getLearningObjectives())
                 .isPublic(request.getIsPublic() == null || request.getIsPublic())
+                .problemCount(problemCount)
+                .allowedProblemTypes(request.getProblemTypes() != null ? request.getProblemTypes() : List.of())
+                .source(source)
                 .build();
 
         return GameResponseDto.from(gameRepository.save(game));
