@@ -20,6 +20,7 @@ public enum ClientExceptionCode {
     GAME_SOURCE_NOT_FOUND,
     GAME_SOURCE_NOT_SET,
     INVALID_SOURCE_FILE,
+    SOURCE_CONTENT_EMPTY,
 
     // AI (Gemini)
     GEMINI_QUOTA_EXCEEDED,
