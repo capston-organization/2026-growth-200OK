@@ -2,7 +2,7 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <title>MainGame2 - 6가지 게임 랜덤</title>
+    <title>MainGame3 - 떡(OX) / 단답형 / 객관식</title>
     <style>
       body {
         margin: 0;
@@ -10,24 +10,13 @@
         overflow: hidden;
         background-color: white;
       }
-      @font-face {
-        font-family: "Nunito";
-        src: url("../../common/Fonts/Nunito/static/Nunito-SemiBold.ttf");
-      }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
-    <!-- 기존 3개 미니게임 (MiniGames) -->
-    <script src="../../MiniGames/ShortAnswerGames/MiniGame1/MiniShortGame1.js"></script>
-    <script src="../../MiniGames/MultiChoiceGames/MiniGame1/MiniMultiGame1.js"></script>
-    <script src="../../MiniGames/OXGames/MiniGame1/MiniOXGame1.js"></script>
-    <!-- MainGame3의 3개 게임(떡OX, 단답형, 객관식) - 에셋은 MainGame3/assets 참조 -->
-    <script>window.MAINGAME3_ASSETS_BASE = "../MainGame3/assets/";</script>
-    <script src="../MainGame3/games/TteokOXGame.js"></script>
-    <script src="../MainGame3/games/ShortAnswerGame.js"></script>
-    <script src="../MainGame3/games/MultiChoiceGame.js"></script>
+    <script src="games/TteokOXGame.js"></script>
+    <script src="games/ShortAnswerGame.js"></script>
+    <script src="games/MultiChoiceGame.js"></script>
   </head>
   <body>
-    <div style="font-family: &quot;Nunito&quot;; opacity: 0; position: absolute; pointer-events: none;">.</div>
     <script>
       class MainScene extends Phaser.Scene {
         constructor() {
@@ -56,7 +45,13 @@
             })
             .setOrigin(0.5);
 
-          this.gameBox = this.add.rectangle(centerX, centerY, 300, 300, 0xffffff);
+          this.gameBox = this.add.rectangle(
+            centerX,
+            centerY,
+            300,
+            300,
+            0xffffff,
+          );
           this.gameBox.setStrokeStyle(4, 0x000000);
 
           this.statusText = this.add
@@ -99,18 +94,8 @@
         startMiniGame() {
           if (!this.isGameRunning) return;
           this.statusText.setText("");
-
-          // 6가지 게임 모두 랜덤 (기존 3 + 떡OX, 단답형, 객관식 3)
-          const games = [
-            "MiniMultiGame1",
-            "MiniOXGame1",
-            "MiniShortGame1",
-            "TteokOXGame",
-            "ShortAnswerGame",
-            "MultiChoiceGame",
-          ];
+          const games = ["TteokOXGame", "ShortAnswerGame", "MultiChoiceGame"];
           const randomKey = Phaser.Math.RND.pick(games);
-
           this.scene.launch(randomKey, {
             speedLevel: this.speedLevel,
             parent: this,
@@ -118,8 +103,11 @@
         }
 
         handleMiniGameResult(isSuccess) {
-          if (isSuccess) this.handleSuccess();
-          else this.handleFail();
+          if (isSuccess) {
+            this.handleSuccess();
+          } else {
+            this.handleFail();
+          }
         }
 
         handleSuccess() {
@@ -133,7 +121,7 @@
             this.consecutiveWins = 0;
             if (this.speedLevel < 5) {
               this.speedLevel++;
-              this.speedText.setText("SPEED: " + this.speedLevel);
+              this.speedText.setText(`SPEED: ${this.speedLevel}`);
             }
           }
           this.time.delayedCall(5000, this.resetAndNext, [], this);
@@ -164,7 +152,8 @@
         }
 
         updateScoreUI() {
-          this.scoreText.setText(String(this.score).padStart(3, "0"));
+          const scoreStr = String(this.score).padStart(3, "0");
+          this.scoreText.setText(scoreStr);
         }
 
         gameOver() {
@@ -185,7 +174,7 @@
           this.statusText.setPosition(centerX, centerY);
           this.speedText.setPosition(width - 20, 20);
           const heartY = centerY + 220;
-          this.hearts.forEach(function (heart, i) {
+          this.hearts.forEach((heart, i) => {
             heart.x = centerX - 60 + i * 60;
             heart.y = heartY;
           });
@@ -202,15 +191,7 @@
           mode: Phaser.Scale.RESIZE,
           autoCenter: Phaser.Scale.CENTER_BOTH,
         },
-        scene: [
-          MainScene,
-          MiniMultiGame1,
-          MiniOXGame1,
-          MiniShortGame1,
-          TteokOXGame,
-          ShortAnswerGame,
-          MultiChoiceGame,
-        ],
+        scene: [MainScene, TteokOXGame, ShortAnswerGame, MultiChoiceGame],
       };
 
       const game = new Phaser.Game(config);
