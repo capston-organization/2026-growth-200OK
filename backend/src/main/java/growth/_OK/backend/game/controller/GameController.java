@@ -103,7 +103,7 @@ public class GameController {
         return ResponseEntity.ok(Map.of("explanation", explanation != null ? explanation : ""));
     }
 
-    /** 문제 전체 조회. 각 문제별 상태(맞음/틀림/오답 후 정답) + 해설. 해설 없으면 Gemini로 생성 후 포함 */
+    // 문제 전체 조회. 각 문제별 상태(맞음/틀림/오답 후 정답) + 해설. 해설 없으면 Gemini로 생성 후 포함
     @GetMapping("/{gameId}/problems")
     public ResponseEntity<List<ProblemWithStatusDto>> getAllProblems(@PathVariable Long gameId,
                                                                       @AuthenticationPrincipal CustomUserDetails user) {

@@ -78,7 +78,12 @@ class GameControllerIntegrationTest {
     @Test
     @DisplayName("게임 생성 API는 201 Created와 본문을 반환한다")
     void createGame() throws Exception {
-        GameCreateRequestDto request = new GameCreateRequestDto(GameType.GRAMMAR, "title", "desc", true);
+        GameCreateRequestDto request = GameCreateRequestDto.builder()
+                .type(GameType.GRAMMAR)
+                .title("title")
+                .description("desc")
+                .isPublic(true)
+                .build();
 
         mockMvc.perform(post("/api/games")
                         .contentType(MediaType.APPLICATION_JSON)
