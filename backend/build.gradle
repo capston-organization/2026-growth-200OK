@@ -54,6 +54,9 @@ dependencies {
 	// AWS S3 사용
 	// implementation 'io.awspring.cloud:spring-cloud-aws-starter-s3:3.1.1'
 
+	// PDF 텍스트 추출
+	implementation 'org.apache.pdfbox:pdfbox:3.0.3'
+
 	// test
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testImplementation 'org.springframework.security:spring-security-test'

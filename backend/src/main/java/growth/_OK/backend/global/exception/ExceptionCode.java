@@ -19,6 +19,14 @@ public enum ExceptionCode {
 
     // 게임
     GAME_NOT_FOUND(HttpStatus.NOT_FOUND, ClientExceptionCode.GAME_NOT_FOUND, "찾을 수 없는 게임입니다."),
+    PROBLEM_NOT_FOUND(HttpStatus.NOT_FOUND, ClientExceptionCode.PROBLEM_NOT_FOUND, "찾을 수 없는 문제입니다."),
+    GAME_SOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, ClientExceptionCode.GAME_SOURCE_NOT_FOUND, "찾을 수 없는 소스입니다."),
+    GAME_SOURCE_NOT_SET(HttpStatus.BAD_REQUEST, ClientExceptionCode.GAME_SOURCE_NOT_SET, "해당 게임에 연결된 소스가 없습니다. 게임 생성 시 sourceId를 지정해 주세요."),
+    INVALID_SOURCE_FILE(HttpStatus.BAD_REQUEST, ClientExceptionCode.INVALID_SOURCE_FILE, "PDF 또는 텍스트 파일만 업로드 가능합니다."),
+    SOURCE_CONTENT_EMPTY(HttpStatus.BAD_REQUEST, ClientExceptionCode.SOURCE_CONTENT_EMPTY, "소스 파일에서 추출된 내용이 없습니다. 파일을 확인하거나 다른 파일을 업로드해 주세요."),
+
+    // AI (Gemini)
+    GEMINI_QUOTA_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, ClientExceptionCode.GEMINI_QUOTA_EXCEEDED, "AI 생성 요청 한도를 초과했습니다. 잠시 후 다시 시도해 주세요."),
     ;
     private final HttpStatus httpStatus;
     private final ClientExceptionCode clientExceptionCode;
