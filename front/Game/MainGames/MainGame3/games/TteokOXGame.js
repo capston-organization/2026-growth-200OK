@@ -14,7 +14,7 @@ class TteokOXGame extends Phaser.Scene {
   }
 
   preload() {
-    var base = "assets/";
+    var base = (typeof window.MAINGAME3_ASSETS_BASE !== "undefined" ? window.MAINGAME3_ASSETS_BASE : "assets/");
     this.load.image("그냥떡", base + "images/그냥떡.png");
     this.load.image("망치떡", base + "images/망치떡.png");
     this.load.image("물떡", base + "images/물떡.png");

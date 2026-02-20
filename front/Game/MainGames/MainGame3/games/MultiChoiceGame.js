@@ -14,7 +14,7 @@ class MultiChoiceGame extends Phaser.Scene {
   }
 
   preload() {
-    var base = "assets/";
+    var base = (typeof window.MAINGAME3_ASSETS_BASE !== "undefined" ? window.MAINGAME3_ASSETS_BASE : "assets/");
     this.load.image("robotBase", base + "images/로봇리듬기본로봇.png");
     this.load.image("robotLeft", base + "images/로봇리듬왼손로봇.png");
     this.load.image("robotRight", base + "images/로봇리듬오른손로봇.png");
