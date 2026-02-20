@@ -7,6 +7,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
+
 
 @Entity
 @Getter
@@ -30,6 +32,14 @@ public class User extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Role role = Role.STUDENT;
+
+    // 기본 정보 (로그인 후 입력/조회)
+    private Integer birthYear;   // 필수
+    private String grade;       // 필수 (예: 초등1, 중1, 고2)
+    private LocalDate birthDate; // 선택
+    private String school;      // 선택
+    @Enumerated(EnumType.STRING)
+    private Gender gender;      // 선택
 
     // ---------------
 
@@ -63,6 +73,17 @@ public class User extends BaseEntity {
     // 프로필 사진 수정
     public void updateProfileImage(String profileImage) {
         this.profileImage = profileImage;
+    }
+
+    // 기본 정보 수정
+    public void updateBasicInfo(String name, Integer birthYear, String grade,
+                               LocalDate birthDate, String school, Gender gender) {
+        if (name != null) this.name = name;
+        if (birthYear != null) this.birthYear = birthYear;
+        if (grade != null) this.grade = grade;
+        if (birthDate != null) this.birthDate = birthDate;
+        if (school != null) this.school = school;
+        if (gender != null) this.gender = gender;
     }
 
 }
