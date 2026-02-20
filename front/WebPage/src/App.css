@@ -1,0 +1,123 @@
+/* CSS 파일 최상단에 추가 */
+* {
+  box-sizing: border-box;
+}
+
+/* =========================================
+   1. 전체 페이지 기본 설정 (Body)
+   ========================================= */
+body {
+  margin: 0; /* 브라우저가 기본적으로 주는 여백을 0으로 없애서 화면에 꽉 차게 함 */
+  background-color: #e6f7ff; /* [수정 포인트] 전체 배경색 (현재: 연한 하늘색) */
+  font-family:
+    "Pretendard", sans-serif; /* 폰트 설정 (Pretendard가 없으면 기본 고딕체 사용) */
+}
+
+/* =========================================
+   2. 레이아웃 틀 (Page Container)
+   - 모든 페이지 내용을 화면 중앙에 예쁘게 모아주는 역할
+   ========================================= */
+.page-container {
+  display: flex; /* 내부 요소들을 정렬하기 위한 마법의 주문 (Flexbox) */
+  flex-direction: column; /* 요소들을 세로로(위에서 아래로) 쌓음 */
+  justify-content: center; /* 세로 기준 중앙 정렬 */
+  align-items: center; /* 가로 기준 중앙 정렬 */
+  /* justify-content: center; 세로 기준 중앙 정렬 */
+  min-height: 100vh; /* [중요] 최소 높이를 화면 전체 높이(100vh)로 설정 */
+  padding: 20px; /* 화면 가장자리와 내용 사이에 여백을 줌 */
+}
+
+/* =========================================
+   3. 메인 카드 박스 (White Box)
+   - 로그인창, 회원가입창 같은 하얀색 둥근 박스
+   ========================================= */
+.white-box {
+  background: white; /* 박스 배경색 */
+  border-radius: 20px; /* [수정 포인트] 모서리 둥글기 (숫자가 클수록 더 둥글어짐) */
+  border: 5px solid #ffc0cb; /* [수정 포인트] 테두리 두께(2px)와 색상(연분홍) */
+  padding: 40px; /* 박스 안쪽 내용물과의 여백 */
+  width: 100%; /* 가로폭을 부모 크기에 맞춤 */
+  max-width: 1000px; /* [수정 포인트] 박스가 너무 넓어지지 않게 최대 크기 제한 */
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05); /* 살짝 그림자를 줘서 떠있는 느낌 (x, y, 흐림정도, 색상) */
+  text-align: center; /* 텍스트 중앙 정렬 */
+  position: relative; /* 내부에 절대 위치(absolute) 요소를 넣을 때 기준점이 됨 */
+}
+
+/* =========================================
+   4. 버튼 스타일 (Button)
+   - '다음 단계', '회원가입 완료' 같은 버튼들
+   ========================================= */
+.btn-primary {
+  background-color: white; /* 버튼 배경색 */
+  border: 3px solid #ffc0cb; /* 버튼 테두리 (연분홍) */
+  color: #333; /* 글자색 (진한 회색) */
+  padding: 15px 30px; /* 버튼 내부 여백 (위아래 10px, 좌우 20px) */
+  border-radius: 20px; /* 버튼 모서리 둥글기 */
+  cursor: pointer; /* 마우스를 올렸을 때 손가락 모양으로 변함 */
+  font-size: 24px; /* 글자 크기 */
+  font-weight: 700; /* 글자 두께 */
+  font-family: "Pretendard", sans-serif; /* 버튼 글꼴 */
+  margin-top: 24px; /* 버튼 위에 공간을 좀 띄움 */
+  transition: 0.2s; /* [효과] 색이 변할 때 0.2초 동안 부드럽게 변함 */
+}
+
+/* 마우스를 버튼 위에 올렸을 때 (:hover) */
+.btn-primary:hover {
+  background-color: #fff0f5; /* [수정 포인트] 마우스 올렸을 때 배경색 (아주 연한 분홍) */
+}
+
+/* 버튼이 비활성화 되었을 때 (클릭 불가 상태) */
+.btn-disabled {
+  opacity: 0.5; /* 불투명도를 50%로 낮쳐서 흐릿하게 보이게 함 */
+  cursor: not-allowed; /* 마우스를 올리면 '금지' 표시가 뜸 */
+}
+
+/* =========================================
+   5. 기타 요소들 (Logo, Navbar 등)
+   ========================================= */
+
+/* 로고가 들어갈 자리 (임시 동그라미) */
+.logo-placeholder {
+  width: 100px; /* 로고 가로 크기 */
+  height: 100px; /* 로고 세로 크기 */
+  background-color: #ffc0cb; /* 로고 배경색 */
+  border-radius: 50%; /* 50%로 하면 완전한 원이 됨 */
+  margin: 0 auto 20px; /* 상단 0, 좌우 자동(중앙정렬), 하단 20px 여백 */
+  display: flex;
+  align-items: center;
+  justify-content: center; /* 글자를 원 정중앙에 배치 */
+  font-weight: bold;
+  color: white;
+}
+/* App.css */
+
+/* 상단 네비게이션 바 */
+.navbar {
+  display: flex;
+  /* justify-content: space-between;  <-- [삭제] 이걸 지워야 요소들이 양끝으로 안 흩어집니다 */
+  align-items: center;
+  background: white;
+  padding: 10px 40px;
+  height: 80px;
+  width: 100%;
+  box-sizing: border-box;
+
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  border-bottom: 2px solid #eee;
+}
+
+/* 네비게이션 메뉴 (Home, 게임만들기...) */
+.nav-menu {
+  display: flex;
+  gap: 80px; /* [수정] 메뉴 글자들 사이 간격을 20px -> 40px로 넓힘 */
+  font-size: 24px; /* [수정] 글자 크기를 14px -> 18px로 키움 */
+  font-weight: 400; /* [추가] 글자를 약간 두껍게 해서 잘 보이게 함 */
+  color: #555;
+
+  /* [핵심 위치 조정] */
+  margin-left: 160px; /* 로고와 메뉴 사이의 간격 (원하는 만큼 숫자 조절) */
+  margin-right: auto; /* ★ 오른쪽 여백을 자동으로 다 채워서, 프로필 아이콘을 맨 오른쪽 끝으로 밀어버림 */
+}

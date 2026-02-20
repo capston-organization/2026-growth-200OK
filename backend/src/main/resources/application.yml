@@ -38,3 +38,8 @@ oauth:
 
 jwt:
   secret: ${JWT_SECRET}
+
+gemini:
+  api-key: ${GEMINI_API_KEY}
+  model: gemini-2.5-flash
+  generate-content-url: https://generativelanguage.googleapis.com/v1beta/models
