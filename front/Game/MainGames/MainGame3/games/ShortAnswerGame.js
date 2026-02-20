@@ -14,7 +14,7 @@ class ShortAnswerGame extends Phaser.Scene {
   }
 
   preload() {
-    var base = "assets/";
+    var base = (typeof window.MAINGAME3_ASSETS_BASE !== "undefined" ? window.MAINGAME3_ASSETS_BASE : "assets/");
     this.load.image("alienWaiting", base + "images/도넛게임기다리는외계인.png");
     this.load.image("alienHappy", base + "images/도넛게임웃는외계인.png");
     this.load.image("alienAngry", base + "images/도넛게임화난외계인.png");
