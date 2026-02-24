@@ -11,6 +11,7 @@ import growth._OK.backend.game.domain.GameSource;
 import growth._OK.backend.game.repository.GameLikeRepository;
 import growth._OK.backend.game.repository.GameRepository;
 import growth._OK.backend.game.repository.GameSourceRepository;
+import growth._OK.backend.game.repository.ProblemAttemptRepository;
 import growth._OK.backend.global.exception.CapstonException;
 import growth._OK.backend.global.exception.ExceptionCode;
 import growth._OK.backend.user.domain.User;
@@ -30,6 +31,7 @@ public class GameService {
     private final GameLikeRepository gameLikeRepository;
     private final GameSourceRepository gameSourceRepository;
     private final UserRepository userRepository;
+    private final ProblemAttemptRepository problemAttemptRepository;
 
     // 게임 생성
     public GameResponseDto createGame(GameCreateRequestDto request, CustomUserDetails userDetails) {
@@ -81,7 +83,7 @@ public class GameService {
         return GameListResponseDto.from(responses);
     }
 
-    // 공개 게임 전체 조회 (최신순)
+    // 공개 게임 전체 최신순 조회
     @Transactional(readOnly = true)
     public GameListResponseDto getPublicGamesLatest(CustomUserDetails userDetails) {
         User user = userDetails != null ? findUser(userDetails) : null;
@@ -110,6 +112,21 @@ public class GameService {
         List<GameResponseDto> responses = gameLikeRepository.findByUser(user).stream()
                 .map(GameLike::getGame)
                 .map(game -> GameResponseDto.from(game, true))
+                .collect(Collectors.toList());
+        return GameListResponseDto.from(responses);
+    }
+
+    // 내가 최근에 플레이한 게임 목록 (최대 5개, 최신순)
+    @Transactional(readOnly = true)
+    public GameListResponseDto getRecentPlayedGames(CustomUserDetails userDetails, int limit) {
+        User user = findUser(userDetails);
+        List<Game> games = problemAttemptRepository.findRecentPlayedGames(user);
+        if (games.size() > limit) {
+            games = games.subList(0, limit);
+        }
+        List<GameResponseDto> responses = games.stream()
+                .map(game -> GameResponseDto.from(game,
+                        gameLikeRepository.existsByGameAndUser(game, user)))
                 .collect(Collectors.toList());
         return GameListResponseDto.from(responses);
     }
