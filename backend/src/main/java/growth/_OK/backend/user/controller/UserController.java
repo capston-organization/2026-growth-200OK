@@ -1,6 +1,8 @@
 package growth._OK.backend.user.controller;
 
 import growth._OK.backend.auth.jwt.CustomUserDetails;
+import growth._OK.backend.game.dto.ResponseDto.GameListResponseDto;
+import growth._OK.backend.game.service.GameService;
 import growth._OK.backend.user.dto.request.UserBasicInfoRequestDto;
 import growth._OK.backend.user.dto.response.StreakResponseDto;
 import growth._OK.backend.user.dto.response.UserBasicInfoResponseDto;
@@ -18,6 +20,7 @@ public class UserController {
 
     private final UserService userService;
     private final UserStreakService userStreakService;
+    private final GameService gameService;
 
     @GetMapping("/me")
     public ResponseEntity<UserBasicInfoResponseDto> getMyBasicInfo(
@@ -43,6 +46,13 @@ public class UserController {
             @AuthenticationPrincipal CustomUserDetails user,
             @RequestParam(required = false) Integer days) {
         StreakResponseDto dto = userStreakService.getStreakData(user.getUser().getUserId(), days);
+        return ResponseEntity.ok(dto);
+    }
+
+    /** 내가 만든 게임 전체 조회 (최신순) */
+    @GetMapping("/me/games")
+    public ResponseEntity<GameListResponseDto> getMyGames(@AuthenticationPrincipal CustomUserDetails user) {
+        GameListResponseDto dto = gameService.getMyGames(user);
         return ResponseEntity.ok(dto);
     }
 }
