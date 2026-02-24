@@ -12,6 +12,11 @@ const SignUpPage = () => {
   // name: 현재 저장된 이름 값
   // setName: 이름을 변경할 때 사용하는 함수
   const [name, setName] = useState("");
+  const [birthYear, setBirthYear] = useState("");
+  const [grade, setGrade] = useState("");
+  const [birthDate, setBirthDate] = useState("");
+  const [school, setSchool] = useState("");
+  const [gender, setGender] = useState("선택해주세요");
 
   // 3. 스타일 객체 정의
   // 여러 input 태그에 똑같은 디자인을 적용하기 위해 미리 만들어둔 스타일 묶음입니다.
@@ -27,6 +32,85 @@ const SignUpPage = () => {
     marginTop: "10px",
     marginBottom: "30px",
     boxSizing: "border-box", // 테두리 포함 크기 계산
+  };
+
+  // --- [추가된 부분 2] 백엔드로 데이터 전송하는 함수 ---
+  const handleSubmit = async () => {
+    // ----------------------------------------------------
+    // 1. 방어 코드 (Validation): 이상한 값은 백엔드로 가기 전에 프론트에서 컷!
+    // ----------------------------------------------------
+    if (!name || !birthYear || !grade) {
+      alert("이름, 출생년도, 학년은 필수 입력입니다!");
+      return; // 여기서 함수를 멈추고 백엔드로 전송하지 않음
+    }
+
+    const yearNum = parseInt(birthYear);
+    if (yearNum < 1900 || yearNum > 2026) {
+      alert("출생년도를 올바르게 입력해주세요. (예: 2010)");
+      return;
+    }
+
+    // ----------------------------------------------------
+    // 2. 데이터 가공 (UX 개선): 유저의 입력을 백엔드 양식에 맞게 변환
+    // ----------------------------------------------------
+
+    // [성별 변환] '그 외', '답하지 않음' 추가
+    let mappedGender = "SECRET"; // 기본값: 답하지 않음
+    if (gender === "남성") mappedGender = "MALE";
+    else if (gender === "여성") mappedGender = "FEMALE";
+    else if (gender === "그 외") mappedGender = "OTHER";
+    else if (gender === "답하지 않음") mappedGender = "SECRET"; // 백엔드가 정한 단어에 맞춰 나중에 수정 가능
+
+    // [출생일 변환] 유저는 "03/15" 만 입력 ➡️ 프론트가 "2010-03-15" 로 조립해줌
+    let formattedDate = null;
+    if (birthDate) {
+      // 입력값에서 숫자만 쏙 뽑아내기 (예: "3/15" -> ["3", "15"])
+      const dateParts = birthDate.match(/\d+/g);
+
+      if (dateParts && dateParts.length >= 2) {
+        // padStart(2, "0") : 한 자리 숫자면 앞에 0을 붙여줌 (예: "3" -> "03")
+        const month = dateParts[0].padStart(2, "0");
+        const day = dateParts[1].padStart(2, "0");
+
+        // 입력받은 '출생년도'와 합체
+        formattedDate = `${birthYear}-${month}-${day}`;
+      } else {
+        alert("출생일은 MM/DD 형식으로 입력해주세요. (예: 03/15)");
+        return;
+      }
+    }
+
+    // ----------------------------------------------------
+    // 3. 백엔드로 쏘기 (이제 안전하고 완벽한 데이터만 날아갑니다)
+    // ----------------------------------------------------
+    const token = localStorage.getItem("accessToken");
+
+    try {
+      const response = await fetch("/auth/me", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: name,
+          birthYear: yearNum, // 검증된 숫자로 전송
+          grade: grade,
+          birthDate: formattedDate, // 조립된 완벽한 날짜 (YYYY-MM-DD)
+          school: school,
+          gender: mappedGender,
+        }),
+      });
+
+      if (response.ok) {
+        alert("정보가 성공적으로 저장되었습니다!");
+        navigate("/create-game", { state: { userName: name } });
+      } else {
+        alert("정보 저장에 실패했습니다. (서버 거절)");
+      }
+    } catch (error) {
+      console.error("저장 중 에러 발생:", error);
+    }
   };
 
   return (
@@ -75,7 +159,13 @@ const SignUpPage = () => {
             >
               * 출생년도
             </label>
-            <input type="number" style={inputStyle} placeholder="YYYY" />
+            <input
+              type="number"
+              style={inputStyle}
+              placeholder="YYYY"
+              value={birthYear}
+              onChange={(e) => setBirthYear(e.target.value)}
+            />
           </div>
 
           <div>
@@ -84,7 +174,12 @@ const SignUpPage = () => {
             >
               * 학년
             </label>
-            <input type="text" style={inputStyle} />
+            <input
+              type="text"
+              style={inputStyle}
+              value={grade}
+              onChange={(e) => setGrade(e.target.value)}
+            />
           </div>
 
           <div>
@@ -93,7 +188,13 @@ const SignUpPage = () => {
             >
               출생일
             </label>
-            <input type="text" style={inputStyle} placeholder="MM/DD" />
+            <input
+              type="text"
+              style={inputStyle}
+              placeholder="MM/DD"
+              value={birthDate}
+              onChange={(e) => setBirthDate(e.target.value)}
+            />
           </div>
 
           <div>
@@ -102,7 +203,12 @@ const SignUpPage = () => {
             >
               학교
             </label>
-            <input type="text" style={inputStyle} />
+            <input
+              type="text"
+              style={inputStyle}
+              value={school}
+              onChange={(e) => setSchool(e.target.value)}
+            />
           </div>
 
           <div>
@@ -111,7 +217,11 @@ const SignUpPage = () => {
             >
               성별
             </label>
-            <select style={inputStyle}>
+            <select
+              style={inputStyle}
+              value={gender}
+              onChange={(e) => setGender(e.target.value)}
+            >
               <option>선택해주세요</option>
               <option>남성</option>
               <option>여성</option>
@@ -126,11 +236,7 @@ const SignUpPage = () => {
           <button
             className="btn-primary"
             // [핵심 기능] 버튼 클릭 시 동작
-            onClick={() =>
-              // navigate(이동할 주소, { 추가 옵션 })
-              // state: { userName: name } -> 입력받은 'name'을 'userName'이라는 꼬리표를 달아 다음 페이지로 보냄
-              navigate("/create-game", { state: { userName: name } })
-            }
+            onClick={handleSubmit}
           >
             &gt; 회원 가입 완료
           </button>
