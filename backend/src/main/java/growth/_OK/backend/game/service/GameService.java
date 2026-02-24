@@ -6,10 +6,12 @@ import growth._OK.backend.game.domain.GameLike;
 import growth._OK.backend.game.dto.ResponseDto.GameListResponseDto;
 import growth._OK.backend.game.dto.ResponseDto.GameResponseDto;
 import growth._OK.backend.game.dto.requestDto.GameCreateRequestDto;
+import growth._OK.backend.game.dto.requestDto.GameUpdateRequestDto;
 import growth._OK.backend.game.domain.GameSource;
 import growth._OK.backend.game.repository.GameLikeRepository;
 import growth._OK.backend.game.repository.GameRepository;
 import growth._OK.backend.game.repository.GameSourceRepository;
+import growth._OK.backend.game.repository.ProblemAttemptRepository;
 import growth._OK.backend.global.exception.CapstonException;
 import growth._OK.backend.global.exception.ExceptionCode;
 import growth._OK.backend.user.domain.User;
@@ -29,6 +31,7 @@ public class GameService {
     private final GameLikeRepository gameLikeRepository;
     private final GameSourceRepository gameSourceRepository;
     private final UserRepository userRepository;
+    private final ProblemAttemptRepository problemAttemptRepository;
 
     // 게임 생성
     public GameResponseDto createGame(GameCreateRequestDto request, CustomUserDetails userDetails) {
@@ -80,6 +83,18 @@ public class GameService {
         return GameListResponseDto.from(responses);
     }
 
+    // 공개 게임 전체 최신순 조회
+    @Transactional(readOnly = true)
+    public GameListResponseDto getPublicGamesLatest(CustomUserDetails userDetails) {
+        User user = userDetails != null ? findUser(userDetails) : null;
+        List<Game> games = gameRepository.findByIsPublicTrueOrderByCreatedAtDesc();
+        List<GameResponseDto> responses = games.stream()
+                .map(game -> GameResponseDto.from(game,
+                        user != null && gameLikeRepository.existsByGameAndUser(game, user)))
+                .collect(Collectors.toList());
+        return GameListResponseDto.from(responses);
+    }
+
     // 내가 만든 게임 전체 조회
     @Transactional(readOnly = true)
     public GameListResponseDto getMyGames(CustomUserDetails userDetails) {
@@ -99,6 +114,34 @@ public class GameService {
                 .map(game -> GameResponseDto.from(game, true))
                 .collect(Collectors.toList());
         return GameListResponseDto.from(responses);
+    }
+
+    // 내가 최근에 플레이한 게임 목록 (최대 5개, 최신순)
+    @Transactional(readOnly = true)
+    public GameListResponseDto getRecentPlayedGames(CustomUserDetails userDetails, int limit) {
+        User user = findUser(userDetails);
+        List<Game> games = problemAttemptRepository.findRecentPlayedGames(user);
+        if (games.size() > limit) {
+            games = games.subList(0, limit);
+        }
+        List<GameResponseDto> responses = games.stream()
+                .map(game -> GameResponseDto.from(game,
+                        gameLikeRepository.existsByGameAndUser(game, user)))
+                .collect(Collectors.toList());
+        return GameListResponseDto.from(responses);
+    }
+
+    // 게임 수정 (제목, 설명, 공개 방식만). 본인 게임만 수정 가능
+    @Transactional
+    public GameResponseDto updateGame(Long gameId, GameUpdateRequestDto request, CustomUserDetails userDetails) {
+        User user = findUser(userDetails);
+        Game game = findGame(gameId);
+        if (!game.getOwner().getUserId().equals(user.getUserId())) {
+            throw new CapstonException(ExceptionCode.GAME_NOT_FOUND);
+        }
+        game.updateInfo(request.getTitle(), request.getDescription(), request.getIsPublic());
+        boolean isLiked = gameLikeRepository.existsByGameAndUser(game, user);
+        return GameResponseDto.from(game, isLiked);
     }
 
     // 좋아요 누르기 / 취소
