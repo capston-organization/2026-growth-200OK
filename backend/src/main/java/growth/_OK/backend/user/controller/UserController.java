@@ -6,6 +6,7 @@ import growth._OK.backend.game.service.GameService;
 import growth._OK.backend.user.dto.request.UserBasicInfoRequestDto;
 import growth._OK.backend.user.dto.response.StreakResponseDto;
 import growth._OK.backend.user.dto.response.UserBasicInfoResponseDto;
+import growth._OK.backend.user.dto.response.GreetingResponseDto;
 import growth._OK.backend.user.service.UserService;
 import growth._OK.backend.user.service.UserStreakService;
 import lombok.RequiredArgsConstructor;
@@ -49,10 +50,25 @@ public class UserController {
         return ResponseEntity.ok(dto);
     }
 
-    /** 내가 만든 게임 전체 조회 (최신순) */
+    // 내가 만든 게임 전체 최신순 조회
     @GetMapping("/me/games")
     public ResponseEntity<GameListResponseDto> getMyGames(@AuthenticationPrincipal CustomUserDetails user) {
         GameListResponseDto dto = gameService.getMyGames(user);
+        return ResponseEntity.ok(dto);
+    }
+
+    // 내가 최근에 플레이한 게임 5개 최신순 조회
+    @GetMapping("/me/games/recent")
+    public ResponseEntity<GameListResponseDto> getMyRecentPlayedGames(@AuthenticationPrincipal CustomUserDetails user) {
+        GameListResponseDto dto = gameService.getRecentPlayedGames(user, 5);
+        return ResponseEntity.ok(dto);
+    }
+
+    // 인삿말 조회: 호출할 때마다 7개 중 랜덤 1개
+    @GetMapping("/me/greeting")
+    public ResponseEntity<GreetingResponseDto> getGreeting(
+            @AuthenticationPrincipal CustomUserDetails user) {
+        GreetingResponseDto dto = userService.getRandomGreeting();
         return ResponseEntity.ok(dto);
     }
 }

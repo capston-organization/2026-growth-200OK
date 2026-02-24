@@ -12,4 +12,6 @@ public interface GameRepository extends JpaRepository<Game, Long> {
     List<Game> findByTitleContainingIgnoreCase(String title);
 
     List<Game> findByOwnerOrderByCreatedAtDesc(User owner);
+
+    List<Game> findByIsPublicTrueOrderByCreatedAtDesc();
 }
