@@ -81,6 +81,18 @@ public class GameService {
         return GameListResponseDto.from(responses);
     }
 
+    // 공개 게임 전체 조회 (최신순)
+    @Transactional(readOnly = true)
+    public GameListResponseDto getPublicGamesLatest(CustomUserDetails userDetails) {
+        User user = userDetails != null ? findUser(userDetails) : null;
+        List<Game> games = gameRepository.findByIsPublicTrueOrderByCreatedAtDesc();
+        List<GameResponseDto> responses = games.stream()
+                .map(game -> GameResponseDto.from(game,
+                        user != null && gameLikeRepository.existsByGameAndUser(game, user)))
+                .collect(Collectors.toList());
+        return GameListResponseDto.from(responses);
+    }
+
     // 내가 만든 게임 전체 조회
     @Transactional(readOnly = true)
     public GameListResponseDto getMyGames(CustomUserDetails userDetails) {

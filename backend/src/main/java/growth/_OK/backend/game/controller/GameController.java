@@ -128,6 +128,12 @@ public class GameController {
         return ResponseEntity.ok(gameService.getGames(title, user));
     }
 
+    // 공개 게임 전체 최신순 조회
+    @GetMapping("/public")
+    public ResponseEntity<GameListResponseDto> getPublicGamesLatest(@AuthenticationPrincipal CustomUserDetails user) {
+        return ResponseEntity.ok(gameService.getPublicGamesLatest(user));
+    }
+
     // 좋아요 누르기 & 삭제
     @PostMapping("/{gameId}/like")
     public ResponseEntity<GameResponseDto> likeGame(@PathVariable Long gameId,
