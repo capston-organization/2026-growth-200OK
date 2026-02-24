@@ -10,6 +10,7 @@ import growth._OK.backend.global.exception.CapstonException;
 import growth._OK.backend.global.exception.ExceptionCode;
 import growth._OK.backend.user.domain.User;
 import growth._OK.backend.user.repository.UserRepository;
+import growth._OK.backend.user.service.UserStreakService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +27,7 @@ public class ProblemAttemptService {
     private final ProblemAttemptRepository problemAttemptRepository;
     private final UserRepository userRepository;
     private final GeminiService geminiService;
+    private final UserStreakService userStreakService;
 
     @Transactional
     public void submitAnswer(Long gameId, Long problemId, Boolean correct, CustomUserDetails userDetails) {
@@ -42,6 +44,7 @@ public class ProblemAttemptService {
                 .correct(Boolean.TRUE.equals(correct))
                 .attemptOrder(nextOrder)
                 .build());
+        userStreakService.recordPlayToday(user.getUserId());
     }
 
     @Transactional(readOnly = true)
