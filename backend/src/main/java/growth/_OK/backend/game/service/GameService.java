@@ -6,6 +6,7 @@ import growth._OK.backend.game.domain.GameLike;
 import growth._OK.backend.game.dto.ResponseDto.GameListResponseDto;
 import growth._OK.backend.game.dto.ResponseDto.GameResponseDto;
 import growth._OK.backend.game.dto.requestDto.GameCreateRequestDto;
+import growth._OK.backend.game.dto.requestDto.GameUpdateRequestDto;
 import growth._OK.backend.game.domain.GameSource;
 import growth._OK.backend.game.repository.GameLikeRepository;
 import growth._OK.backend.game.repository.GameRepository;
@@ -99,6 +100,19 @@ public class GameService {
                 .map(game -> GameResponseDto.from(game, true))
                 .collect(Collectors.toList());
         return GameListResponseDto.from(responses);
+    }
+
+    // 게임 수정 (제목, 설명, 공개 방식만). 본인 게임만 수정 가능
+    @Transactional
+    public GameResponseDto updateGame(Long gameId, GameUpdateRequestDto request, CustomUserDetails userDetails) {
+        User user = findUser(userDetails);
+        Game game = findGame(gameId);
+        if (!game.getOwner().getUserId().equals(user.getUserId())) {
+            throw new CapstonException(ExceptionCode.GAME_NOT_FOUND);
+        }
+        game.updateInfo(request.getTitle(), request.getDescription(), request.getIsPublic());
+        boolean isLiked = gameLikeRepository.existsByGameAndUser(game, user);
+        return GameResponseDto.from(game, isLiked);
     }
 
     // 좋아요 누르기 / 취소

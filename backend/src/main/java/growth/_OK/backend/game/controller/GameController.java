@@ -8,6 +8,7 @@ import growth._OK.backend.game.dto.ResponseDto.GameResponseDto;
 import growth._OK.backend.game.dto.ResponseDto.ProblemWithStatusDto;
 import growth._OK.backend.game.dto.requestDto.GameCreateRequestDto;
 import growth._OK.backend.game.dto.requestDto.GameGenerateProblemsRequestDto;
+import growth._OK.backend.game.dto.requestDto.GameUpdateRequestDto;
 import growth._OK.backend.game.dto.requestDto.SubmitAnswerRequestDto;
 import growth._OK.backend.game.service.GameGenerateService;
 import growth._OK.backend.game.service.GameService;
@@ -17,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -47,6 +49,15 @@ public class GameController {
         GameResponseDto created = gameService.createGame(request, user);
         URI location = URI.create("/games/" + created.getId());
         return ResponseEntity.created(location).body(created);
+    }
+
+    // 게임 수정 (제목, 설명, 공개 방식만). 본인 게임만 수정 가능
+    @PatchMapping("/{gameId}")
+    public ResponseEntity<GameResponseDto> updateGame(@PathVariable Long gameId,
+                                                      @AuthenticationPrincipal CustomUserDetails user,
+                                                      @RequestBody GameUpdateRequestDto request) {
+        GameResponseDto updated = gameService.updateGame(gameId, request, user);
+        return ResponseEntity.ok(updated);
     }
 
     // 소스 업로드 (PDF/텍스트). 해당 게임에 연결. 먼저 POST /games 로 게임 생성 후 호출.

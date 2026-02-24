@@ -93,4 +93,17 @@ public class Game extends BaseEntity {
     public void setSource(GameSource source) {
         this.source = source;
     }
+
+    /** 게임 수정: 제목, 설명, 공개 방식만 변경 가능 */
+    public void updateInfo(String title, String description, Boolean isPublic) {
+        if (title != null && !title.isBlank()) {
+            this.title = title;
+        }
+        if (description != null) {
+            this.description = description;
+        }
+        if (isPublic != null) {
+            this.isPublic = isPublic;
+        }
+    }
 }
