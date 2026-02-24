@@ -99,10 +99,8 @@ public class AuthService {
                 .orElseThrow(() -> new CapstonException(ExceptionCode.USER_NOT_FOUND));
     }
 
-    /**
-     * 회원 탈퇴: 토큰 정리 → 사용자 삭제.
-     * 이벤트/파일 정리는 별도 서비스로 분리 가능.
-     */
+    // 회원 탈퇴: 토큰 정리 → 사용자 삭제.
+    // 이벤트/파일 정리는 별도 서비스로 분리 가능.
     @Transactional
     public void deleteAccount(CustomUserDetails userDetails, String accessToken, HttpServletResponse response) {
         User user = findUser(userDetails);

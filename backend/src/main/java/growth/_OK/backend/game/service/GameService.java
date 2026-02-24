@@ -80,6 +80,16 @@ public class GameService {
         return GameListResponseDto.from(responses);
     }
 
+    // 내가 만든 게임 전체 조회
+    @Transactional(readOnly = true)
+    public GameListResponseDto getMyGames(CustomUserDetails userDetails) {
+        User user = findUser(userDetails);
+        List<GameResponseDto> responses = gameRepository.findByOwnerOrderByCreatedAtDesc(user).stream()
+                .map(game -> GameResponseDto.from(game, gameLikeRepository.existsByGameAndUser(game, user)))
+                .collect(Collectors.toList());
+        return GameListResponseDto.from(responses);
+    }
+
     // 내가 좋아요한 게임 조회
     @Transactional(readOnly = true)
     public GameListResponseDto getLikedGames(CustomUserDetails userDetails) {
