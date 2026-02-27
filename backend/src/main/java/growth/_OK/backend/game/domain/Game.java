@@ -37,6 +37,12 @@ public class Game extends BaseEntity {
     @Column(name = "learning_objectives", columnDefinition = "TEXT")
     private String learningObjectives;
 
+    @Column(name = "preview_learning_objectives", columnDefinition = "TEXT")
+    private String previewLearningObjectives;
+
+    @Column(name = "preview_learning_content", columnDefinition = "TEXT")
+    private String previewLearningContent;
+
     @Column(name = "is_public", nullable = false)
     private boolean isPublic;
 
@@ -89,6 +95,16 @@ public class Game extends BaseEntity {
     // 해당 게임에 소스 연결 (소스 업로드 시 호출)
     public void setSource(GameSource source) {
         this.source = source;
+    }
+
+    public void setPreviewCache(String previewLearningObjectives, String previewLearningContent) {
+        this.previewLearningObjectives = previewLearningObjectives;
+        this.previewLearningContent = previewLearningContent;
+    }
+
+    public void clearPreviewCache() {
+        this.previewLearningObjectives = null;
+        this.previewLearningContent = null;
     }
 
     public void updateInfo(String title, String description, Boolean isPublic) {

@@ -54,6 +54,7 @@ public class GameSourceService {
         if (source != null) {
             String existing = source.getExtractedText() != null ? source.getExtractedText() : "";
             source.setExtractedText(existing.isBlank() ? extractedText : existing + "\n\n" + extractedText);
+            game.clearPreviewCache();
             return gameSourceRepository.save(source).getId();
         }
 
@@ -85,6 +86,7 @@ public class GameSourceService {
         if (source != null) {
             String existing = source.getExtractedText() != null ? source.getExtractedText() : "";
             source.setExtractedText(existing.isBlank() ? sanitized : existing + "\n\n" + sanitized);
+            game.clearPreviewCache();
             return gameSourceRepository.save(source).getId();
         }
 
