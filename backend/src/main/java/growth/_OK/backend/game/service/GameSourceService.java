@@ -29,7 +29,6 @@ public class GameSourceService {
     private final GameSourceRepository gameSourceRepository;
     private final UserRepository userRepository;
 
-    /** 소스(PDF/텍스트) 업로드 시 파일에서 텍스트 추출 후 저장. 프리뷰/문제 생성 시 Gemini가 이 텍스트를 사용함. */
     @Transactional
     public Long uploadSource(Long gameId, MultipartFile file, CustomUserDetails userDetails) {
         User user = findUser(userDetails);
@@ -80,10 +79,8 @@ public class GameSourceService {
         }
     }
 
-    /** PostgreSQL UTF-8에서 허용하지 않는 문자 제거 (NUL 0x00 등). */
     private static String sanitizeForPostgres(String text) {
         if (text == null) return null;
-        // NUL(0x00) 및 기타 C0 제어문자 제거 (PostgreSQL text 타입에서 오류 방지)
         return text.replace("\u0000", "")
                 .replaceAll("[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F]", "");
     }

@@ -12,7 +12,7 @@ import java.time.LocalDate;
 
 @Entity
 @Getter
-@NoArgsConstructor(access = AccessLevel.PROTECTED) // 아무런 매개변수가 없는 생성자를 생성하되 다른 패키지에 소속된 클래스는 접근 불허
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name="users")
 public class User extends BaseEntity {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -20,11 +20,11 @@ public class User extends BaseEntity {
 
     private String name;
     private String nickname;
-    private String profileImage; //프로필 사진 URL
+    private String profileImage;
 
-    @Enumerated(EnumType.STRING) // enum 이름을 DB에 저장
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private Provider provider; // 카카오
+    private Provider provider;
 
     @Column(nullable = false)
     private String providerId;
@@ -33,15 +33,24 @@ public class User extends BaseEntity {
     @Column(nullable = false)
     private Role role = Role.STUDENT;
 
-    // 기본 정보 (로그인 후 입력/조회)
-    private Integer birthYear;   // 필수
-    private String grade;       // 필수 (예: 초등1, 중1, 고2)
-    private LocalDate birthDate; // 선택
-    private String school;      // 선택
+    private Integer birthYear;
+    private String grade;
+    private LocalDate birthDate;
+    private String school;
     @Enumerated(EnumType.STRING)
-    private Gender gender;      // 선택
+    private Gender gender;
 
-    // ---------------
+    @Column(nullable = false)
+    private int coins = 0;
+
+    @Column(nullable = false)
+    private int happiness = 0;
+
+    @Column(nullable = false)
+    private int fullness = 0;
+
+    @Column(nullable = false)
+    private int level = 0;
 
     @Builder
     public User(String username, String providerId, String profileImage, Provider provider, Role role) {
@@ -62,20 +71,18 @@ public class User extends BaseEntity {
                 .build();
     }
 
-    // 이름 수정
     public void updateName(String name) {
         this.name = name;
     }
-    // 닉네임 수정
+
     public void updateNickname(String nickname) {
         this.nickname = nickname;
     }
-    // 프로필 사진 수정
+
     public void updateProfileImage(String profileImage) {
         this.profileImage = profileImage;
     }
 
-    // 기본 정보 수정
     public void updateBasicInfo(String name, Integer birthYear, String grade,
                                LocalDate birthDate, String school, Gender gender) {
         if (name != null) this.name = name;
@@ -84,6 +91,27 @@ public class User extends BaseEntity {
         if (birthDate != null) this.birthDate = birthDate;
         if (school != null) this.school = school;
         if (gender != null) this.gender = gender;
+    }
+
+    public void addCoins(int amount) {
+        this.coins += amount;
+        if (this.coins < 0) {
+            this.coins = 0;
+        }
+    }
+
+    public void increaseHappiness(int amount) {
+        if (amount <= 0) return;
+        this.happiness += amount;
+    }
+
+    public void increaseFullness(int amount) {
+        if (amount <= 0) return;
+        this.fullness += amount;
+    }
+
+    public void levelUp() {
+        this.level += 1;
     }
 
 }

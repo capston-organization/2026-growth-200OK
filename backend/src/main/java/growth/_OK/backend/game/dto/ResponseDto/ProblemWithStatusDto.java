@@ -17,8 +17,6 @@ public class ProblemWithStatusDto {
     private final String correctAnswer;
     private final ProblemType type;
     private final int sortOrder;
-    /** 첫 시도 정답 여부. null이면 미제출 */
     private final Boolean firstAttemptCorrect;
-    /** 해설 (없으면 빈 문자열 또는 Gemini로 생성 후 포함) */
     private final String explanation;
 }
