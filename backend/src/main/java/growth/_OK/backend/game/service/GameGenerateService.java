@@ -45,7 +45,6 @@ public class GameGenerateService {
         return geminiService.generatePreviewFromSource(game.getDescription(), sourceText);
     }
 
-    /** 2단계: Gemini로 문제 생성 후 저장하고 DTO 목록 반환 */
     @Transactional
     public List<GeneratedProblemDto> generateProblems(Long gameId, GameGenerateProblemsRequestDto request,
                                                       CustomUserDetails userDetails) {
@@ -54,6 +53,21 @@ public class GameGenerateService {
         if (game.getSource() == null) {
             throw new CapstonException(ExceptionCode.GAME_SOURCE_NOT_SET);
         }
+
+        List<Problem> existing = problemRepository.findByGame_IdOrderBySortOrderAsc(gameId);
+        if (!existing.isEmpty()) {
+            return existing.stream()
+                    .map(p -> GeneratedProblemDto.builder()
+                            .id(p.getId())
+                            .question(p.getQuestion())
+                            .options(parseOptionsJson(p.getOptionsJson()))
+                            .correctAnswer(p.getCorrectAnswer())
+                            .type(p.getType())
+                            .sortOrder(p.getSortOrder())
+                            .build())
+                    .collect(Collectors.toList());
+        }
+
         int count = request.getProblemCount() != null && request.getProblemCount() > 0
                 ? request.getProblemCount()
                 : game.getProblemCount();
