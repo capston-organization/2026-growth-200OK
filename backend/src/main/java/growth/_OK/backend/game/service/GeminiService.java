@@ -26,6 +26,9 @@ public class GeminiService {
     private final ObjectMapper objectMapper;
 
     private static final int SOURCE_TEXT_MAX_LENGTH = 20_000;
+    private static final int MAX_QUESTION_LENGTH = 80;
+    private static final int MAX_OPTION_LENGTH = 50;
+    private static final int MAX_SHORT_ANSWER_LENGTH = 50;
 
     public GamePreviewResponseDto generatePreviewFromSource(String description, String sourceText) {
         if (sourceText == null || sourceText.isBlank()) {
@@ -80,9 +83,6 @@ public class GeminiService {
         }
     }
 
-    /**
-     * 문제 생성: requestBody에 지정된 개수·문제 유형(SHORT_ANSWER, OX, MULTIPLE_CHOICE)에 맞춰 소스 텍스트 기반으로 문제 생성.
-     */
     public List<RawGeneratedProblem> generateProblemsFromSource(String sourceText, int count, List<ProblemType> types) {
         if (sourceText == null || sourceText.isBlank()) {
             throw new CapstonException(ExceptionCode.SOURCE_CONTENT_EMPTY);
@@ -97,22 +97,25 @@ public class GeminiService {
         String prompt = """
                 아래 소스 텍스트를 바탕으로 정확히 %d개의 퀴즈 문제를 만들어 주세요.
                 
-                문제 유형(반드시 아래 중에서만 선택):
-                - SHORT_ANSWER: 단답형 (빈칸, 한 단어/숫자 등)
-                - OX: O/X (참/거짓)
-                - MULTIPLE_CHOICE: 5지선다 (선택지 5개, 기호 없이 선택지 문장만)
+                [문제 유형] (반드시 아래만 사용)
+                - SHORT_ANSWER: 단답형. 질문 80자 이내, 정답은 50자 이내(한 단어·숫자·짧은 구절).
+                - OX: O/X. 질문 80자 이내, 정답은 "O" 또는 "X"만.
+                - MULTIPLE_CHOICE: 5지선다. 반드시 선택지를 정확히 5개만 만드세요. 4개나 6개 이상 금지.
                 
-                이번 요청에서 사용할 유형: %s
-                (여러 유형이면 문제마다 골고루 섞어서 사용)
+                [글자 수 제한 - UI 표시를 위해 꼭 지켜주세요]
+                - question: 단답형/객관식/OX 모두 80자 이내로 짧고 명확하게.
+                - MULTIPLE_CHOICE의 options: 각 선택지 50자 이내, 반드시 5개만. 기호(①②) 없이 내용만.
+                - SHORT_ANSWER의 correctAnswer: 50자 이내.
                 
-                각 문제는 다음 필드를 가져야 합니다.
-                - question: 문제 지문 (한국어)
-                - options: 선택지 배열. SHORT_ANSWER/OX면 빈 배열 [], MULTIPLE_CHOICE면 5개 문자열 (기호 없이 내용만)
-                - correctAnswer: 정답 (선택지면 정답인 선택지 문자열 그대로, OX면 "O" 또는 "X", 단답형이면 정답 문자열)
-                - type: 반드시 SHORT_ANSWER, OX, MULTIPLE_CHOICE 중 하나
+                사용할 유형: %s (여러 유형이면 골고루 섞기)
                 
-                출력: JSON 배열 하나만 출력. 다른 설명 없이 배열만. 선택지에 ①②③ 같은 기호 붙이지 마세요.
-                예: [{"question":"...","options":["첫 번째 선택지","두 번째 선택지"],"correctAnswer":"첫 번째 선택지","type":"MULTIPLE_CHOICE"}]
+                [필드 규칙]
+                - question: 문제 지문 (한국어, 80자 이내)
+                - options: SHORT_ANSWER/OX면 빈 배열 []. MULTIPLE_CHOICE면 반드시 길이 5인 배열 (5지선다만 허용).
+                - correctAnswer: 정답. OX면 "O" 또는 "X", 단답형이면 50자 이내, 객관식이면 5개 중 정답 선택지 문자열.
+                - type: SHORT_ANSWER, OX, MULTIPLE_CHOICE 중 하나
+                
+                JSON 배열만 출력하고 설명 금지. 선택지에 ①② 기호 붙이지 마세요.
                 
                 소스 텍스트:
                 %s
@@ -138,7 +141,7 @@ public class GeminiService {
             List<RawGeneratedProblem> result = new ArrayList<>();
             for (Map<String, Object> map : list) {
                 RawGeneratedProblem p = new RawGeneratedProblem();
-                p.question = (String) map.getOrDefault("question", "");
+                p.question = truncate((String) map.getOrDefault("question", ""), MAX_QUESTION_LENGTH);
                 p.correctAnswer = stripOptionSymbol((String) map.getOrDefault("correctAnswer", ""));
                 p.type = (String) map.getOrDefault("type", "MULTIPLE_CHOICE");
                 @SuppressWarnings("unchecked")
@@ -146,11 +149,19 @@ public class GeminiService {
                 List<String> sanitized = opt != null
                         ? opt.stream().map(GeminiService::stripOptionSymbol).filter(s -> !s.isBlank()).toList()
                         : List.<String>of();
-                // 5지선다는 기호 제거 후 최대 5개만 사용 (Gemini가 ①당 하나씩 나눠서 10개 나오는 경우 방지)
-                if ("MULTIPLE_CHOICE".equalsIgnoreCase(p.type) && sanitized.size() > 5) {
-                    p.options = sanitized.subList(0, 5);
+                if ("MULTIPLE_CHOICE".equalsIgnoreCase(p.type)) {
+                    if (sanitized.size() > 5) {
+                        sanitized = sanitized.subList(0, 5);
+                    }
+                    p.options = sanitized.stream()
+                            .map(s -> truncate(s, MAX_OPTION_LENGTH))
+                            .toList();
+                    p.correctAnswer = truncate(p.correctAnswer, MAX_OPTION_LENGTH);
                 } else {
                     p.options = sanitized;
+                    if ("SHORT_ANSWER".equalsIgnoreCase(p.type)) {
+                        p.correctAnswer = truncate(p.correctAnswer, MAX_SHORT_ANSWER_LENGTH);
+                    }
                 }
                 result.add(p);
             }
@@ -159,6 +170,13 @@ public class GeminiService {
             log.warn("Failed to parse problems JSON", e);
             return List.of();
         }
+    }
+
+    private static String truncate(String s, int maxLen) {
+        if (s == null) return "";
+        s = s.trim();
+        if (s.length() <= maxLen) return s;
+        return s.substring(0, maxLen);
     }
 
     private static String stripOptionSymbol(String s) {
