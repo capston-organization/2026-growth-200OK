@@ -10,6 +10,7 @@ import growth._OK.backend.game.dto.requestDto.GameCreateRequestDto;
 import growth._OK.backend.game.dto.requestDto.GameGenerateProblemsRequestDto;
 import growth._OK.backend.game.dto.requestDto.GameUpdateRequestDto;
 import growth._OK.backend.game.dto.requestDto.SubmitAnswerRequestDto;
+import growth._OK.backend.game.dto.requestDto.TextSourceRequestDto;
 import growth._OK.backend.game.service.GameGenerateService;
 import growth._OK.backend.game.service.GameService;
 import growth._OK.backend.game.service.GameSourceService;
@@ -66,6 +67,15 @@ public class GameController {
                                                           @AuthenticationPrincipal CustomUserDetails user,
                                                           @RequestParam("file") MultipartFile file) {
         Long sourceId = gameSourceService.uploadSource(gameId, file, user);
+        return ResponseEntity.ok(Map.of("sourceId", sourceId));
+    }
+
+    @PostMapping("/{gameId}/sources/text")
+    public ResponseEntity<Map<String, Long>> addTextSource(@PathVariable Long gameId,
+                                                           @AuthenticationPrincipal CustomUserDetails user,
+                                                           @RequestBody TextSourceRequestDto request) {
+        String text = request.getText() != null ? request.getText() : "";
+        Long sourceId = gameSourceService.addTextSource(gameId, text, user);
         return ResponseEntity.ok(Map.of("sourceId", sourceId));
     }
 

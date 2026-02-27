@@ -29,6 +29,8 @@ public class GameSourceService {
     private final GameSourceRepository gameSourceRepository;
     private final UserRepository userRepository;
 
+    private static final String INLINE_SOURCE_PATH = "inline";
+
     @Transactional
     public Long uploadSource(Long gameId, MultipartFile file, CustomUserDetails userDetails) {
         User user = findUser(userDetails);
@@ -48,19 +50,57 @@ public class GameSourceService {
             throw new CapstonException(ExceptionCode.SOURCE_CONTENT_EMPTY);
         }
 
+        GameSource source = game.getSource();
+        if (source != null) {
+            String existing = source.getExtractedText() != null ? source.getExtractedText() : "";
+            source.setExtractedText(existing.isBlank() ? extractedText : existing + "\n\n" + extractedText);
+            game.clearPreviewCache();
+            return gameSourceRepository.save(source).getId();
+        }
+
         String filePath = "sources/" + gameId + "/" + System.currentTimeMillis() + "_" + originalFilename;
-        GameSource source = GameSource.builder()
+        source = GameSource.builder()
                 .owner(user)
                 .filePath(filePath)
                 .originalFileName(originalFilename)
-                .extractedText(extractedText != null ? extractedText : "")
+                .extractedText(extractedText)
                 .build();
         source = gameSourceRepository.save(source);
         game.setSource(source);
         return source.getId();
     }
 
-    /** PDF는 PDFBox로, 텍스트 파일은 UTF-8로 추출. Gemini 프리뷰/문제 생성에 사용됨. */
+    @Transactional
+    public Long addTextSource(Long gameId, String text, CustomUserDetails userDetails) {
+        User user = findUser(userDetails);
+        Game game = findGame(gameId);
+        if (!game.getOwner().getUserId().equals(user.getUserId())) {
+            throw new CapstonException(ExceptionCode.GAME_NOT_FOUND);
+        }
+        String sanitized = sanitizeForPostgres(text);
+        if (sanitized == null || sanitized.isBlank()) {
+            throw new CapstonException(ExceptionCode.SOURCE_CONTENT_EMPTY);
+        }
+
+        GameSource source = game.getSource();
+        if (source != null) {
+            String existing = source.getExtractedText() != null ? source.getExtractedText() : "";
+            source.setExtractedText(existing.isBlank() ? sanitized : existing + "\n\n" + sanitized);
+            game.clearPreviewCache();
+            return gameSourceRepository.save(source).getId();
+        }
+
+        source = GameSource.builder()
+                .owner(user)
+                .filePath(INLINE_SOURCE_PATH)
+                .originalFileName("user_input")
+                .extractedText(sanitized)
+                .build();
+        source = gameSourceRepository.save(source);
+        game.setSource(source);
+        return source.getId();
+    }
+
     private String extractTextFromFile(MultipartFile file, String originalFilename, String contentType) {
         String lowerName = originalFilename.toLowerCase();
         boolean isPdf = contentType != null && contentType.contains("pdf") || lowerName.endsWith(".pdf");
