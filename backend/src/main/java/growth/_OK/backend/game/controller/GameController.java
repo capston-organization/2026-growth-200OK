@@ -45,7 +45,6 @@ public class GameController {
     private final ProblemAttemptService problemAttemptService;
     private final UserCoinService userCoinService;
 
-    // 게임 생성
     @PostMapping
     public ResponseEntity<GameResponseDto> createGame(@AuthenticationPrincipal CustomUserDetails user,
                                                       @RequestBody GameCreateRequestDto request) {
@@ -54,7 +53,6 @@ public class GameController {
         return ResponseEntity.created(location).body(created);
     }
 
-    // 게임 수정 (제목, 설명, 공개 방식만). 본인 게임만 수정 가능
     @PatchMapping("/{gameId}")
     public ResponseEntity<GameResponseDto> updateGame(@PathVariable Long gameId,
                                                       @AuthenticationPrincipal CustomUserDetails user,
@@ -63,7 +61,6 @@ public class GameController {
         return ResponseEntity.ok(updated);
     }
 
-    // 소스 업로드 (PDF/텍스트). 해당 게임에 연결. 먼저 POST /games 로 게임 생성 후 호출.
     @PostMapping("/{gameId}/sources")
     public ResponseEntity<Map<String, Long>> uploadSource(@PathVariable Long gameId,
                                                           @AuthenticationPrincipal CustomUserDetails user,
@@ -72,7 +69,6 @@ public class GameController {
         return ResponseEntity.ok(Map.of("sourceId", sourceId));
     }
 
-    // 1단계: 게임 설명, 학습 목표, 학습할 내용만 먼저 반환. 게임에 연결된 소스 사용. 소스 없으면 에러.
     @PostMapping("/{gameId}/generate/preview")
     public ResponseEntity<GamePreviewResponseDto> generatePreview(@PathVariable Long gameId,
                                                                   @AuthenticationPrincipal CustomUserDetails user) {
@@ -88,7 +84,6 @@ public class GameController {
         return ResponseEntity.ok(Map.of("problems", gameGenerateService.generateProblems(gameId, request, user)));
     }
 
-    // 문제 제출: 정답/오답 기록. body: { "correct": true | false }
     @PostMapping("/{gameId}/problems/{problemId}/submit")
     public ResponseEntity<Void> submitAnswer(@PathVariable Long gameId,
                                              @PathVariable Long problemId,
@@ -112,7 +107,6 @@ public class GameController {
                 .build());
     }
 
-    // 틀린 문제만 조회 (오답 노트). 첫 시도에서 오답이었던 문제 목록
     @GetMapping("/{gameId}/problems/wrong")
     public ResponseEntity<List<ProblemWithStatusDto>> getWrongProblems(@PathVariable Long gameId,
                                                                         @AuthenticationPrincipal CustomUserDetails user) {
@@ -128,7 +122,6 @@ public class GameController {
         return ResponseEntity.ok(Map.of("explanation", explanation != null ? explanation : ""));
     }
 
-    // 문제 전체 조회. 각 문제별 상태(맞음/틀림/오답 후 정답) + 해설. 해설 없으면 Gemini로 생성 후 포함
     @GetMapping("/{gameId}/problems")
     public ResponseEntity<List<ProblemWithStatusDto>> getAllProblems(@PathVariable Long gameId,
                                                                       @AuthenticationPrincipal CustomUserDetails user) {
@@ -142,7 +135,6 @@ public class GameController {
         return ResponseEntity.ok(gameService.getGames(title, user));
     }
 
-    // 공개 게임 전체 최신순 조회
     @GetMapping("/public")
     public ResponseEntity<GameListResponseDto> getPublicGamesLatest(@AuthenticationPrincipal CustomUserDetails user) {
         return ResponseEntity.ok(gameService.getPublicGamesLatest(user));
@@ -155,7 +147,6 @@ public class GameController {
         return ResponseEntity.ok(gameService.toggleLike(gameId, user));
     }
 
-    // 내가 좋아요 누른 게임 목록
     @GetMapping("/likes/me")
     public ResponseEntity<GameListResponseDto> getLikedGames(@AuthenticationPrincipal CustomUserDetails user) {
         return ResponseEntity.ok(gameService.getLikedGames(user));

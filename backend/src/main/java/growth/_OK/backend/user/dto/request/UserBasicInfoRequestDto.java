@@ -19,7 +19,6 @@ public class UserBasicInfoRequestDto {
     private final Integer birthYear;
     @NotBlank(message = "학년은 필수입니다.")
     private final String grade;
-    // 선택
     private final LocalDate birthDate;
     private final String school;
     private final Gender gender;

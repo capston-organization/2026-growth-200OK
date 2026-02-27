@@ -1,11 +1,8 @@
 package growth._OK.backend.global.exception;
 
 public enum ClientExceptionCode {
-    // 전체
     INTERNAL_SERVER_ERROR,
     ILLEGAL_ARGUMENT,
-
-    // 사용자
     AUTH_TOKEN_EMPTY,
     ACCESS_TOKEN_EMPTY,
     REFRESH_TOKEN_EMPTY,
@@ -14,15 +11,11 @@ public enum ClientExceptionCode {
     AUTH_TOKEN_MISMATCH,
     USER_NOT_FOUND,
     INSUFFICIENT_COINS,
-
-    // 게임
     GAME_NOT_FOUND,
     PROBLEM_NOT_FOUND,
     GAME_SOURCE_NOT_FOUND,
     GAME_SOURCE_NOT_SET,
     INVALID_SOURCE_FILE,
     SOURCE_CONTENT_EMPTY,
-
-    // AI (Gemini)
     GEMINI_QUOTA_EXCEEDED,
 }

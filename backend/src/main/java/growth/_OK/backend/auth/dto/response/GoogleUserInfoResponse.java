@@ -7,10 +7,6 @@ import lombok.ToString;
 @Getter
 @ToString
 public class GoogleUserInfoResponse {
-    /**
-     * Google OpenID Connect user info response
-     * ref: https://openid.net/specs/openid-connect-core-1_0.html#UserInfo
-     */
     @JsonProperty("sub")
     private String id;
 

@@ -8,8 +8,6 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 
-// 유저가 해당 날짜에 게임을 플레이했는지 기록.
-// (user, playDate) 당 1건만 저장 → 오늘 플레이했으면 스트릭 유지, 아니면 빈칸.
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
