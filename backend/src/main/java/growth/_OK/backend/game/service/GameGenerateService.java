@@ -33,7 +33,7 @@ public class GameGenerateService {
     private final GeminiService geminiService;
     private final ObjectMapper objectMapper;
 
-    @Transactional(readOnly = true)
+    @Transactional
     public GamePreviewResponseDto generatePreview(Long gameId, CustomUserDetails userDetails) {
         findUser(userDetails);
         Game game = findGame(gameId);
@@ -41,8 +41,27 @@ public class GameGenerateService {
         if (source == null) {
             throw new CapstonException(ExceptionCode.GAME_SOURCE_NOT_SET);
         }
+        if (game.getPreviewLearningObjectives() != null && game.getPreviewLearningContent() != null
+                && !game.getPreviewLearningObjectives().isBlank() && !game.getPreviewLearningContent().isBlank()) {
+            return GamePreviewResponseDto.builder()
+                    .description(game.getDescription() != null ? game.getDescription() : "")
+                    .learningObjectives(game.getPreviewLearningObjectives())
+                    .learningContent(game.getPreviewLearningContent())
+                    .build();
+        }
         String sourceText = source.getExtractedText();
-        return geminiService.generatePreviewFromSource(game.getDescription(), sourceText);
+        GamePreviewResponseDto dto = geminiService.generatePreviewFromSource(game.getDescription(), sourceText);
+        savePreviewCache(gameId, dto);
+        return dto;
+    }
+
+    @Transactional
+    public void savePreviewCache(Long gameId, GamePreviewResponseDto dto) {
+        Game game = findGame(gameId);
+        game.setPreviewCache(
+                dto.getLearningObjectives() != null ? dto.getLearningObjectives() : "",
+                dto.getLearningContent() != null ? dto.getLearningContent() : ""
+        );
     }
 
     @Transactional
