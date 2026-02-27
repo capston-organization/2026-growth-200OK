@@ -2,6 +2,7 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import LoginPage from "./pages/LoginPage";
+import AuthCallback from "./pages/AuthCallback";
 import SignUpPage from "./pages/SignUpPage";
 import GameCreationPage from "./pages/GameCreationPage";
 import GamePlayPage from "./pages/GamePlayPage";
@@ -15,6 +16,7 @@ function App() {
         <Route path="/signup" element={<SignUpPage />} />
         <Route path="/create-game" element={<GameCreationPage />} />
         <Route path="/play" element={<GamePlayPage />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
       </Routes>
     </Router>
   );
