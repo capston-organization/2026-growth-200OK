@@ -25,7 +25,6 @@ public class JwtTokenProvider {
 
     public SecretKey getSecretKey() {return Keys.hmacShaKeyFor(secretKey.getBytes());}
 
-    // 토큰 생성
     public String createAccessToken(User user) {return createToken(user, ACCESS_EXPIRE, "access");}
     public String createRefreshToken(User user) {return createToken(user, REFRESH_EXPIRE, "refresh");}
 
@@ -42,7 +41,6 @@ public class JwtTokenProvider {
                 .compact();
     }
 
-    // 토큰 검증
     public boolean validateToken(String token) {
         try {
             Jwts.parserBuilder()
@@ -73,7 +71,6 @@ public class JwtTokenProvider {
         }
     }
 
-    // 토큰 타입 확인
     public boolean isRefreshToken(String token) {
         Claims claims = parseClaims(token);
         return "refresh".equals(claims.get("type", String.class));
@@ -88,7 +85,6 @@ public class JwtTokenProvider {
         return Long.valueOf(claims.getSubject());
     }
 
-    // RefreshToken userId 추출
     public Long getUserIdFromRefreshToken(String token) {
         Claims claims = parseClaims(token);
         if (!"refresh".equals(claims.get("type", String.class))) {
@@ -112,7 +108,6 @@ public class JwtTokenProvider {
             long diff = claims.getExpiration().getTime() - System.currentTimeMillis();
             return Math.max(diff, 0);
         } catch (ExpiredJwtException e) {
-            // 이미 만료된 토큰인 경우 TTL 0
             return 0;
         } catch (JwtException e) {
             throw new CapstonException(ExceptionCode.AUTH_TOKEN_INVALID);

@@ -17,8 +17,6 @@ public interface ProblemAttemptRepository extends JpaRepository<ProblemAttempt, 
     List<ProblemAttempt> findByUserAndProblemOrderByAttemptOrderAsc(User user, Problem problem);
     Optional<ProblemAttempt> findFirstByUserAndProblemOrderByAttemptOrderAsc(User user, Problem problem);
 
-    // 유저가 플레이한 게임들 중, 최근에 시도한 순서대로 조회.
-    // (게임당 최대 1개, ProblemAttempt.createdAt의 max 기준)
     @Query("select pa.problem.game from ProblemAttempt pa " +
            "where pa.user = :user " +
            "group by pa.problem.game " +

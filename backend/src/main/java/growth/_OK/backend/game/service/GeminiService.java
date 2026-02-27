@@ -17,9 +17,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-/**
- * Gemini를 사용한 프리뷰/문제/해설 생성. 프롬프트 구성 및 응답 파싱.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -30,10 +27,6 @@ public class GeminiService {
 
     private static final int SOURCE_TEXT_MAX_LENGTH = 20_000;
 
-    /**
-     * 프리뷰 생성: 게임 시작 전, 이 게임에서 풀 문제들에 대해
-     * 학습 목표와 배울 내용을 미리 학습시켜주는 학습 내용으로 구성.
-     */
     public GamePreviewResponseDto generatePreviewFromSource(String description, String sourceText) {
         if (sourceText == null || sourceText.isBlank()) {
             throw new CapstonException(ExceptionCode.SOURCE_CONTENT_EMPTY);
@@ -97,7 +90,6 @@ public class GeminiService {
         String truncated = sourceText.length() > SOURCE_TEXT_MAX_LENGTH
                 ? sourceText.substring(0, SOURCE_TEXT_MAX_LENGTH) + "..."
                 : sourceText;
-        // 문제 유형: SHORT_ANSWER(단답형), OX(참/거짓), MULTIPLE_CHOICE(5지선다) 중 요청대로만 사용
         List<String> typeNames = types.isEmpty()
                 ? List.of("MULTIPLE_CHOICE", "OX", "SHORT_ANSWER")
                 : types.stream().map(Enum::name).collect(Collectors.toList());
@@ -133,7 +125,7 @@ public class GeminiService {
         public String question;
         public List<String> options;
         public String correctAnswer;
-        public String type; // SHORT_ANSWER, OX, MULTIPLE_CHOICE
+        public String type;
     }
 
     private List<RawGeneratedProblem> parseProblemsResponse(String raw) {
@@ -169,7 +161,6 @@ public class GeminiService {
         }
     }
 
-    /** 선택지/정답 앞의 ①②③④⑤, ⑴⑵, 1. 2., (1)(2) 등 기호 제거 */
     private static String stripOptionSymbol(String s) {
         if (s == null) return "";
         s = s.trim();
@@ -184,7 +175,6 @@ public class GeminiService {
         return s;
     }
 
-    /** 해설 생성: 문제(지문, 선택지, 정답)를 입력받아 해당 문제에 대한 해설을 Gemini가 생성. */
     public String generateExplanation(String question, List<String> options, String correctAnswer) {
         StringBuilder prompt = new StringBuilder();
         prompt.append("다음 퀴즈 문제에 대한 정답 해설을 작성해 주세요. 학습자가 왜 이 정답이 맞는지, 오답이 왜 틀렸는지 이해할 수 있도록 2~5문장으로 설명해 주세요. 수학/과학/영어 등은 풀이 과정이나 근거를 간단히 포함해 주세요.\n\n");
