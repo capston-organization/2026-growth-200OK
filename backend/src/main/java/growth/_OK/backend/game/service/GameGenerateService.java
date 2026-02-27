@@ -33,7 +33,7 @@ public class GameGenerateService {
     private final GeminiService geminiService;
     private final ObjectMapper objectMapper;
 
-    @Transactional(readOnly = true)
+    @Transactional
     public GamePreviewResponseDto generatePreview(Long gameId, CustomUserDetails userDetails) {
         findUser(userDetails);
         Game game = findGame(gameId);
@@ -41,11 +41,29 @@ public class GameGenerateService {
         if (source == null) {
             throw new CapstonException(ExceptionCode.GAME_SOURCE_NOT_SET);
         }
+        if (game.getPreviewLearningObjectives() != null && game.getPreviewLearningContent() != null
+                && !game.getPreviewLearningObjectives().isBlank() && !game.getPreviewLearningContent().isBlank()) {
+            return GamePreviewResponseDto.builder()
+                    .description(game.getDescription() != null ? game.getDescription() : "")
+                    .learningObjectives(game.getPreviewLearningObjectives())
+                    .learningContent(game.getPreviewLearningContent())
+                    .build();
+        }
         String sourceText = source.getExtractedText();
-        return geminiService.generatePreviewFromSource(game.getDescription(), sourceText);
+        GamePreviewResponseDto dto = geminiService.generatePreviewFromSource(game.getDescription(), sourceText);
+        savePreviewCache(gameId, dto);
+        return dto;
     }
 
-    /** 2단계: Gemini로 문제 생성 후 저장하고 DTO 목록 반환 */
+    @Transactional
+    public void savePreviewCache(Long gameId, GamePreviewResponseDto dto) {
+        Game game = findGame(gameId);
+        game.setPreviewCache(
+                dto.getLearningObjectives() != null ? dto.getLearningObjectives() : "",
+                dto.getLearningContent() != null ? dto.getLearningContent() : ""
+        );
+    }
+
     @Transactional
     public List<GeneratedProblemDto> generateProblems(Long gameId, GameGenerateProblemsRequestDto request,
                                                       CustomUserDetails userDetails) {
@@ -54,6 +72,21 @@ public class GameGenerateService {
         if (game.getSource() == null) {
             throw new CapstonException(ExceptionCode.GAME_SOURCE_NOT_SET);
         }
+
+        List<Problem> existing = problemRepository.findByGame_IdOrderBySortOrderAsc(gameId);
+        if (!existing.isEmpty()) {
+            return existing.stream()
+                    .map(p -> GeneratedProblemDto.builder()
+                            .id(p.getId())
+                            .question(p.getQuestion())
+                            .options(parseOptionsJson(p.getOptionsJson()))
+                            .correctAnswer(p.getCorrectAnswer())
+                            .type(p.getType())
+                            .sortOrder(p.getSortOrder())
+                            .build())
+                    .collect(Collectors.toList());
+        }
+
         int count = request.getProblemCount() != null && request.getProblemCount() > 0
                 ? request.getProblemCount()
                 : game.getProblemCount();
