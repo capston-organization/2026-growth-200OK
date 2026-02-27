@@ -18,10 +18,6 @@ import java.net.URI;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Gemini generateContent REST API 호출.
- * POST {baseUrl}/{model}:generateContent?key={apiKey}
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -34,10 +30,6 @@ public class GeminiClient {
     private static final String API_KEY_HEADER = "x-goog-api-key";
     private static final int REQUEST_TIMEOUT_SECONDS = 60;
 
-    /**
-     * 프롬프트 한 개로 텍스트 생성. 429 시 GEMINI_QUOTA_EXCEEDED 예외.
-     * API 키는 x-goog-api-key 헤더로 전달 (Google 권장).
-     */
     public String generateText(String prompt) {
         if (prompt == null || prompt.isBlank()) {
             return "";

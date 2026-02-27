@@ -30,7 +30,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         System.out.println(">>> Raw Authorization = " + request.getHeader("Authorization"));
 
 
-        // 0. 로그인 관련 요청은 JWT 필터 제외
         String uri = request.getRequestURI();
         if (uri.startsWith("/auth/google")) {
             filterChain.doFilter(request, response);
@@ -39,7 +38,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String header = request.getHeader("Authorization");
 
-        // 1. Authorization 헤더 없거나 형식 안 맞으면 안됨
         if (header == null || !header.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
@@ -56,7 +54,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 return;
             }
 
-            // 4. 토큰에서 userId 추출 ( 만약 리프레시 토큰이면 패스 )
             if (jwtTokenProvider.isRefreshToken(token)) {filterChain.doFilter(request, response); return;}
             Long userId = jwtTokenProvider.getUserIdFromAccessToken(token);
 
@@ -74,7 +71,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         new WebAuthenticationDetailsSource().buildDetails(request)
                 );
 
-                // 6. SecurityContext에 인증 정보 저장
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             }
 

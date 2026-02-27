@@ -43,7 +43,6 @@ public class UserController {
         return ResponseEntity.ok(CoinBalanceResponseDto.builder().coins(coins).build());
     }
 
-    /** 과자 주기: 코인 1 소모, 포만감 +10 */
     @PostMapping("/me/actions/snack")
     public ResponseEntity<CharacterStatusResponseDto> giveSnack(
             @AuthenticationPrincipal CustomUserDetails user) {
@@ -51,7 +50,6 @@ public class UserController {
         return ResponseEntity.ok(dto);
     }
 
-    /** 놀아주기: 코인 1 소모, 행복도 +10 */
     @PostMapping("/me/actions/play")
     public ResponseEntity<CharacterStatusResponseDto> play(
             @AuthenticationPrincipal CustomUserDetails user) {
@@ -59,7 +57,6 @@ public class UserController {
         return ResponseEntity.ok(dto);
     }
 
-    /** 공부시키기: 코인 2 소모, 레벨업 */
     @PostMapping("/me/actions/study")
     public ResponseEntity<CharacterStatusResponseDto> study(
             @AuthenticationPrincipal CustomUserDetails user) {
@@ -76,9 +73,6 @@ public class UserController {
         return ResponseEntity.ok(dto);
     }
 
-    // 스트릭 조회: 기간 내 날짜별 플레이 여부(채움/빈칸) + 현재 연속 스트릭 일수.
-    // 오늘 플레이했으면 스트릭 유지, 안 했으면 빈칸 / currentStreak 0.
-    // @param days 조회 일수 (기본 30, 최대 365)
     @GetMapping("/me/streak")
     public ResponseEntity<StreakResponseDto> getMyStreak(
             @AuthenticationPrincipal CustomUserDetails user,
@@ -87,21 +81,18 @@ public class UserController {
         return ResponseEntity.ok(dto);
     }
 
-    // 내가 만든 게임 전체 최신순 조회
     @GetMapping("/me/games")
     public ResponseEntity<GameListResponseDto> getMyGames(@AuthenticationPrincipal CustomUserDetails user) {
         GameListResponseDto dto = gameService.getMyGames(user);
         return ResponseEntity.ok(dto);
     }
 
-    // 내가 최근에 플레이한 게임 5개 최신순 조회
     @GetMapping("/me/games/recent")
     public ResponseEntity<GameListResponseDto> getMyRecentPlayedGames(@AuthenticationPrincipal CustomUserDetails user) {
         GameListResponseDto dto = gameService.getRecentPlayedGames(user, 5);
         return ResponseEntity.ok(dto);
     }
 
-    // 인삿말 조회: 호출할 때마다 7개 중 랜덤 1개
     @GetMapping("/me/greeting")
     public ResponseEntity<GreetingResponseDto> getGreeting(
             @AuthenticationPrincipal CustomUserDetails user) {

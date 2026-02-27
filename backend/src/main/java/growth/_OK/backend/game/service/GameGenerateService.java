@@ -33,7 +33,6 @@ public class GameGenerateService {
     private final GeminiService geminiService;
     private final ObjectMapper objectMapper;
 
-    /** 1단계: Gemini로 학습 목표·학습 내용 요약 생성 후 반환. 소스 없으면 예외 */
     @Transactional(readOnly = true)
     public GamePreviewResponseDto generatePreview(Long gameId, CustomUserDetails userDetails) {
         findUser(userDetails);
@@ -81,7 +80,6 @@ public class GameGenerateService {
                     .build();
             saved.add(problemRepository.save(problem));
         }
-        // Gemini가 요청 개수만큼 못 만들었으면 나머지는 기본 문제로 채움
         for (int i = rawList.size(); i < count; i++) {
             Problem problem = Problem.builder()
                     .game(game)
@@ -136,8 +134,6 @@ public class GameGenerateService {
         }
     }
 
-
-    // -------------------------------------------------------------------------------------------
     private User findUser(CustomUserDetails userDetails) {
         return userRepository.findById(userDetails.getUser().getUserId())
                 .orElseThrow(() -> new CapstonException(ExceptionCode.USER_NOT_FOUND));

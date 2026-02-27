@@ -30,7 +30,6 @@ public class Problem extends BaseEntity {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String question;
 
-    /** 5지선다 등 선택지. JSON 배열 문자열 또는 콤마 구분 저장 */
     @Column(columnDefinition = "TEXT")
     private String optionsJson;
 
@@ -41,7 +40,6 @@ public class Problem extends BaseEntity {
     @Column(nullable = false, length = 20)
     private ProblemType type;
 
-    /** AI 생성 해설. 없으면 null */
     @Column(columnDefinition = "TEXT")
     private String explanation;
 
