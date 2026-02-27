@@ -14,6 +14,8 @@ import growth._OK.backend.game.service.GameGenerateService;
 import growth._OK.backend.game.service.GameService;
 import growth._OK.backend.game.service.GameSourceService;
 import growth._OK.backend.game.service.ProblemAttemptService;
+import growth._OK.backend.user.dto.response.CoinBalanceResponseDto;
+import growth._OK.backend.user.service.UserCoinService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -41,6 +43,7 @@ public class GameController {
     private final GameSourceService gameSourceService;
     private final GameGenerateService gameGenerateService;
     private final ProblemAttemptService problemAttemptService;
+    private final UserCoinService userCoinService;
 
     // 게임 생성
     @PostMapping
@@ -96,6 +99,17 @@ public class GameController {
         }
         problemAttemptService.submitAnswer(gameId, problemId, request.getCorrect(), user);
         return ResponseEntity.noContent().build();
+    }
+
+    // 게임 종료 시 코인 1개 지급
+    @PostMapping("/{gameId}/reward/coin")
+    public ResponseEntity<CoinBalanceResponseDto> rewardCoin(
+            @PathVariable Long gameId,
+            @AuthenticationPrincipal CustomUserDetails user) {
+        int coins = userCoinService.addCoins(user.getUser().getUserId(), 1);
+        return ResponseEntity.ok(CoinBalanceResponseDto.builder()
+                .coins(coins)
+                .build());
     }
 
     // 틀린 문제만 조회 (오답 노트). 첫 시도에서 오답이었던 문제 목록

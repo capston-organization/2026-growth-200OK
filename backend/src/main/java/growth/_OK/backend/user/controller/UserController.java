@@ -4,9 +4,13 @@ import growth._OK.backend.auth.jwt.CustomUserDetails;
 import growth._OK.backend.game.dto.ResponseDto.GameListResponseDto;
 import growth._OK.backend.game.service.GameService;
 import growth._OK.backend.user.dto.request.UserBasicInfoRequestDto;
+import growth._OK.backend.user.dto.response.CharacterStatusResponseDto;
+import growth._OK.backend.user.dto.response.CoinBalanceResponseDto;
 import growth._OK.backend.user.dto.response.StreakResponseDto;
 import growth._OK.backend.user.dto.response.UserBasicInfoResponseDto;
 import growth._OK.backend.user.dto.response.GreetingResponseDto;
+import growth._OK.backend.user.service.UserCareService;
+import growth._OK.backend.user.service.UserCoinService;
 import growth._OK.backend.user.service.UserService;
 import growth._OK.backend.user.service.UserStreakService;
 import lombok.RequiredArgsConstructor;
@@ -21,12 +25,45 @@ public class UserController {
 
     private final UserService userService;
     private final UserStreakService userStreakService;
+    private final UserCoinService userCoinService;
+    private final UserCareService userCareService;
     private final GameService gameService;
 
     @GetMapping("/me")
     public ResponseEntity<UserBasicInfoResponseDto> getMyBasicInfo(
             @AuthenticationPrincipal CustomUserDetails user) {
         UserBasicInfoResponseDto dto = userService.getBasicInfo(user.getUser().getUserId());
+        return ResponseEntity.ok(dto);
+    }
+
+    @GetMapping("/me/coins")
+    public ResponseEntity<CoinBalanceResponseDto> getMyCoins(
+            @AuthenticationPrincipal CustomUserDetails user) {
+        int coins = userCoinService.getCoins(user.getUser().getUserId());
+        return ResponseEntity.ok(CoinBalanceResponseDto.builder().coins(coins).build());
+    }
+
+    /** 과자 주기: 코인 1 소모, 포만감 +10 */
+    @PostMapping("/me/actions/snack")
+    public ResponseEntity<CharacterStatusResponseDto> giveSnack(
+            @AuthenticationPrincipal CustomUserDetails user) {
+        CharacterStatusResponseDto dto = userCareService.giveSnack(user.getUser().getUserId());
+        return ResponseEntity.ok(dto);
+    }
+
+    /** 놀아주기: 코인 1 소모, 행복도 +10 */
+    @PostMapping("/me/actions/play")
+    public ResponseEntity<CharacterStatusResponseDto> play(
+            @AuthenticationPrincipal CustomUserDetails user) {
+        CharacterStatusResponseDto dto = userCareService.play(user.getUser().getUserId());
+        return ResponseEntity.ok(dto);
+    }
+
+    /** 공부시키기: 코인 2 소모, 레벨업 */
+    @PostMapping("/me/actions/study")
+    public ResponseEntity<CharacterStatusResponseDto> study(
+            @AuthenticationPrincipal CustomUserDetails user) {
+        CharacterStatusResponseDto dto = userCareService.study(user.getUser().getUserId());
         return ResponseEntity.ok(dto);
     }
 

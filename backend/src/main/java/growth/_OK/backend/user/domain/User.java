@@ -41,6 +41,20 @@ public class User extends BaseEntity {
     @Enumerated(EnumType.STRING)
     private Gender gender;      // 선택
 
+    // 보유 코인 (기본 0)
+    @Column(nullable = false)
+    private int coins = 0;
+
+    // 간단한 육성 상태
+    @Column(nullable = false)
+    private int happiness = 0;   // 놀아주기 누적
+
+    @Column(nullable = false)
+    private int fullness = 0;    // 간식 누적
+
+    @Column(nullable = false)
+    private int level = 0;       // 공부 레벨
+
     // ---------------
 
     @Builder
@@ -84,6 +98,27 @@ public class User extends BaseEntity {
         if (birthDate != null) this.birthDate = birthDate;
         if (school != null) this.school = school;
         if (gender != null) this.gender = gender;
+    }
+
+    public void addCoins(int amount) {
+        this.coins += amount;
+        if (this.coins < 0) {
+            this.coins = 0;
+        }
+    }
+
+    public void increaseHappiness(int amount) {
+        if (amount <= 0) return;
+        this.happiness += amount;
+    }
+
+    public void increaseFullness(int amount) {
+        if (amount <= 0) return;
+        this.fullness += amount;
+    }
+
+    public void levelUp() {
+        this.level += 1;
     }
 
 }
