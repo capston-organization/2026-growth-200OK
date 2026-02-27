@@ -1,12 +1,21 @@
 // src/pages/LoginPage.jsx
 import React from "react";
 // useNavigate: React Router에서 제공하는 '페이지 이동'을 담당하는 함수(Hook)입니다.
-import { useNavigate } from "react-router-dom";
 
 const LoginPage = () => {
-  // navigate라는 변수에 이동 기능을 할당합니다.
-  // 이제 navigate('/주소')를 호출하면 해당 페이지로 바뀝니다.
-  const navigate = useNavigate();
+  // ==========================================
+  // 🏃‍♂️ 1단계: 구글 로그인 창으로 이동시키는 함수
+  // ==========================================
+  const handleGoogleLogin = () => {
+    // 백엔드 정보
+    const clientId =
+      "** 구글 API 콘솔에서 발급받은 클라이언트 ID를 여기에 입력하세요 **";
+    const redirectUri =
+      "** 구글 로그인 후 리디렉션될 URI를 여기에 입력하세요 **";
+    const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=email profile`;
+
+    window.location.href = googleAuthUrl;
+  };
 
   return (
     // style={{ ... }}: CSS 파일에 적지 않고, 직접 자바스크립트 객체로 스타일을 주는 방식(Inline Style)입니다.
@@ -52,7 +61,7 @@ const LoginPage = () => {
             gap: "15px", // 아이콘과 글자 사이 간격
           }}
           // [중요] 클릭 시 '/signup' 주소로 이동! (React Router가 처리함)
-          onClick={() => navigate("/signup")}
+          onClick={handleGoogleLogin}
         >
           {/* 파란색 원 (구글 로고 임시 대용) */}
           <div
