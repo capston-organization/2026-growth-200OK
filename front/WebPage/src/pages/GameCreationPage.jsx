@@ -1,6 +1,6 @@
 // src/pages/GameCreationPage.jsx
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom"; // 페이지 이동 및 데이터 전달받기용
 
 const GameCreationPage = () => {
@@ -18,14 +18,20 @@ const GameCreationPage = () => {
   const [selectedType, setSelectedType] = useState(null); // Step 1: Grammar 또는 Vocabulary (하나만)
   const [files, setFiles] = useState([]); // Step 2: 업로드된 파일 리스트
   const [textInput, setTextInput] = useState(""); // Step 2: 직접 입력한 텍스트
-  const [selectedQuestions, setSelectedQuestions] = useState([]); // Step 3: 선택된 문제 유형들 (여러 개 가능)
+  const [gameName, setGameName] = useState(""); // Step 3: 게임 이름과 설명
+  const [gameDescription, setGameDescription] = useState("");
+  const [selectedQuestions, setSelectedQuestions] = useState([]); // Step 4: 선택된 문제 유형들 (여러 개 가능)
+  const [isLoading, setIsLoading] = useState(false);
+  const fileInputRef = useRef(null); // 숨겨진 파일 입력창을 클릭해줄 리모콘
 
   // --- 기능 함수들 (비즈니스 로직) ---
 
-  // [Step 2] 파일 추가 버튼 클릭 시 (가짜 파일 추가)
-  const addFile = () => {
-    const fileName = `자료_${files.length + 1}.pdf`;
-    setFiles([...files, fileName]); // 기존 목록(...files) 뒤에 새 파일 추가
+  const handleFileChange = (e) => {
+    const selectedFiles = Array.from(e.target.files);
+    if (selectedFiles.length > 0) {
+      // 기존 파일 목록에 새로 선택한 파일 객체(File)를 추가
+      setFiles([...files, ...selectedFiles]);
+    }
   };
 
   // [Step 2] 파일 옆 X 버튼 클릭 시 삭제
@@ -48,7 +54,11 @@ const GameCreationPage = () => {
   // [공통] '다음 단계' 버튼 활성화 여부 체크 (유효성 검사)
   const isNextButtonDisabled = () => {
     if (step === 1) return selectedType === null; // 유형을 안 골랐으면 버튼 끔
-    if (step === 3) return selectedQuestions.length === 0; // 문제 유형을 하나도 안 골랐으면 버튼 끔
+    // 💡 [수정됨] 2단계: 파일이 하나도 없으면 다음으로 못 넘어감!
+    // (텍스트 입력은 현재 API가 없으므로 파일 배열 길이만 체크)
+    if (step === 2) return files.length === 0;
+    if (step === 3) return gameName.trim() === ""; // 💡 게임 이름은 필수로 입력하게 설정
+    if (step === 4) return selectedQuestions.length === 0; // 💡 기존 3단계를 4단계로 변경
     return false; // 2단계는 입력 안 해도 넘어갈 수 있음 (선택 사항)
   };
 
@@ -88,6 +98,93 @@ const GameCreationPage = () => {
     boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
     transition: "0.2s", // 클릭 시 부드럽게 변함
   });
+
+  // 💡 [새로 추가] 게임 생성 및 API 호출 함수
+  const handleCreateGame = async () => {
+    setIsLoading(true); // 로딩 시작
+    try {
+      // 로컬 스토리지에서 액세스 토큰 가져오기 (로그인 후 저장된 토큰)
+      const token = localStorage.getItem("accessToken") || "임시토큰";
+      const headers = { Authorization: `Bearer ${token}` };
+      const BASE_URL = ""; // 실제 백엔드 주소로 변경 필요. 프록시 사용 중이므로 아직은 빈 칸이어도 됨
+
+      // [1번 API] 게임 기본 설정
+      const mappedType = selectedType === "Grammar" ? "GRAMMAR" : "VOCAB";
+      const createGameRes = await fetch(`${BASE_URL}/games`, {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: mappedType,
+          title: gameName,
+          description: gameDescription,
+          isPublic: true,
+        }),
+      });
+      const gameData = await createGameRes.json();
+      const gameId = gameData.id;
+
+      // [2번 API] 소스 파일 업로드 (파일이 있을 때만)
+      if (files.length > 0) {
+        const formData = new FormData();
+        // 💡 배열에 있는 모든 파일을 formData에 추가함
+        files.forEach((file) => {
+          // 주의: 명세서에는 key가 "file"로 되어 있음.
+          // 만약 백엔드에서 여러 파일을 받을 때 "files"라는 이름의 리스트로 받는다면
+          // 키 값을 "files"로 바꿔야 할 수도 있으니 나중에 백엔드 팀원과 꼭 확인해 봐!
+          formData.append("file", file);
+        });
+        const sourceRes = await fetch(`${BASE_URL}/games/${gameId}/sources`, {
+          method: "POST",
+          headers: headers, // FormData는 브라우저가 자동으로 boundary와 함께 Content-Type을 세팅함
+          body: formData,
+        });
+
+        if (!sourceRes.ok) throw new Error("소스 파일 업로드 실패");
+      } else {
+        // 파일이 하나도 없는 경우를 대비한 에러 처리
+        throw new Error("학습할 소스(파일)가 최소 1개 이상 필요합니다.");
+      }
+
+      // [3번 API] 미리보기 생성
+      const previewRes = await fetch(
+        `${BASE_URL}/games/${gameId}/generate/preview`,
+        {
+          method: "POST",
+          headers: headers,
+        },
+      );
+      const previewData = await previewRes.json();
+
+      // [4번 API] 문제 유형 설정 (서술형 제외)
+      const typeMapping = {
+        단답식: "SHORT_ANSWER",
+        OX: "OX",
+        객관식: "MULTIPLE_CHOICE",
+      };
+      const apiProblemTypes = selectedQuestions
+        .filter((q) => q !== "서술형")
+        .map((q) => typeMapping[q]);
+
+      await fetch(`${BASE_URL}/games/${gameId}/generate/problems`, {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          problemTypes: apiProblemTypes.length > 0 ? apiProblemTypes : null,
+          problemCount: 10,
+        }),
+      });
+
+      // 모든 API 성공! 다음 페이지로 이동
+      navigate("/play", {
+        state: { previewData: previewData, gameId: gameId },
+      });
+    } catch (error) {
+      console.error("API 에러:", error);
+      alert("게임 생성 중 오류가 발생했습니다.");
+    } finally {
+      setIsLoading(false); // 로딩 끝
+    }
+  };
 
   return (
     <div
@@ -179,7 +276,12 @@ const GameCreationPage = () => {
               fontWeight: "600",
             }}
           >
-            {["학습영역 선택", "source 입력", "게임 설정"].map((title, idx) => {
+            {[
+              "학습영역 선택",
+              "source 입력",
+              "게임 설명 설정",
+              "게임 설정",
+            ].map((title, idx) => {
               const tabStep = idx + 1;
               const isActive = step === tabStep; // 현재 단계인지 확인
               return (
@@ -270,7 +372,7 @@ const GameCreationPage = () => {
                   <div style={{ flex: 1, overflowY: "auto" }}>
                     {files.map((file, idx) => (
                       <div key={idx} style={ovalBtnStyle}>
-                        <span>📄 {file}</span>
+                        <span>📄 {file.name}</span>
                         <span
                           style={{
                             color: "#FF69B4",
@@ -287,7 +389,7 @@ const GameCreationPage = () => {
 
                     {/* 파일 추가 버튼 */}
                     <div
-                      onClick={addFile}
+                      onClick={() => fileInputRef.current.click()}
                       style={{
                         ...ovalBtnStyle,
                         border: "2px dashed #FFC0CB", // 점선
@@ -297,6 +399,16 @@ const GameCreationPage = () => {
                     >
                       + 추가하기
                     </div>
+
+                    {/* 💡 [추가] 숨겨진 진짜 파일 입력 태그 */}
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileChange}
+                      style={{ display: "none" }}
+                      multiple // 여러 개 선택 가능하게 하려면 유지
+                      accept=".pdf,.txt,.doc,.docx"
+                    />
                   </div>
                 </div>
 
@@ -329,10 +441,99 @@ const GameCreationPage = () => {
             </div>
           )}
 
-          {/* ===========================================
-             STEP 3: 문제 유형 설정 화면 (다중 선택)
-             =========================================== */}
+          {/* 💡 새로 추가된 STEP 3: 게임 설명 설정 화면 */}
           {step === 3 && (
+            <div
+              className="fade-in"
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+              }}
+            >
+              <h3
+                style={{
+                  fontSize: "28px",
+                  margin: "0 0 40px 0",
+                  textAlign: "center",
+                }}
+              >
+                게임에 대한 설명을 입력해주세요.
+              </h3>
+
+              <div
+                style={{
+                  width: "100%",
+                  maxWidth: "700px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "30px",
+                }}
+              >
+                {/* 게임 이름 입력 */}
+                <div style={{ display: "flex", alignItems: "center" }}>
+                  <label
+                    style={{
+                      width: "180px",
+                      fontSize: "22px",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    게임 이름 입력
+                  </label>
+                  <input
+                    type="text"
+                    value={gameName}
+                    onChange={(e) => setGameName(e.target.value)}
+                    placeholder={`${userName}님의 게임-001`}
+                    style={{
+                      flex: 1,
+                      border: "2px solid #FFC0CB",
+                      borderRadius: "10px",
+                      padding: "15px",
+                      fontSize: "18px",
+                      outline: "none",
+                    }}
+                  />
+                </div>
+
+                {/* 게임 설명 입력 */}
+                <div style={{ display: "flex", alignItems: "flex-start" }}>
+                  <label
+                    style={{
+                      width: "180px",
+                      fontSize: "22px",
+                      fontWeight: "bold",
+                      marginTop: "15px",
+                    }}
+                  >
+                    게임 설명 입력
+                  </label>
+                  <textarea
+                    value={gameDescription}
+                    onChange={(e) => setGameDescription(e.target.value)}
+                    placeholder="1. which와 who의 차이점&#13;&#10;2. to 부정사와 to 전치사의 차이점"
+                    style={{
+                      flex: 1,
+                      border: "2px solid #FFC0CB",
+                      borderRadius: "10px",
+                      padding: "15px",
+                      fontSize: "18px",
+                      minHeight: "200px",
+                      resize: "none",
+                      outline: "none",
+                      backgroundColor: "#FFF0F5",
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ===========================================
+             STEP 4: 문제 유형 설정 화면 (다중 선택)
+             =========================================== */}
+          {step === 4 && (
             <div>
               <h3 style={{ fontSize: "28px", margin: 0 }}>
                 게임에 삽입될 문제의 유형을 선택하세요.
@@ -411,14 +612,23 @@ const GameCreationPage = () => {
                 fontSize: "20px",
                 fontWeight: "bold",
               }}
-              disabled={isNextButtonDisabled()} // 조건 불만족 시 클릭 방지
+              disabled={isNextButtonDisabled() || isLoading}
               onClick={() => {
-                if (step === 3)
-                  navigate("/play"); // 마지막 단계 완료 시 게임 플레이 페이지로
-                else setStep(step + 1); // 나머지는 다음 단계로
+                // 💡 [수정] 4단계면 API 호출, 아니면 다음 단계로
+                if (step === 4) {
+                  handleCreateGame();
+                } else {
+                  setStep(step + 1);
+                }
               }}
             >
-              {step === 3 ? "게임 생성" : "다음 단계"} →
+              {/* 로딩 중이면 텍스트 변경 */}
+              {isLoading
+                ? "생성 중..."
+                : step === 4
+                  ? "게임 생성"
+                  : "다음 단계"}{" "}
+              →
             </button>
           </div>
         </div>
