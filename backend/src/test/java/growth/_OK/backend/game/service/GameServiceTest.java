@@ -4,6 +4,7 @@ import growth._OK.backend.auth.jwt.CustomUserDetails;
 import growth._OK.backend.game.domain.Game;
 import growth._OK.backend.game.domain.GameLike;
 import growth._OK.backend.game.domain.GameType;
+import growth._OK.backend.game.domain.ProblemType;
 import growth._OK.backend.game.dto.ResponseDto.GameListResponseDto;
 import growth._OK.backend.game.dto.ResponseDto.GameResponseDto;
 import growth._OK.backend.game.dto.requestDto.GameCreateRequestDto;
@@ -29,7 +30,6 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
@@ -51,8 +51,16 @@ class GameServiceTest {
     void createGame_returnsSavedGame() {
         User user = dummyUser(1L);
         CustomUserDetails principal = new CustomUserDetails(user);
-        GameCreateRequestDto req = new GameCreateRequestDto(GameType.GRAMMAR, "title", "desc", true);
-
+        GameCreateRequestDto req = GameCreateRequestDto.builder()
+            .type(GameType.GRAMMAR)
+            .title("title")
+            .description("desc")
+            .learningObjectives("objective")
+            .isPublic(true)
+            .problemTypes(List.of(ProblemType.OX))
+            .problemCount(5)
+            .sourceId(1L)
+            .build();
         Game saved = Game.builder()
                 .owner(user)
                 .type(GameType.GRAMMAR)
