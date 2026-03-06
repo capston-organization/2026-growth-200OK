@@ -1,3 +1,4 @@
+/* global Phaser */
 /**
  * MiniOXGame1.js
  * -------------------------------------------------------------------------
@@ -23,6 +24,7 @@ class MiniOXGame1 extends Phaser.Scene {
     // 부모 씬(메인 게임)과의 연동 데이터
     this.mainScene = data.parent;
     this.speedLevel = data.speedLevel || 1;
+    this.currentProblem = data.problem; // ★ MainScene에서 넘겨준 1개의 문제 저장
 
     // ★ [반응형 기준점]
     // 1280x720 해상도에서 작업한 수치들이 1.0 스케일이라고 가정합니다.
@@ -123,10 +125,19 @@ class MiniOXGame1 extends Phaser.Scene {
     this.isResolved = false; // 정답 제출 여부
     this.gameResult = false; // 최종 결과 (성공/실패)
 
-    this.movingItems = []; // 현재 화면에 떠다니는 아이템 배열
-    this.isWaitingForNextSpawn = false; // 스폰 딜레이 체크
-    this.problemData = this.getProblem(); // 이번 판에 쓸 문제 가져오기
-    this.hasSentenceSpawned = false; // 문제가 이미 출제되었는지 체크
+    this.movingItems = [];
+    this.isWaitingForNextSpawn = false;
+    this.hasSentenceSpawned = false;
+
+    // ★ 수정: 하드코딩 함수 대신, 넘겨받은 API 데이터를 게임 포맷에 맞게 변환
+    // 백엔드에서 정답을 "O" 라고 준다고 가정
+    const answer = this.currentProblem.correctAnswer;
+    const isAnswerO = answer === "O" || answer === "O" || answer === true;
+
+    this.problemData = {
+      sentence: this.currentProblem.question, // API의 question 값을 문장으로 사용
+      isCorrect: isAnswerO, // O가 정답이면 true, X가 정답이면 false
+    };
 
     // 7. 조작 버튼 생성 (O/X)
     this.createControlButtons();
@@ -286,7 +297,7 @@ class MiniOXGame1 extends Phaser.Scene {
     else if (!this.hasSentenceSpawned && Phaser.Math.Between(0, 100) < 40)
       isProblem = true;
 
-    const { width, height } = this.scale;
+    const { height } = this.scale;
     const boxY = height * 0.35; // 화면 높이의 35% 지점에 배치
 
     // 화면 왼쪽 바깥에서 시작
@@ -344,18 +355,6 @@ class MiniOXGame1 extends Phaser.Scene {
     this.movingItems.push(container);
   }
 
-  // 랜덤한 문제 데이터 반환
-  getProblem() {
-    const problems = [
-      { sentence: "She were happy.", isCorrect: false },
-      { sentence: "I am a boy.", isCorrect: true },
-      { sentence: "They runs fast.", isCorrect: false },
-      { sentence: "Cat can't fly.", isCorrect: true },
-      { sentence: "He don't like it.", isCorrect: false },
-    ];
-    return Phaser.Utils.Array.GetRandom(problems);
-  }
-
   // =================================================================
   // [Interaction] 정답 버튼 처리
   // =================================================================
@@ -395,7 +394,8 @@ class MiniOXGame1 extends Phaser.Scene {
 
     // 메인 씬으로 결과 전달
     if (this.mainScene && this.mainScene.handleMiniGameResult) {
-      this.mainScene.handleMiniGameResult(this.gameResult);
+      // ★ 수정: 성공 여부와 함께 '방금 푼 문제' 객체를 같이 넘겨줌
+      this.mainScene.handleMiniGameResult(this.gameResult, this.currentProblem);
     }
     this.scene.stop();
   }

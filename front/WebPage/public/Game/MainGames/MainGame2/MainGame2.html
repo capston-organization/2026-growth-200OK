@@ -21,13 +21,24 @@
     <script src="../../MiniGames/MultiChoiceGames/MiniGame1/MiniMultiGame1.js"></script>
     <script src="../../MiniGames/OXGames/MiniGame1/MiniOXGame1.js"></script>
     <!-- MainGame3의 3개 게임(떡OX, 단답형, 객관식) - 에셋은 MainGame3/assets 참조 -->
-    <script>window.MAINGAME3_ASSETS_BASE = "../MainGame3/assets/";</script>
+    <script>
+      window.MAINGAME3_ASSETS_BASE = "../MainGame3/assets/";
+    </script>
     <script src="../MainGame3/games/TteokOXGame.js"></script>
     <script src="../MainGame3/games/ShortAnswerGame.js"></script>
     <script src="../MainGame3/games/MultiChoiceGame.js"></script>
   </head>
   <body>
-    <div style="font-family: &quot;Nunito&quot;; opacity: 0; position: absolute; pointer-events: none;">.</div>
+    <div
+      style="
+        font-family: &quot;Nunito&quot;;
+        opacity: 0;
+        position: absolute;
+        pointer-events: none;
+      "
+    >
+      .
+    </div>
     <script>
       class MainScene extends Phaser.Scene {
         constructor() {
@@ -35,11 +46,20 @@
         }
 
         create() {
+          // --- [A] 게임 상태 변수 초기화 ---
           this.lives = 3;
           this.score = 0;
           this.consecutiveWins = 0;
           this.speedLevel = 1;
           this.isGameRunning = true;
+
+          // ★ 추가: 문제 관리 배열
+          this.allProblems = [];
+          this.remainingProblems = [];
+          this.correctAnswers = [];
+          this.wrongAnswers = [];
+          this.accessToken = "";
+          this.gameId = null;
 
           const { width, height } = this.scale;
           const centerX = width * 0.5;
@@ -56,7 +76,13 @@
             })
             .setOrigin(0.5);
 
-          this.gameBox = this.add.rectangle(centerX, centerY, 300, 300, 0xffffff);
+          this.gameBox = this.add.rectangle(
+            centerX,
+            centerY,
+            300,
+            300,
+            0xffffff,
+          );
           this.gameBox.setStrokeStyle(4, 0x000000);
 
           this.statusText = this.add
@@ -85,6 +111,21 @@
           }
 
           this.time.delayedCall(2000, this.startMiniGame, [], this);
+
+          // --- [B] React 데이터 수신 리스너 추가 ---
+          window.addEventListener("message", (event) => {
+            if (event.data && event.data.type === "START_GAME") {
+              this.gameId = event.data.gameId;
+              this.accessToken = event.data.accessToken;
+              this.allProblems = event.data.problems;
+              this.remainingProblems = [...this.allProblems];
+              // 모든 문제는 처음에 '오답' 상태로 시작
+              this.wrongAnswers = [...this.allProblems];
+
+              this.time.delayedCall(2000, this.startMiniGame, [], this);
+            }
+          });
+
           this.scale.on("resize", this.resize, this);
         }
 
@@ -98,28 +139,120 @@
 
         startMiniGame() {
           if (!this.isGameRunning) return;
+          // ★ 남은 문제가 없으면 게임 클리어
+          if (this.remainingProblems.length === 0) {
+            this.gameClear();
+            return;
+          }
+
           this.statusText.setText("");
 
-          // 6가지 게임 모두 랜덤 (기존 3 + 떡OX, 단답형, 객관식 3)
-          const games = [
-            "MiniMultiGame1",
-            "MiniOXGame1",
-            "MiniShortGame1",
-            "TteokOXGame",
-            "ShortAnswerGame",
-            "MultiChoiceGame",
-          ];
-          const randomKey = Phaser.Math.RND.pick(games);
+          // ★ 남은 문제 중 랜덤 추출
+          const randomProblem = Phaser.Utils.Array.GetRandom(
+            this.remainingProblems,
+          );
 
-          this.scene.launch(randomKey, {
+          // ★ 해설 생성 API 호출
+          this.generateExplanation(randomProblem.id);
+
+          // ★ 문제 타입에 따른 게임 키 결정 (6가지 게임 대응)
+          let gameKey = "";
+          if (randomProblem.type === "MULTIPLE_CHOICE") {
+            // 2개 중 하나 랜덤 (기존 버전 vs 떡 버전 등)
+            gameKey = Phaser.Math.RND.pick([
+              "MiniMultiGame1",
+              "MultiChoiceGame",
+            ]);
+          } else if (randomProblem.type === "OX") {
+            gameKey = Phaser.Math.RND.pick(["MiniOXGame1", "TteokOXGame"]);
+          } else if (randomProblem.type === "SHORT_ANSWER") {
+            gameKey = Phaser.Math.RND.pick([
+              "MiniShortGame1",
+              "ShortAnswerGame",
+            ]);
+          } else {
+            // 타입이 없으면 전체 중 랜덤
+            const games = [
+              "MiniMultiGame1",
+              "MiniOXGame1",
+              "MiniShortGame1",
+              "TteokOXGame",
+              "ShortAnswerGame",
+              "MultiChoiceGame",
+            ];
+            gameKey = Phaser.Math.RND.pick(games);
+          }
+
+          this.scene.launch(gameKey, {
             speedLevel: this.speedLevel,
             parent: this,
+            problem: randomProblem, // ★ 문제 객체 전달
           });
         }
 
-        handleMiniGameResult(isSuccess) {
-          if (isSuccess) this.handleSuccess();
-          else this.handleFail();
+        // 결과 처리 통합
+        handleMiniGameResult(isSuccess, problem) {
+          // React에 개별 문제 결과 전송
+          window.parent.postMessage(
+            {
+              type: "SUBMIT_PROBLEM_RESULT",
+              problemId: problem.id,
+              correct: isSuccess,
+            },
+            "*",
+          );
+
+          if (isSuccess) {
+            // 정답 배열 추가 및 남은 목록에서 제거
+            if (!this.correctAnswers.some((p) => p.id === problem.id)) {
+              this.correctAnswers.push(problem);
+            }
+            this.remainingProblems = this.remainingProblems.filter(
+              (p) => p.id !== problem.id,
+            );
+            this.wrongAnswers = this.wrongAnswers.filter(
+              (p) => p.id !== problem.id,
+            );
+            this.handleSuccess();
+          } else {
+            this.handleFail();
+          }
+        }
+
+        // ★ 신규 추가: 게임 클리어 (모든 문제 정답 시)
+        gameClear() {
+          this.isGameRunning = false;
+          this.gameBox.setFillStyle(0xffff00);
+          this.statusText.setText("CONGRATULATIONS!");
+          this.statusText.setColor("#FF1493");
+          this.statusText.setFontSize("48px");
+
+          window.parent.postMessage(
+            {
+              type: "GAME_CLEAR",
+              finalScore: this.score,
+              correctAnswers: this.correctAnswers,
+              wrongAnswers: this.wrongAnswers,
+            },
+            "*",
+          );
+        }
+
+        // ★ 신규 추가: 해설 생성 함수
+        async generateExplanation(problemId) {
+          if (!this.gameId || !this.accessToken) return;
+          const url = `/games/${this.gameId}/problems/${problemId}/explanation`;
+          try {
+            await fetch(url, {
+              method: "GET",
+              headers: {
+                Authorization: `Bearer ${this.accessToken}`,
+                "Content-Type": "application/json",
+              },
+            });
+          } catch (error) {
+            console.error("Explanation error:", error);
+          }
         }
 
         handleSuccess() {
@@ -172,6 +305,16 @@
           this.gameBox.setFillStyle(0xffffff);
           this.statusText.setText("GAME OVER");
           this.statusText.setColor("#FF0000");
+
+          window.parent.postMessage(
+            {
+              type: "GAME_OVER",
+              finalScore: this.score,
+              correctAnswers: this.correctAnswers,
+              wrongAnswers: this.wrongAnswers,
+            },
+            "*",
+          );
         }
 
         resize(gameSize) {
