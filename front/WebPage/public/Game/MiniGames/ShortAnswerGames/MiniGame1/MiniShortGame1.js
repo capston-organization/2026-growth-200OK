@@ -1,3 +1,4 @@
+/* global Phaser */
 /**
  * [MiniShortGame1 클래스]
  * -------------------------------------------------------------------------
@@ -20,6 +21,7 @@ class MiniShortGame1 extends Phaser.Scene {
   init(data) {
     this.mainScene = data.parent;
     this.speedLevel = data.speedLevel || 1; // 기본 속도 레벨 1
+    this.currentProblem = data.problem; // ★ 추가: MainScene에서 넘겨준 1개의 문제 저장
 
     // ★ [반응형 기준점] 1280x720 해상도 기준
     this.baseWidth = 1280;
@@ -80,8 +82,13 @@ class MiniShortGame1 extends Phaser.Scene {
     this.isResolved = false; // 정답 제출 완료 여부
     this.gameResult = false; // 최종 성공/실패 여부
 
-    // 문제 데이터 가져오기 & 입력 변수 초기화
-    this.problemData = this.getProblem();
+    // ★ 수정: 하드코딩 함수 대신 API로 받은 문제를 게임 데이터로 변환
+    // 상대방 말풍선에는 질문 전체를 띄우고, 내 말풍선에는 기본 빈칸(____)을 띄웁니다.
+    this.problemData = {
+      question: this.currentProblem.question,
+      displaySentence: "____", // 단답형 입력을 위한 기본 빈칸
+      answer: String(this.currentProblem.correctAnswer), // 정답 문자열 처리
+    };
     this.userInputValue = "";
 
     // UI 컨테이너 (타이머 등을 담을 레이어 - 맨 위)
@@ -420,41 +427,10 @@ class MiniShortGame1 extends Phaser.Scene {
 
     // 결과 전달
     if (this.mainScene && this.mainScene.handleMiniGameResult) {
-      this.mainScene.handleMiniGameResult(this.gameResult);
+      // ★ 수정: 성공 여부와 함께 '방금 푼 문제' 객체를 같이 넘겨줌
+      this.mainScene.handleMiniGameResult(this.gameResult, this.currentProblem);
     }
     this.scene.stop();
-  }
-
-  // [데이터] 문제 은행 (랜덤 반환)
-  getProblem() {
-    const problems = [
-      {
-        question: "I will go to a hospital.\nI can't go alone.",
-        displaySentence: "Do you want to go ____ me?",
-        answer: "with",
-      },
-      {
-        question: "Look at the sky!\nIt's raining.",
-        displaySentence: "I need __ umbrella.",
-        answer: "an",
-      },
-      {
-        question: "I am very hungry now.\nWhat should we do?",
-        displaySentence: "___'s eat some pizza.",
-        answer: "Let",
-      },
-      {
-        question: "Is this your pencil?\nI don't think so.",
-        displaySentence: "__, it is not.",
-        answer: "No",
-      },
-      {
-        question: "She runs very fast.\nI can't keep up with her.",
-        displaySentence: "I ___'t catch her.",
-        answer: "can",
-      },
-    ];
-    return Phaser.Utils.Array.GetRandom(problems);
   }
 
   // =================================================================

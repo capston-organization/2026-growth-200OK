@@ -1,3 +1,4 @@
+/* global Phaser */
 /**
  * MiniMultiGame1: 영어 단어 맞추기 (Refactored_Final_Responsive_Fixed)
  *
@@ -18,6 +19,7 @@ class MiniMultiGame1 extends Phaser.Scene {
   init(data) {
     this.mainScene = data.parent;
     this.speedLevel = data.speedLevel || 1;
+    this.currentProblem = data.problem; // ★ MainScene에서 넘겨준 1개의 문제 저장
 
     // ★ [MiniOXGame1 방식] 반응형 기준점 설정
     this.baseWidth = 1280;
@@ -221,40 +223,35 @@ class MiniMultiGame1 extends Phaser.Scene {
   // [5] Set Problem
   // =================================================================
   setProblem() {
-    const problems = [
-      {
-        q: "She ___ happy.",
-        answers: ["is", "was"],
-        options: ["is", "not", "am", "playing", "was"],
-      },
-      {
-        q: "We ___ friends.",
-        answers: ["are", "were"],
-        options: ["can", "are", "am", "were", "be"],
-      },
-      {
-        q: "It ___ rain.",
-        answers: ["will", "can"],
-        options: ["will", "can", "apple", "are", "am"],
-      },
-    ];
+    // ★ 하드코딩된 problems 배열 삭제
+    const p = this.currentProblem; // 전달받은 문제 사용
 
-    const p = Phaser.Utils.Array.GetRandom(problems);
-    this.questionText.setText(p.q);
+    // API 명세서에 따르면 문제는 p.question 에 들어있음
+    this.questionText.setText(p.question);
 
+    // 옵션 섞기 (API의 p.options 사용)
     const options = Phaser.Utils.Array.Shuffle([...p.options]).slice(0, 5);
     this.correctCount = 0;
-    this.totalCorrect = 0;
+
+    // API 명세서에 따르면 단일 정답인 correctAnswer가 있음.
+    // 만약 정답이 여러 개라면 백엔드 명세가 배열이어야 하지만,
+    // 보여준 예시는 "correctAnswer": "삼" 이므로 문자열 처리 기준으로 작성할게.
+    this.totalCorrect = 1;
 
     this.targets.forEach((t, i) => {
-      t.word.setText(options[i]);
+      // 옵션이 5개가 안될 수도 있으니 예외 처리
+      const optionText = options[i] || "";
+      t.word.setText(optionText);
       t.clicked = false;
       t.image.setTexture(`target${t.id}`);
       t.image.clearTint();
 
-      if (p.answers.includes(options[i])) {
+      // 타겟 숨기기/보이기 처리 (옵션 개수가 적을 때를 대비)
+      t.container.setVisible(optionText !== "");
+
+      // 정답 체크 로직 수정
+      if (optionText === p.correctAnswer) {
         t.isAnswer = true;
-        this.totalCorrect++;
       } else {
         t.isAnswer = false;
       }
@@ -343,7 +340,8 @@ class MiniMultiGame1 extends Phaser.Scene {
     this.input.setDefaultCursor("default");
 
     if (this.mainScene && this.mainScene.handleMiniGameResult) {
-      this.mainScene.handleMiniGameResult(this.gameResult);
+      // ★ 수정: 게임 결과와 함께 '어떤 문제였는지'도 같이 넘겨줌
+      this.mainScene.handleMiniGameResult(this.gameResult, this.currentProblem);
     }
     this.scene.stop();
   }

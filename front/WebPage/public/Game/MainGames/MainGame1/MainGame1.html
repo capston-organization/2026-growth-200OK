@@ -60,6 +60,17 @@
           this.speedLevel = 1; // 게임 속도 레벨 (1~5단계)
           this.isGameRunning = true; // 게임 진행 중 여부 (Game Over 체크용)
 
+          // ★ 추가: 전체 문제 배열과 남은 문제 배열
+          this.allProblems = [];
+          this.remainingProblems = [];
+
+          // ★ [추가] 정답과 오답을 추적할 배열 추가
+          this.correctAnswers = [];
+          this.wrongAnswers = [];
+
+          this.accessToken = ""; // 토큰 저장용
+          this.gameId = null; // 게임 세션 ID 저장용
+
           // --- [B] UI 및 화면 요소 배치 ---
           const { width, height } = this.scale; // 현재 화면 크기 가져오기
           const centerX = width * 0.5;
@@ -116,9 +127,25 @@
             this.hearts.push(heart); // 배열에 저장 (나중에 색 바꿀 때 사용)
           }
 
-          // --- [C] 게임 루프 시작 ---
-          // 2초 대기(delayedCall) 후 첫 번째 미니게임을 시작(startMiniGame)합니다.
-          this.time.delayedCall(2000, this.startMiniGame, [], this);
+          // --- [C] React에서 데이터 받아서 게임 루프 시작 ---
+          window.addEventListener("message", (event) => {
+            if (event.data && event.data.type === "START_GAME") {
+              console.log("Phaser: React로부터 데이터 수신 성공!", event.data);
+              // ★ gameId와 accessToken을 추가로 저장합니다.
+              this.gameId = event.data.gameId;
+              this.accessToken = event.data.accessToken;
+
+              // ★ 수정: React에서 받은 문제를 저장하고, remainingProblems 복사
+              this.allProblems = event.data.problems;
+              this.remainingProblems = [...this.allProblems];
+
+              // ★ 5번 로직 핵심: 모든 문제는 기본적으로 'Failed(오답)' 상태로 시작합니다!
+              this.wrongAnswers = [...this.allProblems];
+
+              // 데이터가 들어온 후 2초 대기 후 첫 미니게임 시작
+              this.time.delayedCall(2000, this.startMiniGame, [], this);
+            }
+          });
 
           // 화면 크기가 변경되면 UI 위치를 재조정하는 이벤트 연결 (반응형)
           this.scale.on("resize", this.resize, this);
@@ -145,23 +172,44 @@
         startMiniGame() {
           if (!this.isGameRunning) return; // 게임 오버 상태면 실행 안 함
 
+          // ★ 추가: 남은 문제가 없으면 게임 클리어 (Congratulation)
+          if (this.remainingProblems.length === 0) {
+            this.gameClear();
+            return;
+          }
           this.statusText.setText(""); // 'Ready' 글자 지움
 
-          // ★ 실행할 미니게임들의 Key 목록 ★
-          // 만들었던 게임들(OX, 객관식, 단답형)의 Key를 모두 여기에 적어야 랜덤으로 나옵니다.
-          const games = ["MiniMultiGame1", "MiniOXGame1", "MiniShortGame1"];
+          // ★ 추가: 남은 문제 중 랜덤으로 하나 선택
+          const randomProblem = Phaser.Utils.Array.GetRandom(
+            this.remainingProblems,
+          );
 
-          // 배열에서 랜덤으로 하나 선택
-          const randomKey = Phaser.Math.RND.pick(games);
+          // ★ [핵심] 미니게임이 시작되는 즉시 해설 생성을 요청합니다.
+          // 사용자가 문제를 푸는 동안 백엔드에서 AI 해설 등이 생성됩니다.
+          this.generateExplanation(randomProblem.id);
 
-          // 선택된 미니게임 씬(Scene) 실행 (launch)
-          // launch는 MainScene을 끄지 않고 위에 겹쳐서 실행합니다.
-          this.scene.launch(randomKey, {
-            speedLevel: this.speedLevel, // 현재 스피드 정보를 넘겨줌
-            parent: this, // ★ 중요: MainScene 자신을 넘겨줘서 미니게임이 결과를 보고할 수 있게 함
+          // ★ 수정: 문제의 type에 따라 실행할 미니게임 매칭 (API 명세서 참고)
+          // 백엔드 데이터에 "type": "MULTIPLE_CHOICE" 등이 있다고 가정
+          let gameKey = "";
+          if (randomProblem.type === "MULTIPLE_CHOICE")
+            gameKey = "MiniMultiGame1";
+          else if (randomProblem.type === "OX") gameKey = "MiniOXGame1";
+          else if (randomProblem.type === "SHORT_ANSWER")
+            gameKey = "MiniShortGame1";
+          else {
+            // type이 명확하지 않다면 랜덤으로 실행 (기존 방식)
+            const games = ["MiniMultiGame1", "MiniOXGame1", "MiniShortGame1"];
+            gameKey = Phaser.Math.RND.pick(games);
+          }
+
+          // 선택된 미니게임에 '현재 풀어야 할 문제 1개'만 전달
+          this.scene.launch(gameKey, {
+            speedLevel: this.speedLevel,
+            parent: this,
+            problem: randomProblem, // ★ 전체 배열이 아닌 1개의 문제만 전달
           });
 
-          console.log(`Launched: ${randomKey}, Speed: ${this.speedLevel}`);
+          console.log(`Launched: ${gameKey}, Speed: ${this.speedLevel}`);
         }
 
         /**
@@ -169,12 +217,57 @@
          * - 미니게임(MiniGame1.js 등)에서 게임이 끝나면 이 함수를 호출합니다.
          * @param {boolean} isSuccess - 성공(true) / 실패(false)
          */
-        handleMiniGameResult(isSuccess) {
+        handleMiniGameResult(isSuccess, problem) {
+          // ★ 추가: React로 해당 문제의 정답 여부 전송 (React에서 POST API 호출하도록)
+          window.parent.postMessage(
+            {
+              type: "SUBMIT_PROBLEM_RESULT",
+              problemId: problem.id,
+              correct: isSuccess,
+            },
+            "*",
+          );
+
           if (isSuccess) {
+            // [추가] 정답 배열에 중복 없이 추가
+            if (!this.correctAnswers.some((p) => p.id === problem.id)) {
+              this.correctAnswers.push(problem);
+            }
+            // 남은 문제 배열에서 제거 (이제 문제로 안 나옴)
+            this.remainingProblems = this.remainingProblems.filter(
+              (p) => p.id !== problem.id,
+            );
+            // ★ 성공한 문제는 '오답(기본 상태)' 배열에서 완전히 빼냅니다.
+            this.wrongAnswers = this.wrongAnswers.filter(
+              (p) => p.id !== problem.id,
+            );
+
             this.handleSuccess();
           } else {
+            // ★ 이미 모든 문제가 처음부터 wrongAnswers에 들어있으므로,
+            // 실패했을 때는 배열을 건드릴 필요 없이 상태 처리만 하면 됩니다.
             this.handleFail();
           }
+        }
+
+        // ★ 추가: 모든 문제를 다 맞췄을 때 호출되는 함수
+        gameClear() {
+          this.isGameRunning = false;
+          this.gameBox.setFillStyle(0xffff00); // 금색 느낌
+          this.statusText.setText("CONGRATULATIONS!");
+          this.statusText.setColor("#FF1493"); // 예쁜 색
+          this.statusText.setFontSize("48px");
+
+          // ★ 정답/오답 배열도 같이 React로 전송
+          window.parent.postMessage(
+            {
+              type: "GAME_CLEAR",
+              finalScore: this.score,
+              correctAnswers: this.correctAnswers,
+              wrongAnswers: this.wrongAnswers,
+            },
+            "*",
+          );
         }
 
         /**
@@ -251,6 +344,31 @@
         }
 
         /**
+         * [추가] 해설 단 건 조회/생성 API 호출 (비동기)
+         * 화면에 보여줄 필요가 없으므로 호출 후 응답을 기다리지 않고 게임을 계속 진행합니다.
+         */
+        async generateExplanation(problemId) {
+          if (!this.gameId || !this.accessToken) return;
+
+          const url = `/games/${this.gameId}/problems/${problemId}/explanation`;
+
+          try {
+            // 결과를 보여줄 필요가 없으므로 fetch만 실행하고 넘아갑니다.
+            await fetch(url, {
+              method: "GET",
+              headers: {
+                Authorization: `Bearer ${this.accessToken}`,
+                "Content-Type": "application/json",
+              },
+            });
+            console.log(`Explanation request sent for problem: ${problemId}`);
+          } catch (error) {
+            // 게임 진행에 지장을 주면 안 되므로 에러는 콘솔에만 출력합니다.
+            console.error("Failed to generate explanation:", error);
+          }
+        }
+
+        /**
          * 7. gameOver(): 게임 오버 처리
          */
         gameOver() {
@@ -259,9 +377,16 @@
           this.statusText.setText("GAME OVER");
           this.statusText.setColor("#FF0000"); // 빨간 글씨
 
-          // ★ [React와 통신] 부모 창으로 메시지 전송
-          // 나중에는 여기에 wrongAnswers 배열도 같이 보내면 됩니다.
-          window.parent.postMessage({ type: "GAME_OVER" }, "*");
+          // ★ [수정] 정답/오답 배열도 같이 React로 전송
+          window.parent.postMessage(
+            {
+              type: "GAME_OVER",
+              finalScore: this.score,
+              correctAnswers: this.correctAnswers,
+              wrongAnswers: this.wrongAnswers,
+            },
+            "*",
+          );
         }
 
         /**

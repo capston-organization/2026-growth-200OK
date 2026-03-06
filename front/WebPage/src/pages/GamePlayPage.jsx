@@ -1,268 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useLocation } from "react-router-dom"; // 🔥 추가
-// =================================================================================
-// [1. 데이터 영역]
-// 나중에 서버나 DB에서 데이터를 가져올 때 이 변수들을 교체하면 됩니다.
-// =================================================================================
-
-// [Mock Data] 학습 목표 및 내용
-
-const LEARNING_GOAL = `
-
-1. 관계대명사 구별:
-
-`;
-
-const LEARNING_CONTENT = `
-
-1. 관계대명사 구별:
-
-   - 사람일 때: who
-
-   - 사물일 때: which
-
-   
-
-2. 수 일치 (Subject-Verb Agreement):
-
-   - 주어가 단수면 is, 복수면 are
-
-   - You는 항상 are를 씁니다.
-`;
-
-// [Mock Data] 오답 노트용 문제 데이터 (틀린 문제라고 가정)
-// type: "CHOICE"(객관식), "OX"(OX퀴즈), "SHORT"(주관식)
-
-const MOCK_WRONG_ANSWERS = [
-  {
-    id: 1,
-
-    type: "CHOICE",
-
-    question: "The book ______ is on the table is mine.",
-
-    options: ["who", "whom", "which", "whose", "that"],
-
-    answer: "which",
-
-    explanation:
-      "선행사가 사물(The book)이므로 관계대명사는 which가 적절합니다. 또한 주격 관계대명사이므로 뒤에 바로 동사가 옵니다.",
-  },
-
-  {
-    id: 2,
-
-    type: "OX",
-
-    question:
-      "다음 문장의 문법 상 오류가 없다면 O 있다면 X를 고르시오.\n'You is good.'",
-
-    options: ["O", "X"],
-
-    answer: "X",
-
-    explanation:
-      "You는 2인칭 대명사로 Be동사는 항상 are를 써야 합니다. (You are good). 이는 영어 문법의 가장 기초적인 수 일치 규칙 중 하나입니다.",
-  },
-
-  {
-    id: 3,
-
-    type: "SHORT",
-
-    question: "다음 문장의 빈칸에 들어갈 말을 쓰시오.\n'You ______ good.'",
-
-    answer: "are",
-
-    explanation: "주어 You에 맞는 Be동사는 are입니다.",
-  },
-];
-
-// [수정 포인트 1] 스크롤 테스트를 위해 데이터를 20개로 늘렸습니다.
-
-const INITIAL_CORRECT_RESULTS = Array.from({ length: 20 }).map((_, i) => ({
-  id: 100 + i,
-
-  title: `Practice Question No.${i + 1}`, // 제목
-
-  question: `This is the full text for Practice Question No.${i + 1}.`, // 실제 문제 내용
-
-  status: i % 3 === 0 ? "blue" : "yellow", // 파랑, 노랑 섞어서 생성
-
-  explanation:
-    i === 0
-      ? `(이 해설은 스크롤 테스트를 위해 아주 길게 작성되었습니다)\n\n
-
-         첫 번째 문제에 대한 아주 상세한 해설입니다.
-
-         관계대명사는 두 문장을 연결하는 접속사와 대명사의 역할을 동시에 합니다.
-
-         
-
-         1. 선행사 확인: 문장 앞에 오는 명사가 사람인지 사물인지 확인합니다.
-
-         2. 격 확인: 주격, 소유격, 목적격을 판단합니다.
-
-         3. 동사 수 일치: 관계대명사절 내의 동사는 선행사의 수에 일치시킵니다.
-
-         
-
-         이 모든 과정을 거쳐야 정확한 정답을 도출할 수 있습니다.
-
-         영어 문법은 반복 학습이 중요하므로, 틀린 문제는 반드시 오답 노트를 통해 복습하시기 바랍니다.
-
-         스크롤이 잘 되는지 확인해보세요! 아래로 더 내려보세요.
-
-         
-
-         [추가 설명]
-
-         Lorem ipsum dolor sit amet, consectetur adipiscing elit.
-
-         Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-
-         Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
-
-         `
-      : `Short explanation for question ${i + 1}. Good job!`,
-}));
-
-// =================================================================================
-// [2. 메인 컴포넌트 시작]
-// 화면에 보이는 모든 기능이 여기 모여 있습니다.
-// =================================================================================
-const GamePlayPage = () => {
-  // --- State 관리 (화면의 상태를 기억하는 변수들) ---
-
-  // phase: 현재 어떤 화면을 보여줄지 결정 (GOAL -> CONTENT -> GAME -> RETRY -> SUCCESS_ALL -> ANALYSIS)
-  const [phase, setPhase] = useState("GOAL");
-
-  const [isGameOver, setIsGameOver] = useState(false);
-
-  const iframeRef = useRef(null);
-
-  const [retryIndex, setRetryIndex] = useState(0);
-
-  const [userSelection, setUserSelection] = useState("");
-
-  const [showHintPopup, setShowHintPopup] = useState(false);
-
-  const [retryStatus, setRetryStatus] = useState({});
-
-  const [selectedAnalysisId, setSelectedAnalysisId] = useState(null);
-
-  // [수정 포인트 2] 초기값을 빈 배열이 아니라, 바로 테스트해볼 수 있게 합쳐진 데이터로 설정할 수도 있습니다.
-
-  // 실제 로직에서는 빈 배열([])로 시작하는 것이 맞습니다.
-
-  const [finalResults, setFinalResults] = useState([]);
-
-  useEffect(() => {
-    const handleMessage = (event) => {
-      if (event.data && event.data.type === "GAME_OVER") {
-        console.log("React: Game Over 신호 수신!");
-
-        setIsGameOver(true);
-      }
-    };
-
-    window.addEventListener("message", handleMessage);
-
-    return () => window.removeEventListener("message", handleMessage);
-  }, []);
-
-  // [Phase가 ANALYSIS로 변할 때] 혹은 [게임/재시도 종료 시] 데이터를 준비
-
-  // 여기서는 useEffect를 사용하여 ANALYSIS 단계 진입 시 데이터가 비어있으면 채워넣도록 방어 로직을 추가합니다.
-
-  useEffect(() => {
-    if (phase === "ANALYSIS" && finalResults.length === 0) {
-      prepareFinalResults();
-    }
-  }, [phase]);
-
-  const handleCheckWrongAnswers = () => {
-    setPhase("RETRY");
-
-    setRetryIndex(0);
-
-    setUserSelection("");
-
-    setShowHintPopup(false);
-
-    setRetryStatus({});
-  };
-
-  const handleSubmitRetry = () => {
-    const currentProblem = MOCK_WRONG_ANSWERS[retryIndex];
-
-    const isCorrect =
-      userSelection.trim().toLowerCase() ===
-      currentProblem.answer.toLowerCase();
-
-    if (isCorrect) {
-      setRetryStatus((prev) => ({
-        ...prev,
-
-        [currentProblem.id]: prev[currentProblem.id] || "yellow",
-      }));
-
-      if (retryIndex < MOCK_WRONG_ANSWERS.length - 1) {
-        setRetryIndex(retryIndex + 1);
-
-        setUserSelection("");
-
-        setShowHintPopup(false);
-      } else {
-        prepareFinalResults();
-
-        setPhase("SUCCESS_ALL");
-      }
-    } else {
-      setRetryStatus((prev) => ({
-        ...prev,
-
-        [currentProblem.id]: "red",
-      }));
-
-      setShowHintPopup(true);
-    }
-  };
-
-  const prepareFinalResults = () => {
-    // 1. 처음에 맞춘 문제들 (20개 더미 데이터)
-
-    const passed = INITIAL_CORRECT_RESULTS.map((item) => ({
-      ...item,
-
-      // question 필드가 이미 Mock Data에 있으므로 그대로 사용
-    }));
-
-    // 2. 틀렸다가 다시 푼 문제들
-
-    const retried = MOCK_WRONG_ANSWERS.map((p) => ({
-      id: p.id,
-
-      title:
-        p.question.length > 20
-          ? p.question.substring(0, 20) + "..."
-          : p.question,
-
-      status: retryStatus[p.id] === "red" ? "red" : "yellow",
-
-      explanation: p.explanation,
-
-      question: p.question,
-    }));
-
-    setFinalResults([...passed, ...retried]);
-  };
-
-  // --- Renders ---
-
-  const ScrollBarStyle = () => (
-    <style>
-      {`
+import { useLocation } from "react-router-dom"; // 💡 1. useLocation 임포트 필수!
+// --- Renders ---
+
+const ScrollBarStyle = () => (
+  <style>
+    {`
 
         ::-webkit-scrollbar {
 
@@ -293,86 +35,386 @@ const GamePlayPage = () => {
         }
 
       `}
-    </style>
+  </style>
+);
+
+const containerStyle = {
+  width: "100%",
+
+  height: "100vh",
+
+  background: "#E3F2FD",
+
+  display: "flex",
+
+  justifyContent: "center",
+
+  alignItems: "center",
+
+  fontFamily: "'Nunito', sans-serif",
+
+  position: "relative",
+
+  overflow: "hidden",
+};
+
+const whiteBoxStyle = {
+  background: "white",
+
+  borderRadius: "20px",
+
+  padding: "40px",
+
+  boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
+
+  textAlign: "center",
+
+  width: "80%",
+
+  maxWidth: "1400px",
+
+  display: "flex",
+
+  flexDirection: "column",
+
+  justifyContent: "center",
+
+  alignItems: "center",
+
+  border: "2px solid #FFCDD2",
+};
+
+const buttonStyle = {
+  marginTop: "30px",
+
+  padding: "15px 40px",
+
+  fontSize: "24px",
+
+  borderRadius: "30px",
+
+  background: "white",
+
+  color: "black",
+
+  cursor: "pointer",
+
+  boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
+
+  border: "1px solid #ddd",
+
+  fontWeight: "bold",
+};
+
+const pinkBtnStyle = {
+  ...buttonStyle,
+
+  background: "#FF8E99",
+
+  color: "white",
+
+  border: "none",
+};
+
+// =================================================================================
+// [1. 메인 컴포넌트 시작]
+// 화면에 보이는 모든 기능이 여기 모여 있습니다.
+// =================================================================================
+const GamePlayPage = () => {
+  // --- State 관리 (화면의 상태를 기억하는 변수들) ---
+  // 💡 2. 이전 페이지에서 넘겨준 데이터 꺼내기
+  const location = useLocation();
+  // 새로고침 시 state가 날아갈 수 있으므로 방어 코드(|| {}) 작성
+  const { previewData, problems, gameId } = location.state || {};
+
+  // 💡 3. 꺼낸 데이터를 활용할 변수 선언 (Mock 데이터 대체)
+  const learningGoal =
+    previewData?.learningObjectives || "학습 목표가 없습니다.";
+  const learningContent =
+    previewData?.learningContent || "학습 내용이 없습니다.";
+
+  // 실제 게임 화면이나 로직에 쓸 문제 데이터 상태
+  const [gameProblems] = useState(problems || []);
+
+  // 실제 게임에서 유저가 맞춘 문제와 틀린 문제를 저장할 State
+  const [correctAnswers, setCorrectAnswers] = useState([]);
+  const [wrongAnswers, setWrongAnswers] = useState([]);
+
+  // phase: 현재 어떤 화면을 보여줄지 결정 (GOAL -> CONTENT -> GAME -> RETRY -> SUCCESS_ALL -> ANALYSIS)
+  const [phase, setPhase] = useState("GOAL");
+
+  const [isGameOver, setIsGameOver] = useState(false);
+
+  const iframeRef = useRef(null);
+
+  const [retryIndex, setRetryIndex] = useState(0);
+
+  const [userSelection, setUserSelection] = useState("");
+
+  const [showHintPopup, setShowHintPopup] = useState(false);
+
+  const [retryStatus, setRetryStatus] = useState({});
+
+  const [selectedAnalysisId, setSelectedAnalysisId] = useState(null);
+  // 💡 1. 팝업에 띄울 실시간 해설을 담을 State
+  const [currentExplanation, setCurrentExplanation] = useState("");
+
+  // 💡 2. useMemo로 되어있던 finalResults를 지우고 useState로 변경!
+  const [finalResults, setFinalResults] = useState([]);
+
+  const [isGenerating, setIsGenerating] = useState(false); // 💡 해설 생성 로딩 상태 추가
+
+  // --- 귀여운 로딩창 컴포넌트 (내부에 추가하거나 위로 빼셔도 됩니다) ---
+  const LoadingOverlay = () => (
+    <div
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        width: "100%",
+        height: "100%",
+        background: "rgba(255, 255, 255, 0.9)",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 9999,
+      }}
+    >
+      <div
+        className="loader"
+        style={{
+          border: "8px solid #f3f3f3",
+          borderTop: "8px solid #FF8E99",
+          borderRadius: "50%",
+          width: "60px",
+          height: "60px",
+          animation: "spin 1s linear infinite",
+        }}
+      />
+      <h2 style={{ color: "#FF8E99", marginTop: "20px" }}>
+        AI가 열심히 해설을 쓰고 있어요... ✍️
+      </h2>
+      <p>잠시만 기다려주세요!</p>
+      <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+    </div>
   );
 
-  const containerStyle = {
-    width: "100%",
+  useEffect(() => {
+    const handleMessage = (event) => {
+      // ★ [수정] GAME_OVER 뿐만 아니라 GAME_CLEAR 이벤트도 수신하도록 변경
+      if (
+        event.data &&
+        (event.data.type === "GAME_OVER" || event.data.type === "GAME_CLEAR")
+      ) {
+        console.log("React: 게임 종료 신호 및 결과 데이터 수신!", event.data);
 
-    height: "100vh",
+        setIsGameOver(true);
 
-    background: "#E3F2FD",
+        // 드디어 Phaser가 보내준 진짜 맞춘 문제/틀린 문제를 State에 저장!
+        setCorrectAnswers(event.data.correctAnswers || []);
+        setWrongAnswers(event.data.wrongAnswers || []);
+      }
+    };
 
-    display: "flex",
+    window.addEventListener("message", handleMessage);
 
-    justifyContent: "center",
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
 
-    alignItems: "center",
+  // 컴포넌트 최상위 useEffect들 아래에 추가
+  useEffect(() => {
+    if (phase === "ANALYSIS") {
+      const fetchAnalysisData = async () => {
+        try {
+          // 💡 API 4: 오답 결과와 전체 문제 해설 조회
+          const response = await fetch(`/games/${gameId}/problems`, {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+            },
+          });
 
-    fontFamily: "'Nunito', sans-serif",
+          if (response.ok) {
+            const data = await response.json();
 
-    position: "relative",
+            // 서버 데이터(firstAttemptCorrect) + 로컬 데이터(retryStatus) 조합해서 색상 판별
+            const mappedResults = data.map((p) => {
+              let statusStr = "blue"; // 기본: 게임에서 한 번에 맞춤
 
-    overflow: "hidden",
+              if (!p.firstAttemptCorrect) {
+                // 게임에서 틀렸다면, 오답노트에서 한 번이라도 틀렸는지(red) 확인
+                statusStr = retryStatus[p.id] === "red" ? "red" : "yellow";
+              }
+
+              return {
+                id: p.id,
+                title:
+                  p.question.length > 20
+                    ? p.question.substring(0, 20) + "..."
+                    : p.question,
+                status: statusStr,
+                explanation: p.explanation,
+                question: p.question,
+              };
+            });
+
+            setFinalResults(mappedResults);
+          }
+        } catch (error) {
+          console.error("최종 결과 조회 실패:", error);
+        }
+      };
+      fetchAnalysisData();
+    }
+  }, [phase, gameId, retryStatus]);
+
+  // 4번에서 추가한 useEffect 바로 아래에 하나 더 추가
+  useEffect(() => {
+    const fetchExplanationIfNeeded = async () => {
+      if (!selectedAnalysisId) return;
+
+      // 현재 선택된 문제 찾기
+      const selectedResult = finalResults.find(
+        (r) => r.id === selectedAnalysisId,
+      );
+
+      // 해설이 없거나 기본 텍스트인 경우에만 API 3 호출
+      if (
+        selectedResult &&
+        (!selectedResult.explanation ||
+          selectedResult.explanation === "(해설 없음)")
+      ) {
+        try {
+          const response = await fetch(
+            `/games/${gameId}/problems/${selectedAnalysisId}/explanation`,
+            {
+              headers: {
+                Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+              },
+            },
+          );
+          if (response.ok) {
+            const data = await response.json();
+            // 가져온 해설로 기존 finalResults 배열 업데이트
+            setFinalResults((prev) =>
+              prev.map((item) =>
+                item.id === selectedAnalysisId
+                  ? { ...item, explanation: data.explanation }
+                  : item,
+              ),
+            );
+          }
+        } catch (error) {
+          console.error("해설 상세 조회/생성 실패:", error);
+        }
+      }
+    };
+
+    fetchExplanationIfNeeded();
+  }, [selectedAnalysisId, gameId, finalResults]); // 의존성 배열에 주의
+
+  // [Phase가 ANALYSIS로 변할 때] 혹은 [게임/재시도 종료 시] 데이터를 준비
+
+  // 여기서는 useEffect를 사용하여 ANALYSIS 단계 진입 시 데이터가 비어있으면 채워넣도록 방어 로직을 추가합니다.
+
+  const handleCheckWrongAnswers = async () => {
+    // 1. 로딩 시작
+    setIsGenerating(true);
+
+    try {
+      // 2. 모든 문제(특히 틀린 문제 우선)의 해설을 병렬로 요청
+      // API 3의 특성(없으면 생성, 있으면 조회)을 이용해 미리 "찌르기" 작업을 합니다.
+      const preparationTasks = gameProblems.map((problem) =>
+        fetch(`/games/${gameId}/problems/${problem.id}/explanation`, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+          },
+        }),
+      );
+
+      // 모든 요청이 완료될 때까지 대기 (Promise.all)
+      await Promise.all(preparationTasks);
+
+      console.log("모든 해설 생성/조회 완료!");
+    } catch (error) {
+      console.error("해설 준비 중 오류 발생:", error);
+    } finally {
+      // 3. 로딩 종료 및 화면 전환
+      setIsGenerating(false);
+
+      if (wrongAnswers.length === 0) {
+        setPhase("SUCCESS_ALL");
+      } else {
+        setPhase("RETRY");
+        setRetryIndex(0);
+        setUserSelection("");
+        setShowHintPopup(false);
+        setRetryStatus({});
+      }
+    }
   };
 
-  const whiteBoxStyle = {
-    background: "white",
+  const handleSubmitRetry = async () => {
+    const currentProblem = wrongAnswers[retryIndex];
+    const safeUserSelection = String(userSelection || "")
+      .trim()
+      .toLowerCase();
+    const safeAnswer = String(currentProblem.correctAnswer || "").toLowerCase();
+    const isCorrect = safeUserSelection === safeAnswer;
 
-    borderRadius: "20px",
+    try {
+      // 💡 API 1: 정답 제출
+      await fetch(`/games/${gameId}/problems/${currentProblem.id}/submit`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+        },
+        body: JSON.stringify({ correct: isCorrect }),
+      });
 
-    padding: "40px",
+      if (isCorrect) {
+        setRetryStatus((prev) => ({
+          ...prev,
+          [currentProblem.id]: prev[currentProblem.id] || "yellow", // 한번이라도 틀렸으면 red 유지, 아니면 yellow
+        }));
 
-    boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
+        if (retryIndex < wrongAnswers.length - 1) {
+          setRetryIndex(retryIndex + 1);
+          setUserSelection("");
+          setShowHintPopup(false);
+        } else {
+          setPhase("SUCCESS_ALL");
+        }
+      } else {
+        setRetryStatus((prev) => ({
+          ...prev,
+          [currentProblem.id]: "red", // 한번이라도 틀리면 무조건 red 낙인
+        }));
 
-    textAlign: "center",
-
-    width: "80%",
-
-    maxWidth: "1400px",
-
-    display: "flex",
-
-    flexDirection: "column",
-
-    justifyContent: "center",
-
-    alignItems: "center",
-
-    border: "2px solid #FFCDD2",
+        // 💡 API 3: 해설 단 건 조회 (틀렸을 때 팝업용)
+        const expRes = await fetch(
+          `/games/${gameId}/problems/${currentProblem.id}/explanation`,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+            },
+          },
+        );
+        if (expRes.ok) {
+          const expData = await expRes.json();
+          setCurrentExplanation(expData.explanation); // 받아온 해설 저장
+        }
+        setShowHintPopup(true);
+      }
+    } catch (error) {
+      console.error("정답 제출 또는 해설 조회 실패:", error);
+    }
   };
 
-  const buttonStyle = {
-    marginTop: "30px",
-
-    padding: "15px 40px",
-
-    fontSize: "24px",
-
-    borderRadius: "30px",
-
-    background: "white",
-
-    color: "black",
-
-    cursor: "pointer",
-
-    boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
-
-    border: "1px solid #ddd",
-
-    fontWeight: "bold",
-  };
-
-  const pinkBtnStyle = {
-    ...buttonStyle,
-
-    background: "#FF8E99",
-
-    color: "white",
-
-    border: "none",
-  };
+  if (isGenerating) {
+    return <LoadingOverlay />;
+  }
 
   // [Phase 1] 학습 목표 (수정됨: 제목 중앙 정렬 + 스크롤 최적화)
 
@@ -472,7 +514,7 @@ const GamePlayPage = () => {
                 margin: "auto 0",
               }}
             >
-              {LEARNING_GOAL}
+              {learningGoal}
             </h2>
           </div>
 
@@ -583,7 +625,7 @@ const GamePlayPage = () => {
               paddingRight: "10px",
             }}
           >
-            {LEARNING_CONTENT}
+            {learningContent}
           </div>
 
           {/* 하단 버튼 */}
@@ -611,7 +653,25 @@ const GamePlayPage = () => {
   // [Phase 3] 게임 플레이
 
   if (phase === "GAME") {
-    const gameUrl = "/Game/MainGames/MainGame1/MainGame1.html";
+    // 💡 URL 뒤에 파라미터로 gameId를 붙여줄 수도 있습니다.
+    const gameUrl = `/Game/MainGames/MainGame2/MainGame2.html?gameId=${gameId}`;
+
+    // 💡 iframe이 로드되면 게임 쪽으로 문제 데이터를 쏴주는 함수
+    const handleIframeLoad = () => {
+      // 💡 로컬 스토리지에서 토큰을 가져옵니다.
+      const token = localStorage.getItem("accessToken");
+      if (iframeRef.current && iframeRef.current.contentWindow) {
+        iframeRef.current.contentWindow.postMessage(
+          {
+            type: "START_GAME",
+            gameId: gameId,
+            problems: gameProblems, // 안 쓰이던 문제 데이터를 여기서 넘깁니다!
+            accessToken: token, // JWT 토큰
+          },
+          "*",
+        );
+      }
+    };
 
     return (
       <div style={{ ...containerStyle, background: "black" }}>
@@ -625,6 +685,7 @@ const GamePlayPage = () => {
           ref={iframeRef}
           src={gameUrl}
           title="Phaser Game"
+          onLoad={handleIframeLoad} // 💡 추가된 부분: 로딩 완료 시 데이터 전송
           style={{
             width: "100%",
 
@@ -674,7 +735,16 @@ const GamePlayPage = () => {
   // [Phase 4] 오답 다시 풀기
 
   if (phase === "RETRY") {
-    const currentProblem = MOCK_WRONG_ANSWERS[retryIndex];
+    // ★ [방어 코드 추가] wrongAnswers가 비어있거나, 해당 인덱스에 데이터가 없으면 렌더링 중단
+    if (
+      !wrongAnswers ||
+      wrongAnswers.length === 0 ||
+      !wrongAnswers[retryIndex]
+    ) {
+      return <div>오답 데이터를 불러오는 중...</div>;
+    }
+
+    const currentProblem = wrongAnswers[retryIndex];
 
     const getOptionStyle = (opt) => ({
       padding: "20px",
@@ -729,7 +799,7 @@ const GamePlayPage = () => {
             }}
           >
             <span style={{ color: "#FF8E99", fontWeight: "bold" }}>
-              오답 다시 풀기 ({retryIndex + 1}/{MOCK_WRONG_ANSWERS.length})
+              오답 다시 풀기 ({retryIndex + 1}/{wrongAnswers.length})
             </span>
 
             <span style={{ cursor: "pointer" }}>X</span>
@@ -759,7 +829,8 @@ const GamePlayPage = () => {
               width: "100%",
             }}
           >
-            {currentProblem.type === "SHORT" ? (
+            {/* 1. 단답형 문제 처리 (API 명세서에 맞게 SHORT_ANSWER로 수정) */}
+            {currentProblem.type === "SHORT_ANSWER" ? (
               <input
                 type="text"
                 value={userSelection}
@@ -767,21 +838,27 @@ const GamePlayPage = () => {
                 placeholder="정답을 입력하세요"
                 style={{
                   padding: "15px",
-
                   fontSize: "24px",
-
                   borderRadius: "30px",
-
                   border: "2px solid #FF8E99",
-
                   width: "60%",
-
                   textAlign: "center",
-
                   outline: "none",
                 }}
               />
+            ) : currentProblem.type === "OX" ? (
+              /* 2. OX 문제 처리 (강제로 'O', 'X' 버튼 생성) */
+              ["O", "X"].map((opt, idx) => (
+                <div
+                  key={idx}
+                  style={getOptionStyle(opt)}
+                  onClick={() => setUserSelection(opt)}
+                >
+                  {opt}
+                </div>
+              ))
             ) : (
+              /* 3. 객관식 문제 처리 */
               currentProblem.options.map((opt, idx) => (
                 <div
                   key={idx}
@@ -867,7 +944,7 @@ const GamePlayPage = () => {
                     fontWeight: "bold",
                   }}
                 >
-                  정답: {currentProblem.answer}
+                  정답: {currentProblem.correctAnswer}
                 </p>
 
                 <p
@@ -878,7 +955,7 @@ const GamePlayPage = () => {
                     whiteSpace: "pre-line",
                   }}
                 >
-                  {currentProblem.explanation}
+                  {currentExplanation}
                 </p>
               </div>
 
