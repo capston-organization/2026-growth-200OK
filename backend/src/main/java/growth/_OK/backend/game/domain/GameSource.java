@@ -22,14 +22,11 @@ public class GameSource extends BaseEntity {
     @JoinColumn(name = "owner_id", nullable = false)
     private User owner;
 
-    /** 저장된 파일 경로 또는 스토리지 키 */
     @Column(nullable = false)
     private String filePath;
 
-    /** 원본 파일명 */
     private String originalFileName;
 
-    /** 추출된 텍스트 (PDF/텍스트에서). AI 생성 시 사용 */
     @Column(columnDefinition = "TEXT")
     private String extractedText;
 

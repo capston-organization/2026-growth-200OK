@@ -34,9 +34,14 @@ public class Game extends BaseEntity {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String description;
 
-    // 학습 목표
     @Column(name = "learning_objectives", columnDefinition = "TEXT")
     private String learningObjectives;
+
+    @Column(name = "preview_learning_objectives", columnDefinition = "TEXT")
+    private String previewLearningObjectives;
+
+    @Column(name = "preview_learning_content", columnDefinition = "TEXT")
+    private String previewLearningContent;
 
     @Column(name = "is_public", nullable = false)
     private boolean isPublic;
@@ -44,7 +49,6 @@ public class Game extends BaseEntity {
     @Column(nullable = false)
     private int likeCount;
 
-    // 게임에 포함될 문제 갯수 (기본: 10개)
     @Column(name = "problem_count", nullable = false)
     private int problemCount;
 
@@ -55,7 +59,6 @@ public class Game extends BaseEntity {
     @Column(name = "problem_type", length = 20)
     private List<ProblemType> allowedProblemTypes = new ArrayList<>();
 
-    // 이 게임의 출제 소스 (업로드한 PDF/텍스트). 문제 생성 시 사용. null이면 문제 생성 불가
     @ManyToOne(fetch = FetchType.LAZY, optional = true)
     @JoinColumn(name = "source_id", nullable = true)
     private GameSource source;
@@ -94,7 +97,16 @@ public class Game extends BaseEntity {
         this.source = source;
     }
 
-    /** 게임 수정: 제목, 설명, 공개 방식만 변경 가능 */
+    public void setPreviewCache(String previewLearningObjectives, String previewLearningContent) {
+        this.previewLearningObjectives = previewLearningObjectives;
+        this.previewLearningContent = previewLearningContent;
+    }
+
+    public void clearPreviewCache() {
+        this.previewLearningObjectives = null;
+        this.previewLearningContent = null;
+    }
+
     public void updateInfo(String title, String description, Boolean isPublic) {
         if (title != null && !title.isBlank()) {
             this.title = title;

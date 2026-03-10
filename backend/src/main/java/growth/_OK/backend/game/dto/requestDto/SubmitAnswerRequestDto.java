@@ -8,7 +8,6 @@ import lombok.Getter;
 @Getter
 @Builder
 public class SubmitAnswerRequestDto {
-    /** 정답 여부 */
     private final Boolean correct;
 
     @JsonCreator

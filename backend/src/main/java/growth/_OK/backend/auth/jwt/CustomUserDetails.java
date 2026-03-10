@@ -21,14 +21,11 @@ public class CustomUserDetails implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        // ROLE_ 접두사는 Spring Security 권장 컨벤션
         return List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()));
     }
 
-    // 자체 로그인 X
     @Override public String getPassword() {return null;}
 
-    // userId
     @Override public String getUsername() {return user.getUserId().toString();}
 
 
