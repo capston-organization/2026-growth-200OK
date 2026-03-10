@@ -240,7 +240,12 @@ const GameCreationPage = () => {
 
         {/* 중앙 메뉴 (현재 페이지 표시) */}
         <div className="nav-menu">
-          <span>Home</span>
+          <span
+            style={{ cursor: "pointer" }}
+            onClick={() => navigate("/main", { state: { userName } })}
+          >
+            Home
+          </span>
           {/* 현재 페이지인 '게임 만들기'에만 분홍색 밑줄 강조 */}
           <span
             style={{
@@ -248,14 +253,36 @@ const GameCreationPage = () => {
               color: "#333",
               borderBottom: "3px solid #FF69B4",
               paddingBottom: "5px",
+              cursor: "pointer",
             }}
+            onClick={() => navigate("/create-game", { state: { userName } })}
           >
             게임 만들기
           </span>
-          <span>공유하기</span>
-          <span>게임하기</span>
-          <span>분석하기</span>
-          <span>육성하기</span>
+          <span
+            style={{ cursor: "pointer" }}
+            onClick={() => navigate("/main", { state: { userName } })}
+          >
+            공유하기
+          </span>
+          <span
+            style={{ cursor: "pointer" }}
+            onClick={() => navigate("/main", { state: { userName } })}
+          >
+            게임하기
+          </span>
+          <span
+            style={{ cursor: "pointer" }}
+            onClick={() => navigate("/main", { state: { userName } })}
+          >
+            분석하기
+          </span>
+          <span
+            style={{ cursor: "pointer" }}
+            onClick={() => navigate("/main", { state: { userName } })}
+          >
+            육성하기
+          </span>
 
           {/* 환영 문구 (가져온 userName 사용) */}
           <span
