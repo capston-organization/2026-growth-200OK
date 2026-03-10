@@ -28,7 +28,6 @@ public class UserStreakService {
     private final UserPlayDateRepository userPlayDateRepository;
     private final UserRepository userRepository;
 
-    // 오늘 날짜에 플레이 기록. 이미 있으면 무시
     @Transactional
     public void recordPlayToday(Long userId) {
         User user = userRepository.findById(userId)
@@ -43,12 +42,6 @@ public class UserStreakService {
                 .build());
     }
 
-    /**
-     * 스트릭 조회: 기간 내 날짜별 플레이 여부 + 현재 연속 스트릭 일수.
-     *
-     * @param userId 유저 ID
-     * @param days   조회할 일수 (기본 30, 최대 365). 과거 days일부터 오늘까지.
-     */
     @Transactional(readOnly = true)
     public StreakResponseDto getStreakData(Long userId, Integer days) {
         User user = userRepository.findById(userId)
@@ -79,7 +72,6 @@ public class UserStreakService {
                 .build();
     }
 
-    // 오늘 포함 연속 플레이 일수. 오늘 안 했으면 0
     private int computeCurrentStreak(Set<LocalDate> playedDates, LocalDate today) {
         if (!playedDates.contains(today)) {
             return 0;

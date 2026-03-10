@@ -30,21 +30,17 @@ public class AuthService {
     @Transactional
     public void googleLogin(GoogleCodeRequest request, HttpServletResponse response) {
 
-        // 인가코드가 %2F 등으로 인코딩되어 들어오므로 디코딩 후 사용
         String decodedCode = java.net.URLDecoder.decode(request.getCode(), java.nio.charset.StandardCharsets.UTF_8);
 
         GoogleUserInfoResponse googleInfo = googleClient.requestUserInfo(decodedCode);
-        String providerId = googleInfo.getId(); // 구글 sub는 long 범위를 넘을 수 있어 문자열로 저장
+        String providerId = googleInfo.getId();
 
-        // 1. 유저 찾기 or 생성하기
         User user = userRepository.findByProviderId(providerId)
                 .orElseGet(() -> registerUser(providerId, googleInfo));
         log.info("로그인: {}", user.getName());
 
-        // 2. 로그인 또는 회원가입 후 토큰 발급
         TokenResponse tokens = tokenService.generateTokens(user);
 
-        // 3. Response
         response.addCookie(tokenService.createRefreshCookie(tokens.getRefresh_token()));
         response.setHeader("Authorization", "Bearer " + tokens.getAccess_token());
     }
@@ -62,8 +58,6 @@ public class AuthService {
     }
 
     public TokenResponse reissue(String refreshToken) {
-
-        // jwt 파싱 → userId 추출
         Long userId = jwtTokenProvider.getUserIdFromRefreshToken(refreshToken);
 
         // redis에 저장된 refreshToken과 비교
@@ -74,10 +68,8 @@ public class AuthService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CapstonException(ExceptionCode.USER_NOT_FOUND));
 
-        // accessToken 재발급
         String newAccessToken = jwtTokenProvider.createAccessToken(user);
 
-        // refreshToken, accessToken 노출X
         return new TokenResponse("Bearer", newAccessToken, null,"3600", "1209600" );
     }
 
@@ -92,20 +84,16 @@ public class AuthService {
         CookieUtil.deleteCookie(response, "refresh_token");
     }
 
-    // user 찾기
     @Transactional(readOnly = true)
     private User findUser(CustomUserDetails userDetails){
         return userRepository.findById(userDetails.getUser().getUserId())
                 .orElseThrow(() -> new CapstonException(ExceptionCode.USER_NOT_FOUND));
     }
 
-    // 회원 탈퇴: 토큰 정리 → 사용자 삭제.
-    // 이벤트/파일 정리는 별도 서비스로 분리 가능.
     @Transactional
     public void deleteAccount(CustomUserDetails userDetails, String accessToken, HttpServletResponse response) {
         User user = findUser(userDetails);
 
-        // 토큰 정리 (refresh 삭제 + access 블랙리스트 등록)
         tokenService.deleteRefreshToken(user.getUserId().toString());
         String originAccessToken = accessToken.substring(7);
         long remainingTime = jwtTokenProvider.getRemainingTime(originAccessToken);

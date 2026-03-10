@@ -33,7 +33,6 @@ public class GameService {
     private final UserRepository userRepository;
     private final ProblemAttemptRepository problemAttemptRepository;
 
-    // 게임 생성
     public GameResponseDto createGame(GameCreateRequestDto request, CustomUserDetails userDetails) {
         User owner = findUser(userDetails);
         int problemCount = (request.getProblemCount() == null || request.getProblemCount() <= 0)
@@ -64,7 +63,6 @@ public class GameService {
         return GameResponseDto.from(gameRepository.save(game));
     }
 
-    // 게임 전체 조회 (Option: 제목으로 검색기능)
     @Transactional(readOnly = true)
     public GameListResponseDto getGames(String title, CustomUserDetails userDetails) {
         List<Game> games = (title == null || title.isBlank())
@@ -95,7 +93,6 @@ public class GameService {
         return GameListResponseDto.from(responses);
     }
 
-    // 내가 만든 게임 전체 조회
     @Transactional(readOnly = true)
     public GameListResponseDto getMyGames(CustomUserDetails userDetails) {
         User user = findUser(userDetails);
@@ -116,7 +113,6 @@ public class GameService {
         return GameListResponseDto.from(responses);
     }
 
-    // 내가 최근에 플레이한 게임 목록 (최대 5개, 최신순)
     @Transactional(readOnly = true)
     public GameListResponseDto getRecentPlayedGames(CustomUserDetails userDetails, int limit) {
         User user = findUser(userDetails);
@@ -144,7 +140,6 @@ public class GameService {
         return GameResponseDto.from(game, isLiked);
     }
 
-    // 좋아요 누르기 / 취소
     @Transactional
     public GameResponseDto toggleLike(Long gameId, CustomUserDetails userDetails) {
         User user = findUser(userDetails);
@@ -174,7 +169,6 @@ public class GameService {
                 .orElseThrow(() -> new CapstonException(ExceptionCode.USER_NOT_FOUND));
     }
 
-    // game 찾기
     @Transactional(readOnly = true)
     private Game findGame(Long gameId){
         return gameRepository.findById(gameId)

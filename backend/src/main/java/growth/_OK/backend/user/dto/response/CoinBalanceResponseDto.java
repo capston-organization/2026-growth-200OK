@@ -4,12 +4,10 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 
-import java.util.List;
-
 @Getter
 @Builder
 @AllArgsConstructor
-public class StreakResponseDto {
-    private final List<StreakDayDto> dates;
-    private final int currentStreak;
+public class CoinBalanceResponseDto {
+    private final int coins;
 }
+

@@ -26,11 +26,9 @@ public class ProblemAttempt extends BaseEntity {
     @JoinColumn(name = "problem_id", nullable = false)
     private Problem problem;
 
-    /** 해당 제출이 정답인지 */
     @Column(nullable = false)
     private boolean correct;
 
-    /** 이 문제에 대한 해당 유저의 제출 순서 (1=첫 시도) */
     @Column(nullable = false)
     private int attemptOrder;
 
