@@ -11,7 +11,6 @@ class MultiChoiceGame extends Phaser.Scene {
   init(data) {
     this.mainScene = data.parent;
     this.speedLevel = data.speedLevel || 1;
-    this.problem = data.problem; // ★ 전달받은 문제를 저장합니다.
   }
 
   preload() {
@@ -318,14 +317,34 @@ class MultiChoiceGame extends Phaser.Scene {
       )
       .setOrigin(0.5);
 
-    if (this.problem) {
-      // API 데이터 형식에 맞게 변환 (예시: problem.choices가 ['사과', '배'...] 형태일 때)
-      this.currentQuestionData = {
-        question: this.problem.content, // 문제 내용
-        options: this.problem.choices.map((c) => c.content || c), // 보기 내용
-        correctAnswer: this.problem.choices.findIndex((c) => c.isAnswer), // 정답 인덱스 (0~4)
-      };
-    }
+    this.questions = [
+      {
+        question: "Which is correct? (3rd person singular)",
+        options: ["He go", "He goes", "He going", "He gone", "He went"],
+        correctAnswer: 1,
+      },
+      {
+        question: "What is the correct past tense of 'run'?",
+        options: ["runned", "ran", "run", "running", "runs"],
+        correctAnswer: 1,
+      },
+      {
+        question: "Which sentence is grammatically correct?",
+        options: [
+          "She don't like it",
+          "She doesn't like it",
+          "She not like it",
+          "She doesn't likes it",
+          "She not likes it",
+        ],
+        correctAnswer: 1,
+      },
+      {
+        question: "What is the plural of 'mouse'?",
+        options: ["mouses", "mice", "mouse", "mices", "mousies"],
+        correctAnswer: 1,
+      },
+    ];
     this.currentQuestionIndex = 0;
     this.showResult = false;
     this.drumHitCount = 0;
@@ -406,11 +425,8 @@ class MultiChoiceGame extends Phaser.Scene {
     if (this.showResult) return;
     this.drumHitCount = 0;
     this.currentDrumForHits = null;
-
-    // ★ this.questions 대신 미리 만들어둔 currentQuestionData를 사용합니다.
-    var question = this.currentQuestionData;
+    var question = this.questions[this.currentQuestionIndex];
     var isCorrect = drumIndex === question.correctAnswer;
-
     this.showResult = true;
     this.robot.setTexture("robotBase");
 
@@ -435,27 +451,13 @@ class MultiChoiceGame extends Phaser.Scene {
     this.time.delayedCall(2000, this.finishGame, [], this);
   }
 
-  // showQuestion() 함수 수정
   showQuestion() {
-    var question = this.currentQuestionData; // 전달받은 데이터 사용
+    var question = this.questions[this.currentQuestionIndex];
     this.questionText.setText(question.question);
-
     for (var i = 0; i < 5; i++) {
-      if (question.options[i]) {
-        this.optionTexts[i].setText(
-          String.fromCharCode(65 + i) + ". " + question.options[i],
-        );
-        this.optionButtons[i].setVisible(true);
-        this.optionTexts[i].setVisible(true);
-        this.drums[i].drum.setVisible(true);
-        this.drums[i].label.setVisible(true);
-      } else {
-        // 보기 개수가 5개보다 적을 경우 남은 버튼 숨기기
-        this.optionButtons[i].setVisible(false);
-        this.optionTexts[i].setVisible(false);
-        this.drums[i].drum.setVisible(false);
-        this.drums[i].label.setVisible(false);
-      }
+      this.optionTexts[i].setText(
+        String.fromCharCode(65 + i) + ". " + question.options[i],
+      );
     }
     this.resultText.setVisible(false);
     this.showResult = false;
@@ -470,8 +472,7 @@ class MultiChoiceGame extends Phaser.Scene {
 
   finishGame() {
     if (this.mainScene && this.mainScene.handleMiniGameResult) {
-      // ★ 두 번째 인자로 반드시 this.problem을 넘겨줘야 MainGame에서 성공 처리가 됩니다.
-      this.mainScene.handleMiniGameResult(this.gameResult, this.problem);
+      this.mainScene.handleMiniGameResult(this.gameResult);
     }
     this.scene.stop();
   }
