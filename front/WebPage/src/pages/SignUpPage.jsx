@@ -104,7 +104,7 @@ const SignUpPage = () => {
 
       if (response.ok) {
         alert("정보가 성공적으로 저장되었습니다!");
-        navigate("/create-game", { state: { userName: name } });
+        navigate("/main", { state: { userName: name } });
       } else {
         alert("정보 저장에 실패했습니다. (서버 거절)");
       }

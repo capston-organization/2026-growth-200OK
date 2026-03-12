@@ -54,12 +54,11 @@ const GameCreationPage = () => {
   // [공통] '다음 단계' 버튼 활성화 여부 체크 (유효성 검사)
   const isNextButtonDisabled = () => {
     if (step === 1) return selectedType === null; // 유형을 안 골랐으면 버튼 끔
-    // 💡 [수정됨] 2단계: 파일이 하나도 없으면 다음으로 못 넘어감!
-    // (텍스트 입력은 현재 API가 없으므로 파일 배열 길이만 체크)
-    if (step === 2) return files.length === 0;
+    // 2단계: 파일이나 텍스트 둘 다 비어 있으면 다음으로 못 넘어감
+    if (step === 2) return files.length === 0 && textInput.trim() === "";
     if (step === 3) return gameName.trim() === ""; // 💡 게임 이름은 필수로 입력하게 설정
     if (step === 4) return selectedQuestions.length === 0; // 💡 기존 3단계를 4단계로 변경
-    return false; // 2단계는 입력 안 해도 넘어갈 수 있음 (선택 사항)
+    return false;
   };
 
   // --- 스타일 정의 (반복되는 디자인을 변수로 분리) ---
@@ -123,14 +122,18 @@ const GameCreationPage = () => {
       const gameData = await createGameRes.json();
       const gameId = gameData.id;
 
+      // 1) 둘 다 완전히 비어 있으면 에러
+      if (files.length === 0 && textInput.trim() === "") {
+        throw new Error(
+          "학습할 소스(파일 또는 텍스트)가 최소 1개 이상 필요합니다.",
+        );
+      }
+
       // [2번 API] 소스 파일 업로드 (파일이 있을 때만)
       if (files.length > 0) {
         const formData = new FormData();
         // 💡 배열에 있는 모든 파일을 formData에 추가함
         files.forEach((file) => {
-          // 주의: 명세서에는 key가 "file"로 되어 있음.
-          // 만약 백엔드에서 여러 파일을 받을 때 "files"라는 이름의 리스트로 받는다면
-          // 키 값을 "files"로 바꿔야 할 수도 있으니 나중에 백엔드 팀원과 꼭 확인해 봐!
           formData.append("file", file);
         });
         const sourceRes = await fetch(`${BASE_URL}/games/${gameId}/sources`, {
@@ -140,9 +143,23 @@ const GameCreationPage = () => {
         });
 
         if (!sourceRes.ok) throw new Error("소스 파일 업로드 실패");
-      } else {
-        // 파일이 하나도 없는 경우를 대비한 에러 처리
-        throw new Error("학습할 소스(파일)가 최소 1개 이상 필요합니다.");
+      }
+
+      // [2-1번 API] 소스 텍스트 업로드 (직접 입력한 텍스트가 있을 때만)
+      if (textInput.trim()) {
+        const textSourceRes = await fetch(
+          `${BASE_URL}/games/${gameId}/sources/text`,
+          {
+            method: "POST",
+            headers: {
+              ...headers,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ text: textInput }),
+          },
+        );
+
+        if (!textSourceRes.ok) throw new Error("소스 텍스트 업로드 실패");
       }
 
       // [3번 API] 미리보기 생성
@@ -165,18 +182,26 @@ const GameCreationPage = () => {
         .filter((q) => q !== "서술형")
         .map((q) => typeMapping[q]);
 
-      await fetch(`${BASE_URL}/games/${gameId}/generate/problems`, {
-        method: "POST",
-        headers: { ...headers, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          problemTypes: apiProblemTypes.length > 0 ? apiProblemTypes : null,
-          problemCount: 10,
-        }),
-      });
+      const problemRes = await fetch(
+        `${BASE_URL}/games/${gameId}/generate/problems`,
+        {
+          method: "POST",
+          headers: { ...headers, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            problemTypes: apiProblemTypes.length > 0 ? apiProblemTypes : null,
+            problemCount: 10,
+          }),
+        },
+      );
+      const problemData = await problemRes.json();
 
-      // 모든 API 성공! 다음 페이지로 이동
+      // 모든 API 성공! 다음 페이지로 이동하면서 데이터를 통째로 넘김
       navigate("/play", {
-        state: { previewData: previewData, gameId: gameId },
+        state: {
+          gameId: gameId,
+          previewData: previewData, // 3번 API에서 받은 학습 목표/내용
+          problems: problemData.problems, // 4번 API에서 받은 실제 문제 배열
+        },
       });
     } catch (error) {
       console.error("API 에러:", error);
@@ -216,7 +241,12 @@ const GameCreationPage = () => {
 
         {/* 중앙 메뉴 (현재 페이지 표시) */}
         <div className="nav-menu">
-          <span>Home</span>
+          <span
+            style={{ cursor: "pointer" }}
+            onClick={() => navigate("/main", { state: { userName } })}
+          >
+            Home
+          </span>
           {/* 현재 페이지인 '게임 만들기'에만 분홍색 밑줄 강조 */}
           <span
             style={{
@@ -224,14 +254,36 @@ const GameCreationPage = () => {
               color: "#333",
               borderBottom: "3px solid #FF69B4",
               paddingBottom: "5px",
+              cursor: "pointer",
             }}
+            onClick={() => navigate("/create-game", { state: { userName } })}
           >
             게임 만들기
           </span>
-          <span>공유하기</span>
-          <span>게임하기</span>
-          <span>분석하기</span>
-          <span>육성하기</span>
+          <span
+            style={{ cursor: "pointer" }}
+            onClick={() => navigate("/main", { state: { userName } })}
+          >
+            공유하기
+          </span>
+          <span
+            style={{ cursor: "pointer" }}
+            onClick={() => navigate("/main", { state: { userName } })}
+          >
+            게임하기
+          </span>
+          <span
+            style={{ cursor: "pointer" }}
+            onClick={() => navigate("/main", { state: { userName } })}
+          >
+            분석하기
+          </span>
+          <span
+            style={{ cursor: "pointer" }}
+            onClick={() => navigate("/main", { state: { userName } })}
+          >
+            육성하기
+          </span>
 
           {/* 환영 문구 (가져온 userName 사용) */}
           <span
