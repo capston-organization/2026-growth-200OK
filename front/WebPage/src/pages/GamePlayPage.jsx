@@ -654,7 +654,7 @@ const GamePlayPage = () => {
 
   if (phase === "GAME") {
     // 💡 URL 뒤에 파라미터로 gameId를 붙여줄 수도 있습니다.
-    const gameUrl = `/Game/MainGames/MainGame2/MainGame2.html?gameId=${gameId}`;
+    const gameUrl = `/Game/MainGames/MainGame1/MainGame1.html?gameId=${gameId}`;
 
     // 💡 iframe이 로드되면 게임 쪽으로 문제 데이터를 쏴주는 함수
     const handleIframeLoad = () => {
