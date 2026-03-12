@@ -18,7 +18,8 @@ const MainPage = () => {
     }
   };
 
-  const streakDays = Array.from({ length: 40 }, (_, index) => index);
+  /* 스트릭 개수 정하는 변수*/
+  const streakDays = Array.from({ length: 123 }, (_, index) => index);
 
   return (
     <div
@@ -121,7 +122,8 @@ const MainPage = () => {
         <div
           className="white-box"
           style={{
-            maxWidth: "1100px",
+            maxWidth: "1300px",
+            margin: "0 auto",
             borderRadius: "30px",
             borderWidth: "4px",
             padding: "30px 40px 40px",
@@ -189,18 +191,18 @@ const MainPage = () => {
                 display: "flex",
                 alignItems: "center",
                 marginBottom: "16px",
-                fontSize: "18px",
+                fontSize: "24px",
                 fontWeight: "600",
               }}
             >
-              <span style={{ marginRight: "8px" }}>📅</span>
+              <span style={{ fontSize: "24px", marginRight: "8px" }}>📅</span>
               <span>스트릭 : N일째 공부했어요!</span>
             </div>
             <div
               style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(20, 1fr)",
-                gap: "6px",
+                display: "flex", // grid 대신 flex 사용
+                flexWrap: "wrap", // 공간이 모자라면 다음 줄로 넘어가기
+                gap: "8px", // 박스 사이 간격을 일정하게 8px로 고정
                 marginBottom: "12px",
               }}
             >
@@ -208,8 +210,8 @@ const MainPage = () => {
                 <div
                   key={day}
                   style={{
-                    width: "14px",
-                    height: "14px",
+                    width: "20px",
+                    height: "20px",
                     borderRadius: "4px",
                     backgroundColor: day % 3 === 0 ? "#FF8E99" : "#E0E0E0",
                   }}
@@ -218,7 +220,7 @@ const MainPage = () => {
             </div>
             <div
               style={{
-                fontSize: "14px",
+                fontSize: "20px",
                 color: "#777",
                 marginTop: "4px",
               }}
@@ -250,7 +252,7 @@ const MainPage = () => {
                   display: "flex",
                   alignItems: "center",
                   gap: "8px",
-                  fontSize: "18px",
+                  fontSize: "24px",
                   fontWeight: "600",
                 }}
               >
@@ -259,7 +261,7 @@ const MainPage = () => {
               </div>
               <span
                 style={{
-                  fontSize: "14px",
+                  fontSize: "20px",
                   color: "#777",
                   fontWeight: "600",
                 }}
@@ -268,44 +270,52 @@ const MainPage = () => {
               </span>
             </div>
 
-            {[
-              "which/who/that의 구분",
-              "동의어 맞추기",
-              "it ~ to v 문법",
-            ].map((title, index) => (
-              <div
-                key={title}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  background: "#FFB3BA",
-                  borderRadius: "12px",
-                  padding: "10px 16px",
-                  marginBottom: index === 2 ? 0 : 10,
-                  color: "white",
-                }}
-              >
-                <div
-                  style={{
-                    width: "32px",
-                    textAlign: "center",
-                    fontWeight: "700",
-                  }}
-                >
-                  {index + 1}
-                </div>
-                <div style={{ flex: 1, fontSize: "16px" }}>{title}</div>
-                <div
-                  style={{
-                    width: "32px",
-                    textAlign: "center",
-                    fontSize: "18px",
-                  }}
-                >
-                  🔍
-                </div>
-              </div>
-            ))}
+            {["which/who/that의 구분", "동의어 맞추기", "it ~ to v 문법"].map(
+              (title, index) => {
+                // 순위에 따른 배경색 지정 (진한색 -> 중간색 -> 연한색)
+                const bgColors = ["#FF8E99", "#FFB3BA", "#FFE0E5"];
+
+                return (
+                  <div
+                    key={title}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      background: bgColors[index], // ✨ 고정된 색상 대신 변수 사용!
+                      borderRadius: "12px",
+                      padding: "10px 16px",
+                      marginBottom: index === 2 ? 0 : 10,
+                      color: index === 2 ? "#333" : "white", // ✨ 가장 연한 배경엔 글씨를 어둡게!
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: "24px",
+                        width: "32px",
+                        textAlign: "center",
+                        fontWeight: "700",
+                      }}
+                    >
+                      {index + 1}
+                    </div>
+                    <div
+                      style={{ flex: 1, fontSize: "20px", fontWeight: "600" }}
+                    >
+                      {title}
+                    </div>
+                    <div
+                      style={{
+                        width: "32px",
+                        textAlign: "center",
+                        fontSize: "20px",
+                      }}
+                    >
+                      🔍
+                    </div>
+                  </div>
+                );
+              },
+            )}
 
             <div
               style={{
@@ -318,7 +328,7 @@ const MainPage = () => {
                 className="btn-primary"
                 style={{
                   marginTop: 0,
-                  fontSize: "16px",
+                  fontSize: "20px",
                   padding: "8px 16px",
                 }}
               >
@@ -349,7 +359,7 @@ const MainPage = () => {
                   display: "flex",
                   alignItems: "center",
                   gap: "8px",
-                  fontSize: "18px",
+                  fontSize: "24px",
                   fontWeight: "600",
                 }}
               >
@@ -379,11 +389,11 @@ const MainPage = () => {
                     style={{
                       background: "#E1BEE7",
                       borderRadius: "12px",
-                      height: "80px",
+                      height: "250px",
                       marginBottom: "10px",
                     }}
                   />
-                  <div style={{ fontSize: "14px", fontWeight: "600" }}>
+                  <div style={{ fontSize: "24px", fontWeight: "600" }}>
                     게임 {num}
                   </div>
                 </div>
@@ -397,4 +407,3 @@ const MainPage = () => {
 };
 
 export default MainPage;
-

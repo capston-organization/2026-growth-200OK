@@ -122,14 +122,18 @@ const GameCreationPage = () => {
       const gameData = await createGameRes.json();
       const gameId = gameData.id;
 
+      // 1) 둘 다 완전히 비어 있으면 에러
+      if (files.length === 0 && textInput.trim() === "") {
+        throw new Error(
+          "학습할 소스(파일 또는 텍스트)가 최소 1개 이상 필요합니다.",
+        );
+      }
+
       // [2번 API] 소스 파일 업로드 (파일이 있을 때만)
       if (files.length > 0) {
         const formData = new FormData();
         // 💡 배열에 있는 모든 파일을 formData에 추가함
         files.forEach((file) => {
-          // 주의: 명세서에는 key가 "file"로 되어 있음.
-          // 만약 백엔드에서 여러 파일을 받을 때 "files"라는 이름의 리스트로 받는다면
-          // 키 값을 "files"로 바꿔야 할 수도 있으니 나중에 백엔드 팀원과 꼭 확인해 봐!
           formData.append("file", file);
         });
         const sourceRes = await fetch(`${BASE_URL}/games/${gameId}/sources`, {
@@ -139,22 +143,19 @@ const GameCreationPage = () => {
         });
 
         if (!sourceRes.ok) throw new Error("소스 파일 업로드 실패");
-      } else {
-        // 파일이 하나도 없는 경우를 대비한 에러 처리
-        throw new Error("학습할 소스(파일)가 최소 1개 이상 필요합니다.");
       }
 
       // [2-1번 API] 소스 텍스트 업로드 (직접 입력한 텍스트가 있을 때만)
       if (textInput.trim()) {
-        const textFormData = new FormData();
-        textFormData.append("text", textInput);
-
         const textSourceRes = await fetch(
           `${BASE_URL}/games/${gameId}/sources/text`,
           {
             method: "POST",
-            headers: headers, // FormData 사용 시 Content-Type 생략
-            body: textFormData,
+            headers: {
+              ...headers,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ text: textInput }),
           },
         );
 
