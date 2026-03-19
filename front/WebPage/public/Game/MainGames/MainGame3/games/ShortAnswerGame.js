@@ -11,6 +11,7 @@ class ShortAnswerGame extends Phaser.Scene {
   init(data) {
     this.mainScene = data.parent;
     this.speedLevel = data.speedLevel || 1;
+    this.currentProblem = data.problem || null; // MainGame1에서 넘겨준 1개의 문제
   }
 
   preload() {
@@ -55,19 +56,13 @@ class ShortAnswerGame extends Phaser.Scene {
       this.input.keyboard.once("keydown", playBg);
     }
 
+    // MainGame1에서는 생명(하트)을 메인씬이 관리하므로 미니게임 상단 하트 표시 제거
     this.scoreText = this.add
       .text(width - 30, 30, "맞힌 문제: 0", {
         fontSize: "24px",
         fill: "#FF6B9D",
         fontFamily: "Arial",
         fontStyle: "bold",
-      })
-      .setOrigin(1, 0);
-
-    this.heartsText = this.add
-      .text(width - 30, 65, "❤️❤️❤️", {
-        fontSize: "32px",
-        fontFamily: "Arial",
       })
       .setOrigin(1, 0);
 
@@ -283,19 +278,38 @@ class ShortAnswerGame extends Phaser.Scene {
     this.inputText = "";
     this.timerEvent = null;
     this.isTimerRunning = false;
-    this.questions = [
-      { question: "What is the comparative form of 'good'?", answer: "better" },
-      {
-        question: "What is the third person singular form of 'have'?",
-        answer: "has",
-      },
-      {
-        question: "What is the past participle of 'write'?",
-        answer: "written",
-      },
-      { question: "What is the plural of 'tooth'?", answer: "teeth" },
-      { question: "What is the past tense of 'swim'?", answer: "swam" },
-    ];
+
+    // MainGame1에서 problem을 넘겨준 경우: 그 문제 1개만 사용
+    if (this.currentProblem) {
+      this.questions = [
+        {
+          question:
+            (this.currentProblem && this.currentProblem.question) || "",
+          answer:
+            this.currentProblem && this.currentProblem.correctAnswer != null
+              ? String(this.currentProblem.correctAnswer)
+              : "",
+        },
+      ];
+    } else {
+      // 기존 MainGame3용 Mock 데이터 (문제 여러 개)
+      this.questions = [
+        {
+          question: "What is the comparative form of 'good'?",
+          answer: "better",
+        },
+        {
+          question: "What is the third person singular form of 'have'?",
+          answer: "has",
+        },
+        {
+          question: "What is the past participle of 'write'?",
+          answer: "written",
+        },
+        { question: "What is the plural of 'tooth'?", answer: "teeth" },
+        { question: "What is the past tense of 'swim'?", answer: "swam" },
+      ];
+    }
     this.currentQuestionIndex = 0;
 
     this.input.keyboard.on(
@@ -450,7 +464,8 @@ class ShortAnswerGame extends Phaser.Scene {
 
   finishGame() {
     if (this.mainScene && this.mainScene.handleMiniGameResult) {
-      this.mainScene.handleMiniGameResult(this.gameResult);
+      // MainGame1 흐름: 결과와 함께 어떤 문제였는지도 넘겨줌
+      this.mainScene.handleMiniGameResult(this.gameResult, this.currentProblem);
     }
     this.scene.stop();
   }
