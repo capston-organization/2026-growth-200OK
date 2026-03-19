@@ -11,6 +11,7 @@ class MultiChoiceGame extends Phaser.Scene {
   init(data) {
     this.mainScene = data.parent;
     this.speedLevel = data.speedLevel || 1;
+    this.currentProblem = data.problem || null; // MainGame1에서 넘겨준 1개의 문제
   }
 
   preload() {
@@ -32,50 +33,47 @@ class MultiChoiceGame extends Phaser.Scene {
 
     this.cameras.main.setBackgroundColor("#1a1a2e");
 
-    try {
-      this.backgroundMusic = this.sound.add("robotRhythmBg", {
-        loop: true,
-        volume: 2.5,
-      });
-      var playBg = function () {
-        if (!this.backgroundMusic || this.backgroundMusic.isPlaying) return;
-        var ctx = this.sound.context;
-        if (ctx.state === "suspended") {
-          ctx
-            .resume()
-            .then(
-              function () {
-                this.backgroundMusic.play();
-              }.bind(this),
-            )
-            .catch(function () {});
-        } else {
-          this.backgroundMusic.play();
-        }
-      }.bind(this);
-      var unlockBg = function () {
-        playBg();
-        if (this.backgroundMusic && this.backgroundMusic.isPlaying) {
-          this.input.off("pointerdown", unlockBg);
-          if (this.input.keyboard) this.input.keyboard.off("keydown", unlockBg);
-        }
-      };
-      this.time.delayedCall(600, playBg);
-      this.input.on("pointerdown", unlockBg);
-      if (this.input.keyboard) this.input.keyboard.on("keydown", unlockBg);
-    } catch (e) {
-      console.warn("로봇 리듬 배경음악 로드 실패:", e);
+    // 배경음은 로드에 성공한 경우에만 재생 (MainGame1에서 에셋 경로가 다르면 로드 실패 가능)
+    if (this.cache.audio.exists("robotRhythmBg")) {
+      try {
+        this.backgroundMusic = this.sound.add("robotRhythmBg", {
+          loop: true,
+          volume: 2.5,
+        });
+        var playBg = function () {
+          if (!this.backgroundMusic || this.backgroundMusic.isPlaying) return;
+          var ctx = this.sound.context;
+          if (ctx.state === "suspended") {
+            ctx
+              .resume()
+              .then(
+                function () {
+                  this.backgroundMusic.play();
+                }.bind(this),
+              )
+              .catch(function () {});
+          } else {
+            this.backgroundMusic.play();
+          }
+        }.bind(this);
+        var unlockBg = function () {
+          playBg();
+          if (this.backgroundMusic && this.backgroundMusic.isPlaying) {
+            this.input.off("pointerdown", unlockBg);
+            if (this.input.keyboard) this.input.keyboard.off("keydown", unlockBg);
+          }
+        };
+        this.time.delayedCall(600, playBg);
+        this.input.on("pointerdown", unlockBg);
+        if (this.input.keyboard) this.input.keyboard.on("keydown", unlockBg);
+      } catch (e) {
+        console.warn("로봇 리듬 배경음악 재생 실패:", e);
+      }
     }
 
-    this.heartsText = this.add
-      .text(width - 50, 30, "❤️❤️❤️", {
-        fontSize: "28px",
-        fontFamily: "Arial",
-      })
-      .setOrigin(1, 0);
-
+    // MainGame1에서는 생명(하트)을 메인씬이 관리하므로 미니게임 상단 하트 표시 제거
     this.scoreText = this.add
-      .text(width - 50, 65, "맞힌 문제: 0", {
+      .text(width - 50, 30, "맞힌 문제: 0", {
         fontSize: "24px",
         fill: "#00d4ff",
         fontFamily: "Arial",
@@ -317,34 +315,62 @@ class MultiChoiceGame extends Phaser.Scene {
       )
       .setOrigin(0.5);
 
-    this.questions = [
-      {
-        question: "Which is correct? (3rd person singular)",
-        options: ["He go", "He goes", "He going", "He gone", "He went"],
-        correctAnswer: 1,
-      },
-      {
-        question: "What is the correct past tense of 'run'?",
-        options: ["runned", "ran", "run", "running", "runs"],
-        correctAnswer: 1,
-      },
-      {
-        question: "Which sentence is grammatically correct?",
-        options: [
-          "She don't like it",
-          "She doesn't like it",
-          "She not like it",
-          "She doesn't likes it",
-          "She not likes it",
-        ],
-        correctAnswer: 1,
-      },
-      {
-        question: "What is the plural of 'mouse'?",
-        options: ["mouses", "mice", "mouse", "mices", "mousies"],
-        correctAnswer: 1,
-      },
-    ];
+    // MainGame1에서 problem을 넘겨준 경우: 그 문제 1개로만 라운드 구성
+    if (this.currentProblem) {
+      var opts =
+        this.currentProblem && this.currentProblem.options
+          ? this.currentProblem.options.slice()
+          : [];
+      while (opts.length < 5) opts.push("");
+
+      var correctStr =
+        this.currentProblem && this.currentProblem.correctAnswer != null
+          ? String(this.currentProblem.correctAnswer)
+          : "";
+      var correctIndex = opts.findIndex(function (o) {
+        return String(o) === correctStr;
+      });
+      if (correctIndex < 0) correctIndex = 0;
+
+      this.questions = [
+        {
+          question:
+            (this.currentProblem && this.currentProblem.question) || "",
+          options: opts.slice(0, 5),
+          correctAnswer: correctIndex,
+        },
+      ];
+    } else {
+      // 기존 MainGame3용 Mock 데이터 (문제 여러 개)
+      this.questions = [
+        {
+          question: "Which is correct? (3rd person singular)",
+          options: ["He go", "He goes", "He going", "He gone", "He went"],
+          correctAnswer: 1,
+        },
+        {
+          question: "What is the correct past tense of 'run'?",
+          options: ["runned", "ran", "run", "running", "runs"],
+          correctAnswer: 1,
+        },
+        {
+          question: "Which sentence is grammatically correct?",
+          options: [
+            "She don't like it",
+            "She doesn't like it",
+            "She not like it",
+            "She doesn't likes it",
+            "She not likes it",
+          ],
+          correctAnswer: 1,
+        },
+        {
+          question: "What is the plural of 'mouse'?",
+          options: ["mouses", "mice", "mouse", "mices", "mousies"],
+          correctAnswer: 1,
+        },
+      ];
+    }
     this.currentQuestionIndex = 0;
     this.showResult = false;
     this.drumHitCount = 0;
@@ -472,7 +498,8 @@ class MultiChoiceGame extends Phaser.Scene {
 
   finishGame() {
     if (this.mainScene && this.mainScene.handleMiniGameResult) {
-      this.mainScene.handleMiniGameResult(this.gameResult);
+      // MainGame1 흐름: 결과와 함께 어떤 문제였는지도 넘겨줌
+      this.mainScene.handleMiniGameResult(this.gameResult, this.currentProblem);
     }
     this.scene.stop();
   }

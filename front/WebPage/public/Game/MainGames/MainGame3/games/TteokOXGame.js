@@ -11,6 +11,7 @@ class TteokOXGame extends Phaser.Scene {
   init(data) {
     this.mainScene = data.parent;
     this.speedLevel = data.speedLevel || 1;
+    this.currentProblem = data.problem || null; // MainGame1에서 넘겨준 1개의 문제
   }
 
   preload() {
@@ -49,18 +50,36 @@ class TteokOXGame extends Phaser.Scene {
     this.showResult = false;
     this.beatInputs = { 1: null, 2: null, 3: null, 4: null };
 
-    this.questions = [
-      { question: "'go'의 과거형은 'went'이다.", answer: true },
-      {
-        question: "영어 동사는 모두 -ed를 붙여 과거형을 만든다.",
-        answer: false,
-      },
-      { question: "'child'의 복수형은 'children'이다.", answer: true },
-      {
-        question: "'She don't like it'은 문법적으로 맞는 문장이다.",
-        answer: false,
-      },
-    ];
+    // MainGame1에서 problem을 넘겨준 경우: 그 문제 1개만 사용
+    if (this.currentProblem) {
+      var answerStr =
+        this.currentProblem && this.currentProblem.correctAnswer != null
+          ? String(this.currentProblem.correctAnswer)
+          : "";
+      var answerBool = answerStr.toUpperCase() === "O";
+
+      this.questions = [
+        {
+          question:
+            (this.currentProblem && this.currentProblem.question) || "",
+          answer: answerBool,
+        },
+      ];
+    } else {
+      // 기존 MainGame3용 Mock 데이터 (문제 여러 개)
+      this.questions = [
+        { question: "'go'의 과거형은 'went'이다.", answer: true },
+        {
+          question: "영어 동사는 모두 -ed를 붙여 과거형을 만든다.",
+          answer: false,
+        },
+        { question: "'child'의 복수형은 'children'이다.", answer: true },
+        {
+          question: "'She don't like it'은 문법적으로 맞는 문장이다.",
+          answer: false,
+        },
+      ];
+    }
     this.currentQuestionIndex = 0;
 
     var questionBoxWidth = width - 400;
@@ -97,19 +116,13 @@ class TteokOXGame extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
+    // MainGame1에서는 생명(하트)을 메인씬이 관리하므로 미니게임 상단 하트 표시 제거
     this.scoreText = this.add
       .text(width - 50, 30, "맞힌 문제: 0", {
         fontSize: "24px",
         fill: "#4A6B8B",
         fontFamily: "Arial",
         fontStyle: "bold",
-      })
-      .setOrigin(1, 0);
-
-    this.heartsText = this.add
-      .text(width - 50, 60, "❤️❤️❤️", {
-        fontSize: "28px",
-        fontFamily: "Arial",
       })
       .setOrigin(1, 0);
 
@@ -521,7 +534,8 @@ class TteokOXGame extends Phaser.Scene {
 
   finishGame() {
     if (this.mainScene && this.mainScene.handleMiniGameResult) {
-      this.mainScene.handleMiniGameResult(this.gameResult);
+      // MainGame1 흐름: 결과와 함께 어떤 문제였는지도 넘겨줌
+      this.mainScene.handleMiniGameResult(this.gameResult, this.currentProblem);
     }
     this.scene.stop();
   }
