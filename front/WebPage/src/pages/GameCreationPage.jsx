@@ -268,13 +268,13 @@ const GameCreationPage = () => {
           </span>
           <span
             style={{ cursor: "pointer" }}
-            onClick={() => navigate("/main", { state: { userName } })}
+            onClick={() => navigate("/play", { state: { userName } })}
           >
             게임하기
           </span>
           <span
             style={{ cursor: "pointer" }}
-            onClick={() => navigate("/main", { state: { userName } })}
+            onClick={() => navigate("/analyze", { state: { userName } })}
           >
             분석하기
           </span>

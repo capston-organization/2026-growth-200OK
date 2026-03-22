@@ -12,6 +12,27 @@ class ShortAnswerGame extends Phaser.Scene {
     this.mainScene = data.parent;
     this.speedLevel = data.speedLevel || 1;
     this.currentProblem = data.problem || null; // MainGame1에서 넘겨준 1개의 문제
+    this.backgroundMusic = null;
+  }
+
+  /**
+   * 도넛 BGM 완전히 끄기 (isPlaying 체크 없이 stop + destroy — 루프 BGM이 MainScene으로 남는 현상 방지)
+   */
+  stopDonutBgm() {
+    if (!this.backgroundMusic) return;
+    try {
+      this.backgroundMusic.stop();
+    } catch (e) {
+      /* ignore */
+    }
+    try {
+      if (typeof this.backgroundMusic.destroy === "function") {
+        this.backgroundMusic.destroy();
+      }
+    } catch (e2) {
+      /* ignore */
+    }
+    this.backgroundMusic = null;
   }
 
   preload() {
@@ -55,6 +76,9 @@ class ShortAnswerGame extends Phaser.Scene {
       this.input.once("pointerdown", playBg);
       this.input.keyboard.once("keydown", playBg);
     }
+
+    // 씬이 어떤 이유로든 종료될 때 BGM이 남지 않도록 정리
+    this.events.once("shutdown", this.stopDonutBgm, this);
 
     // MainGame1에서는 생명(하트)을 메인씬이 관리하므로 미니게임 상단 하트 표시 제거
     this.scoreText = this.add
@@ -457,12 +481,12 @@ class ShortAnswerGame extends Phaser.Scene {
 
     this.resultText.setVisible(true);
     this.gameResult = isCorrect;
-    if (this.backgroundMusic && this.backgroundMusic.isPlaying)
-      this.backgroundMusic.stop();
+    this.stopDonutBgm();
     this.time.delayedCall(2000, this.finishGame, [], this);
   }
 
   finishGame() {
+    this.stopDonutBgm();
     if (this.mainScene && this.mainScene.handleMiniGameResult) {
       // MainGame1 흐름: 결과와 함께 어떤 문제였는지도 넘겨줌
       this.mainScene.handleMiniGameResult(this.gameResult, this.currentProblem);

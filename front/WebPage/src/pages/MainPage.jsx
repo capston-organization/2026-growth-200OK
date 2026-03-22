@@ -12,6 +12,8 @@ const MainPage = () => {
       navigate("/main", { state: { userName } });
     } else if (target === "create") {
       navigate("/create-game", { state: { userName } });
+    } else if (target === "analysis") {
+      navigate("/analyze", { state: { userName } });
     } else {
       // 아직 페이지가 없으므로 모두 메인으로
       navigate("/main", { state: { userName } });

@@ -197,16 +197,23 @@
           // 사용자가 문제를 푸는 동안 백엔드에서 AI 해설 등이 생성됩니다.
           this.generateExplanation(randomProblem.id);
 
-          // ★ 수정: 문제의 type에 따라 실행할 미니게임 매칭 (다른 팀원의 미니게임과 연동)
-          // 백엔드 데이터에 "type": "MULTIPLE_CHOICE" 등이 있다고 가정
+          // ★ 수정: 문제 type별로 (MainGame3 미니게임 | Mini 미니게임) 중 랜덤 선택
+          // 백엔드 데이터에 "type": "MULTIPLE_CHOICE" / "OX" / "SHORT_ANSWER" 등이 있다고 가정
           let gameKey = "";
-          if (randomProblem.type === "MULTIPLE_CHOICE")
-            gameKey = "MultiChoiceGame";
-          else if (randomProblem.type === "OX") gameKey = "TteokOXGame";
-          else if (randomProblem.type === "SHORT_ANSWER")
-            gameKey = "ShortAnswerGame";
-          else {
-            // type이 명확하지 않다면 랜덤으로 실행
+          if (randomProblem.type === "MULTIPLE_CHOICE") {
+            gameKey = Phaser.Math.RND.pick([
+              "MultiChoiceGame",
+              "MiniMultiGame1",
+            ]);
+          } else if (randomProblem.type === "OX") {
+            gameKey = Phaser.Math.RND.pick(["TteokOXGame", "MiniOXGame1"]);
+          } else if (randomProblem.type === "SHORT_ANSWER") {
+            gameKey = Phaser.Math.RND.pick([
+              "ShortAnswerGame",
+              "MiniShortGame1",
+            ]);
+          } else {
+            // type이 명확하지 않다면 세 종류 중 랜덤 (각 타입 대표 씬만 후보)
             const games = ["MultiChoiceGame", "TteokOXGame", "ShortAnswerGame"];
             gameKey = Phaser.Math.RND.pick(games);
           }
