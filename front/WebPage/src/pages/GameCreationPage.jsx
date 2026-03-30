@@ -270,24 +270,18 @@ const GameCreationPage = () => {
             style={{ cursor: "pointer" }}
             onClick={() => navigate("/play", { state: { userName } })}
           >
-            게임하기
+            분석하기
           </span>
           <span
             style={{ cursor: "pointer" }}
             onClick={() => navigate("/analyze", { state: { userName } })}
           >
-            분석하기
-          </span>
-          <span
-            style={{ cursor: "pointer" }}
-            onClick={() => navigate("/main", { state: { userName } })}
-          >
             육성하기
           </span>
 
-          {/* 환영 문구 (가져온 userName 사용) */}
           <span
-            style={{ color: "#FF69B4", fontWeight: "bold", marginLeft: "20px" }}
+            style={{ color: "#FF69B4", fontWeight: "bold", marginLeft: "20px", cursor: "pointer" }}
+            onClick={() => navigate("/mypage", { state: { userName } })}
           >
             [{userName} 님]
           </span>

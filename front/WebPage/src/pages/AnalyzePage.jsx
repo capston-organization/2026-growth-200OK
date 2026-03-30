@@ -21,6 +21,8 @@ const AnalyzePage = () => {
       navigate("/create-game", { state: { userName } });
     } else if (target === "analysis") {
       navigate("/analyze", { state: { userName } });
+    } else if (target === "mypage") {
+      navigate("/mypage", { state: { userName } });
     } else {
       navigate("/main", { state: { userName } });
     }
@@ -105,7 +107,8 @@ const AnalyzePage = () => {
           </span>
 
           <span
-            style={{ color: "#FF69B4", fontWeight: "bold", marginLeft: "20px" }}
+            style={{ color: "#FF69B4", fontWeight: "bold", marginLeft: "20px", cursor: "pointer" }}
+            onClick={() => handleNavClick("mypage")}
           >
             [{userName} 님]
           </span>

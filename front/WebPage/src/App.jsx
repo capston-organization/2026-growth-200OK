@@ -7,6 +7,7 @@ import SignUpPage from "./pages/SignUpPage";
 import GameCreationPage from "./pages/GameCreationPage";
 import GamePlayPage from "./pages/GamePlayPage";
 import AnalyzePage from "./pages/AnalyzePage";
+import MyPage from "./pages/MyPage";
 import MainPage from "./pages/MainPage";
 import "./App.css";
 
@@ -20,6 +21,7 @@ function App() {
         <Route path="/create-game" element={<GameCreationPage />} />
         <Route path="/play" element={<GamePlayPage />} />
         <Route path="/analyze" element={<AnalyzePage />} />
+        <Route path="/mypage" element={<MyPage />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
       </Routes>
     </Router>
