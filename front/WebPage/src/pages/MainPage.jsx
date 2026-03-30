@@ -14,8 +14,9 @@ const MainPage = () => {
       navigate("/create-game", { state: { userName } });
     } else if (target === "analysis") {
       navigate("/analyze", { state: { userName } });
+    } else if (target === "mypage") {
+      navigate("/mypage", { state: { userName } });
     } else {
-      // 아직 페이지가 없으므로 모두 메인으로
       navigate("/main", { state: { userName } });
     }
   };
@@ -40,6 +41,7 @@ const MainPage = () => {
   const [isGreetingLoading, setIsGreetingLoading] = useState(false);
 
   useEffect(() => {
+    const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
     const token = localStorage.getItem("accessToken");
     if (!token) return;
 
@@ -47,10 +49,36 @@ const MainPage = () => {
       Authorization: `Bearer ${token}`,
     };
 
+    const safeParseJson = async (res, apiName) => {
+      const contentType = res.headers.get("content-type") || "";
+      const rawText = await res.text();
+
+      if (!contentType.includes("application/json")) {
+        console.warn(`[${apiName}] JSON이 아닌 응답 수신`, {
+          status: res.status,
+          contentType,
+          preview: rawText.slice(0, 120),
+          url: res.url,
+        });
+        return null;
+      }
+
+      try {
+        return JSON.parse(rawText);
+      } catch {
+        console.warn(`[${apiName}] JSON 파싱 실패`, {
+          status: res.status,
+          preview: rawText.slice(0, 120),
+          url: res.url,
+        });
+        return null;
+      }
+    };
+
     const fetchGreeting = async () => {
       try {
         setIsGreetingLoading(true);
-        const res = await fetch("/users/me/greeting", {
+        const res = await fetch(`${BASE_URL}/users/me/greeting`, {
           method: "GET",
           headers: commonHeaders,
         });
@@ -60,7 +88,7 @@ const MainPage = () => {
           return;
         }
 
-        const data = await res.json();
+        const data = await safeParseJson(res, "greeting");
         if (data && data.message) {
           setGreetingMessage(data.message);
         }
@@ -73,13 +101,13 @@ const MainPage = () => {
 
     const fetchStreak = async () => {
       try {
-        const res = await fetch("/users/me/streak?days=365", {
+        const res = await fetch(`${BASE_URL}/users/me/streak?days=123`, {
           method: "GET",
           headers: commonHeaders,
         });
         if (!res.ok) return;
 
-        const data = await res.json();
+        const data = await safeParseJson(res, "streak");
         if (!data || !Array.isArray(data.dates)) return;
 
         setStreakDates(data.dates);
@@ -106,13 +134,13 @@ const MainPage = () => {
 
     const fetchRecentGames = async () => {
       try {
-        const res = await fetch("/users/me/games/recent", {
+        const res = await fetch(`${BASE_URL}/users/me/games/recent`, {
           method: "GET",
           headers: commonHeaders,
         });
         if (!res.ok) return;
 
-        const data = await res.json();
+        const data = await safeParseJson(res, "recentGames");
         if (data && Array.isArray(data.games)) {
           setRecentGames(data.games.slice(0, 5));
         }
@@ -198,7 +226,8 @@ const MainPage = () => {
           </span>
 
           <span
-            style={{ color: "#FF69B4", fontWeight: "bold", marginLeft: "20px" }}
+            style={{ color: "#FF69B4", fontWeight: "bold", marginLeft: "20px", cursor: "pointer" }}
+            onClick={() => handleNavClick("mypage")}
           >
             [{userName} 님]
           </span>

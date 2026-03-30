@@ -159,13 +159,21 @@ const SignUpPage = () => {
             >
               * 출생년도
             </label>
-            <input
-              type="number"
+            <select
               style={inputStyle}
-              placeholder="YYYY"
               value={birthYear}
               onChange={(e) => setBirthYear(e.target.value)}
-            />
+            >
+              <option value="">년도를 선택해주세요</option>
+              {Array.from(
+                { length: new Date().getFullYear() - 1900 + 1 },
+                (_, i) => new Date().getFullYear() - i,
+              ).map((y) => (
+                <option key={y} value={String(y)}>
+                  {y}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>
@@ -186,15 +194,40 @@ const SignUpPage = () => {
             <label
               style={{ fontSize: "24px", fontWeight: 600, color: "#fd8da0" }}
             >
-              출생일
+              출생일 (선택)
             </label>
-            <input
-              type="text"
-              style={inputStyle}
-              placeholder="MM/DD"
-              value={birthDate}
-              onChange={(e) => setBirthDate(e.target.value)}
-            />
+            <div style={{ display: "flex", gap: "10px" }}>
+              <select
+                style={{ ...inputStyle, flex: 1 }}
+                value={birthDate.split("/")[0] || ""}
+                onChange={(e) => {
+                  const day = birthDate.split("/")[1] || "";
+                  setBirthDate(e.target.value ? `${e.target.value}/${day}` : "");
+                }}
+              >
+                <option value="">월</option>
+                {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                  <option key={m} value={String(m).padStart(2, "0")}>
+                    {String(m).padStart(2, "0")}
+                  </option>
+                ))}
+              </select>
+              <select
+                style={{ ...inputStyle, flex: 1 }}
+                value={birthDate.split("/")[1] || ""}
+                onChange={(e) => {
+                  const month = birthDate.split("/")[0] || "";
+                  setBirthDate(month ? `${month}/${e.target.value}` : `/${e.target.value}`);
+                }}
+              >
+                <option value="">일</option>
+                {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                  <option key={d} value={String(d).padStart(2, "0")}>
+                    {String(d).padStart(2, "0")}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div>

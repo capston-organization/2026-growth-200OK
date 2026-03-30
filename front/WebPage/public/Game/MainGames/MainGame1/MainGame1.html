@@ -197,25 +197,50 @@
           // 사용자가 문제를 푸는 동안 백엔드에서 AI 해설 등이 생성됩니다.
           this.generateExplanation(randomProblem.id);
 
-          // ★ 수정: 문제 type별로 (MainGame3 미니게임 | Mini 미니게임) 중 랜덤 선택
-          // 백엔드 데이터에 "type": "MULTIPLE_CHOICE" / "OX" / "SHORT_ANSWER" 등이 있다고 가정
+          // 문제 type을 정규화해, 선택한 유형 외 게임(예: 객관식)이 fallback으로 뜨지 않게 처리
+          const normalizeType = (rawType) => {
+            const t = String(rawType || "").toUpperCase().replace(/[\s-]/g, "_");
+            if (t === "MULTIPLE_CHOICE" || t === "MULTIPLECHOICE")
+              return "MULTIPLE_CHOICE";
+            if (t === "SHORT_ANSWER" || t === "SHORTANSWER")
+              return "SHORT_ANSWER";
+            if (t === "OX" || t === "TRUE_FALSE") return "OX";
+            return "";
+          };
+
+          const sceneByType = {
+            MULTIPLE_CHOICE: ["MultiChoiceGame", "MiniMultiGame1"],
+            OX: ["TteokOXGame", "MiniOXGame1"],
+            SHORT_ANSWER: ["ShortAnswerGame", "MiniShortGame1"],
+          };
+
+          const normalizedType = normalizeType(randomProblem.type);
           let gameKey = "";
-          if (randomProblem.type === "MULTIPLE_CHOICE") {
-            gameKey = Phaser.Math.RND.pick([
-              "MultiChoiceGame",
-              "MiniMultiGame1",
-            ]);
-          } else if (randomProblem.type === "OX") {
-            gameKey = Phaser.Math.RND.pick(["TteokOXGame", "MiniOXGame1"]);
-          } else if (randomProblem.type === "SHORT_ANSWER") {
-            gameKey = Phaser.Math.RND.pick([
-              "ShortAnswerGame",
-              "MiniShortGame1",
-            ]);
+
+          if (normalizedType && sceneByType[normalizedType]) {
+            gameKey = Phaser.Math.RND.pick(sceneByType[normalizedType]);
           } else {
-            // type이 명확하지 않다면 세 종류 중 랜덤 (각 타입 대표 씬만 후보)
-            const games = ["MultiChoiceGame", "TteokOXGame", "ShortAnswerGame"];
-            gameKey = Phaser.Math.RND.pick(games);
+            // type이 비정상인 경우, 현재 남은 문제들의 '유효 타입' 후보 안에서만 랜덤 선택
+            const typeSet = new Set();
+            this.remainingProblems.forEach((p) => {
+              const nt = normalizeType(p && p.type);
+              if (nt) typeSet.add(nt);
+            });
+
+            const fallbackScenes = [];
+            typeSet.forEach((t) => {
+              fallbackScenes.push(...sceneByType[t]);
+            });
+
+            if (fallbackScenes.length > 0) {
+              gameKey = Phaser.Math.RND.pick(fallbackScenes);
+            } else {
+              // 최후 안전장치: 유형을 추정할 근거가 없으면 단답형 계열로만 제한
+              gameKey = Phaser.Math.RND.pick([
+                "ShortAnswerGame",
+                "MiniShortGame1",
+              ]);
+            }
           }
 
           // 선택된 미니게임에 '현재 풀어야 할 문제 1개'만 전달

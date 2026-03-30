@@ -1,3 +1,4 @@
+/* global Phaser */
 /**
  * ShortAnswerGame.js (단답형 = 도넛게임)
  * frontend ShortAnswerScene와 동일한 에셋·UI·로직. MainGame3용 1라운드 후 결과 보고.
@@ -13,6 +14,9 @@ class ShortAnswerGame extends Phaser.Scene {
     this.speedLevel = data.speedLevel || 1;
     this.currentProblem = data.problem || null; // MainGame1에서 넘겨준 1개의 문제
     this.backgroundMusic = null;
+    this.hiddenInputEl = null;
+    this.handleHiddenInput = null;
+    this.handleHiddenKeydown = null;
   }
 
   /**
@@ -22,17 +26,77 @@ class ShortAnswerGame extends Phaser.Scene {
     if (!this.backgroundMusic) return;
     try {
       this.backgroundMusic.stop();
-    } catch (e) {
+    } catch {
       /* ignore */
     }
     try {
       if (typeof this.backgroundMusic.destroy === "function") {
         this.backgroundMusic.destroy();
       }
-    } catch (e2) {
+    } catch {
       /* ignore */
     }
     this.backgroundMusic = null;
+  }
+
+  // 한글 IME 입력을 안정적으로 받기 위한 숨김 input
+  setupHiddenInput(maxLength) {
+    var self = this;
+    this.destroyHiddenInput();
+    var input = document.createElement("input");
+    input.type = "text";
+    input.autocomplete = "off";
+    input.autocapitalize = "off";
+    input.spellcheck = false;
+    input.maxLength = maxLength;
+    input.value = this.inputText || "";
+    input.style.position = "fixed";
+    input.style.left = "-9999px";
+    input.style.top = "0";
+    input.style.opacity = "0";
+    input.style.pointerEvents = "none";
+    document.body.appendChild(input);
+
+    this.handleHiddenInput = function () {
+      self.inputText = input.value.slice(0, maxLength);
+      self.inputDisplayText.setText(self.inputText);
+    };
+    this.handleHiddenKeydown = function (e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        self.submitAnswer();
+      }
+    };
+
+    input.addEventListener("input", this.handleHiddenInput);
+    input.addEventListener("keydown", this.handleHiddenKeydown);
+    this.hiddenInputEl = input;
+    setTimeout(function () {
+      if (self.hiddenInputEl) self.hiddenInputEl.focus();
+    }, 0);
+    this.input.on("pointerdown", function () {
+      if (self.hiddenInputEl) self.hiddenInputEl.focus();
+    });
+  }
+
+  destroyHiddenInput() {
+    if (!this.hiddenInputEl) return;
+    try {
+      if (this.handleHiddenInput)
+        this.hiddenInputEl.removeEventListener("input", this.handleHiddenInput);
+      if (this.handleHiddenKeydown)
+        this.hiddenInputEl.removeEventListener(
+          "keydown",
+          this.handleHiddenKeydown,
+        );
+      if (this.hiddenInputEl.parentNode)
+        this.hiddenInputEl.parentNode.removeChild(this.hiddenInputEl);
+    } catch {
+      /* ignore */
+    }
+    this.hiddenInputEl = null;
+    this.handleHiddenInput = null;
+    this.handleHiddenKeydown = null;
   }
 
   preload() {
@@ -79,6 +143,7 @@ class ShortAnswerGame extends Phaser.Scene {
 
     // 씬이 어떤 이유로든 종료될 때 BGM이 남지 않도록 정리
     this.events.once("shutdown", this.stopDonutBgm, this);
+    this.events.once("shutdown", this.destroyHiddenInput, this);
 
     // MainGame1에서는 생명(하트)을 메인씬이 관리하므로 미니게임 상단 하트 표시 제거
     this.scoreText = this.add
@@ -340,19 +405,34 @@ class ShortAnswerGame extends Phaser.Scene {
       "keydown",
       function (event) {
         if (!this.isTimerRunning) return;
+        // 숨김 input이 포커스면 텍스트 입력은 input 이벤트가 처리
+        if (this.hiddenInputEl && document.activeElement === this.hiddenInputEl) {
+          if (event.key === "Enter") {
+            this.submitAnswer();
+          }
+          return;
+        }
         if (event.key === "Backspace") {
           this.inputText = this.inputText.slice(0, -1);
           this.inputDisplayText.setText(this.inputText);
         } else if (event.key === "Enter") {
           this.submitAnswer();
-        } else if (event.key.length === 1 && event.key.match(/[a-zA-Z0-9\s]/)) {
-          this.inputText += event.key;
+        } else {
+          if (event.isComposing || event.key === "Process") return;
+          if (event.ctrlKey || event.metaKey || event.altKey) return;
+          if (event.key === "Dead" || event.key === "Unidentified") return;
+          var k = event.key;
+          if (k.length < 1 || k.length > 4) return;
+          var code = k.charCodeAt(0);
+          if (code <= 31 || code === 127) return;
+          this.inputText += k;
           this.inputDisplayText.setText(this.inputText);
         }
       },
       this,
     );
 
+    this.setupHiddenInput(40);
     this.showQuestion();
   }
 
@@ -486,6 +566,7 @@ class ShortAnswerGame extends Phaser.Scene {
   }
 
   finishGame() {
+    this.destroyHiddenInput();
     this.stopDonutBgm();
     if (this.mainScene && this.mainScene.handleMiniGameResult) {
       // MainGame1 흐름: 결과와 함께 어떤 문제였는지도 넘겨줌
