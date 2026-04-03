@@ -1,21 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import LearningVillageLogoImage from "../assets/images/Learning_Village_Logo_ImageOnly.png";
+import LearningVillageLogoText from "../assets/images/Learning_Village_Logo_TextOnly.png";
 
 const MyPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const userName = location.state?.userName || "사용자";
-
-  const handleNavClick = (target) => {
-    if (target === "home") navigate("/main", { state: { userName } });
-    else if (target === "create")
-      navigate("/create-game", { state: { userName } });
-    else if (target === "analysis")
-      navigate("/analyze", { state: { userName } });
-    else if (target === "mypage")
-      navigate("/mypage", { state: { userName } });
-    else navigate("/main", { state: { userName } });
-  };
 
   // ── 프로필 상태 ──
   const [name, setName] = useState("");
@@ -109,7 +100,7 @@ const MyPage = () => {
 
     const fetchMyGames = async () => {
       try {
-        const res = await fetch("/users/games/me", { method: "GET", headers });
+        const res = await fetch("/users/me/games", { method: "GET", headers });
         if (!res.ok) return;
         const d = await res.json();
         if (d && Array.isArray(d.games)) setMyGames(d.games);
@@ -266,17 +257,19 @@ const MyPage = () => {
     borderRadius: "10px",
     border: "2px solid #FFC0CB",
     backgroundColor: "#FFF0F5",
-    fontSize: "16px",
+    fontSize: "24px",
     marginTop: "6px",
+    marginRight: "12px",
     boxSizing: "border-box",
   };
 
   const labelStyle = {
-    fontSize: "18px",
-    fontWeight: "600",
-    color: "#333",
+    fontSize: "28px",
+    fontWeight: "700",
+    color: "rgb(240, 110, 151)",
     display: "block",
     marginBottom: "2px",
+    marginTop: "16px",
   };
 
   return (
@@ -288,56 +281,67 @@ const MyPage = () => {
         boxSizing: "border-box",
       }}
     >
-      {/* ── 네비게이션 바 ── */}
-      <div className="navbar">
-        <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
-          <div
-            className="logo-placeholder"
-            style={{ width: 40, height: 40, margin: 0, fontSize: "12px" }}
-          >
-            Logo
-          </div>
-          <span
-            style={{ color: "#FF69B4", fontWeight: "bold", fontSize: "24px" }}
-          >
-            learning village
-          </span>
+      {/* ── 네비게이션 바 (GameCreationPage와 동일) ── */}
+      <div className="navbar" style={{ justifyContent: "space-between" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            flexShrink: 0,
+            zIndex: 2,
+          }}
+        >
+          <img
+            src={LearningVillageLogoImage}
+            alt=""
+            style={{ height: 56, width: "auto", display: "block" }}
+          />
+          <img
+            src={LearningVillageLogoText}
+            alt="learning village"
+            style={{ height: 40, width: "auto", display: "block" }}
+          />
         </div>
 
-        <div className="nav-menu">
+        <div
+          className="nav-menu"
+          style={{
+            position: "absolute",
+            left: "50%",
+            transform: "translateX(calc(-40%))",
+            marginLeft: 0,
+            marginRight: 0,
+            zIndex: 1,
+          }}
+        >
           <span
             style={{ cursor: "pointer" }}
-            onClick={() => handleNavClick("home")}
+            onClick={() => navigate("/main", { state: { userName } })}
           >
             Home
           </span>
           <span
             style={{ cursor: "pointer" }}
-            onClick={() => handleNavClick("create")}
+            onClick={() => navigate("/create-game", { state: { userName } })}
           >
             게임 만들기
           </span>
           <span
             style={{ cursor: "pointer" }}
-            onClick={() => handleNavClick("share")}
+            onClick={() => navigate("/main", { state: { userName } })}
           >
             공유하기
           </span>
           <span
             style={{ cursor: "pointer" }}
-            onClick={() => handleNavClick("play")}
-          >
-            게임하기
-          </span>
-          <span
-            style={{ cursor: "pointer" }}
-            onClick={() => handleNavClick("analysis")}
+            onClick={() => navigate("/analyze", { state: { userName } })}
           >
             분석하기
           </span>
           <span
             style={{ cursor: "pointer" }}
-            onClick={() => handleNavClick("grow")}
+            onClick={() => navigate("/main", { state: { userName } })}
           >
             육성하기
           </span>
@@ -346,11 +350,11 @@ const MyPage = () => {
               color: "#FF69B4",
               fontWeight: "bold",
               marginLeft: "20px",
-              borderBottom: "3px solid #FF69B4",
+              borderBottom: "3px solid rgb(240, 110, 151)",
               paddingBottom: "5px",
               cursor: "pointer",
             }}
-            onClick={() => handleNavClick("mypage")}
+            onClick={() => navigate("/mypage", { state: { userName } })}
           >
             [{userName} 님]
           </span>
@@ -362,8 +366,10 @@ const MyPage = () => {
             height: 40,
             background: "#ddd",
             borderRadius: "50%",
+            flexShrink: 0,
+            zIndex: 2,
           }}
-        ></div>
+        />
       </div>
 
       {/* ── 메인 콘텐츠 ── */}
@@ -387,9 +393,27 @@ const MyPage = () => {
           }}
         >
           {/* ── 프로필 섹션 ── */}
-          <h2 style={{ fontSize: "28px", fontWeight: "700", marginBottom: "20px" }}>
+          <h2
+            style={{
+              fontSize: "36px",
+              fontWeight: "800",
+              marginBottom: "20px",
+              color: "rgb(240, 110, 151)",
+            }}
+          >
             프로필
           </h2>
+
+          {/*프로필 밑 구분선*/}
+          <div
+            style={{
+              width: "100%",
+              height: "2px", // 선 두께
+              backgroundColor: "rgb(240, 110, 151)", // 원하는 색
+              margin: "8px 0 40px", // 위/아래 간격
+              borderRadius: "999px", // 끝 둥글게 (선택)
+            }}
+          />
 
           {/* 이름 (전체 폭) */}
           <div style={{ marginBottom: "16px" }}>
@@ -507,14 +531,14 @@ const MyPage = () => {
               disabled={!profileDirty}
               style={{
                 borderRadius: "20px",
-                border: profileDirty
-                  ? "2px solid #FF69B4"
-                  : "2px solid #CCC",
+                border: profileDirty ? "2px solid #FF69B4" : "2px solid #CCC",
                 background: profileDirty ? "#FFE4F1" : "#EEE",
-                color: profileDirty ? "#FF69B4" : "#999",
+                color: profileDirty ? "rgb(240, 110, 151)" : "#999",
                 padding: "10px 24px",
-                fontSize: "16px",
+                fontSize: "24px",
                 fontWeight: "600",
+                marginTop: "12px",
+                marginBottom: "60px",
                 cursor: profileDirty ? "pointer" : "default",
               }}
               onClick={handleSaveProfile}
@@ -538,7 +562,7 @@ const MyPage = () => {
                 display: "flex",
                 alignItems: "center",
                 gap: "8px",
-                fontSize: "24px",
+                fontSize: "28px",
                 fontWeight: "600",
                 marginBottom: "20px",
               }}
@@ -551,7 +575,7 @@ const MyPage = () => {
               <div
                 style={{
                   padding: "20px",
-                  fontSize: "18px",
+                  fontSize: "24px",
                   color: "#777",
                   textAlign: "center",
                 }}
@@ -591,7 +615,7 @@ const MyPage = () => {
                         marginBottom: "10px",
                       }}
                     />
-                    <div style={{ fontSize: "18px", fontWeight: "600" }}>
+                    <div style={{ fontSize: "20px", fontWeight: "600" }}>
                       {game.title || `게임 ${game.id}`}
                     </div>
                   </div>
@@ -614,7 +638,7 @@ const MyPage = () => {
                 display: "flex",
                 alignItems: "center",
                 gap: "8px",
-                fontSize: "24px",
+                fontSize: "28px",
                 fontWeight: "600",
                 marginBottom: "20px",
               }}
@@ -627,7 +651,7 @@ const MyPage = () => {
               <div
                 style={{
                   padding: "20px",
-                  fontSize: "18px",
+                  fontSize: "24px",
                   color: "#777",
                   textAlign: "center",
                 }}
@@ -662,7 +686,7 @@ const MyPage = () => {
                         marginBottom: "10px",
                       }}
                     />
-                    <div style={{ fontSize: "18px", fontWeight: "600" }}>
+                    <div style={{ fontSize: "20px", fontWeight: "600" }}>
                       {game.title || `게임 ${game.id}`}
                     </div>
                   </div>
@@ -825,7 +849,13 @@ const MyPage = () => {
                   >
                     삭제
                   </button>
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                    }}
+                  >
                     <button
                       style={{
                         borderRadius: "12px",
@@ -863,7 +893,7 @@ const MyPage = () => {
                     }}
                     onClick={handleGameUpdate}
                   >
-                    게임 플레이
+                    게임 수정
                   </button>
                 </div>
               </div>

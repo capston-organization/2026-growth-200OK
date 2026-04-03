@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useLocation } from "react-router-dom"; // 💡 1. useLocation 임포트 필수!
+import { useLocation, useNavigate } from "react-router-dom"; // 💡 1. useLocation 임포트 필수!
 // --- Renders ---
 
 const ScrollBarStyle = () => (
@@ -124,8 +124,9 @@ const GamePlayPage = () => {
   // --- State 관리 (화면의 상태를 기억하는 변수들) ---
   // 💡 2. 이전 페이지에서 넘겨준 데이터 꺼내기
   const location = useLocation();
+  const navigate = useNavigate();
   // 새로고침 시 state가 날아갈 수 있으므로 방어 코드(|| {}) 작성
-  const { previewData, problems, gameId } = location.state || {};
+  const { previewData, problems, gameId, userName } = location.state || {};
 
   // 💡 3. 꺼낸 데이터를 활용할 변수 선언 (Mock 데이터 대체)
   const learningGoal =
@@ -146,6 +147,7 @@ const GamePlayPage = () => {
   const [isGameOver, setIsGameOver] = useState(false);
 
   const iframeRef = useRef(null);
+  const [iframeReloadKey, setIframeReloadKey] = useState(0);
 
   const [retryIndex, setRetryIndex] = useState(0);
 
@@ -267,6 +269,26 @@ const GamePlayPage = () => {
       fetchAnalysisData();
     }
   }, [phase, gameId, retryStatus]);
+
+  const resetSessionForReplay = () => {
+    setPhase("GOAL");
+    setIsGameOver(false);
+    setCorrectAnswers([]);
+    setWrongAnswers([]);
+    setRetryIndex(0);
+    setUserSelection("");
+    setShowHintPopup(false);
+    setRetryStatus({});
+    setSelectedAnalysisId(null);
+    setCurrentExplanation("");
+    setFinalResults([]);
+    setIsGenerating(false);
+    setIframeReloadKey((k) => k + 1);
+  };
+
+  const handleEndGame = () => {
+    navigate("/analyze", { state: { userName } });
+  };
 
   // 4번에서 추가한 useEffect 바로 아래에 하나 더 추가
   useEffect(() => {
@@ -682,6 +704,7 @@ const GamePlayPage = () => {
         </div>
 
         <iframe
+          key={iframeReloadKey}
           ref={iframeRef}
           src={gameUrl}
           title="Phaser Game"
@@ -1086,34 +1109,43 @@ const GamePlayPage = () => {
 
             display: "flex",
 
-            boxShadow: "0 5px 20px rgba(0,0,0,0.05)",
+            flexDirection: "column",
 
-            // [중요] flex 컨테이너에서 자식이 넘치지 않도록 관리
+            boxShadow: "0 5px 20px rgba(0,0,0,0.05)",
 
             overflow: "hidden",
           }}
         >
-          {/* 왼쪽: 문제 목록 */}
-
           <div
             style={{
               flex: 1,
 
-              borderRight: "1px solid #eee",
+              minHeight: 0,
 
-              paddingRight: "20px", // 스크롤바 공간 확보
+              display: "flex",
 
-              marginRight: "10px",
+              flexDirection: "row",
 
-              // [중요] 세로 스크롤 허용
-
-              overflowY: "auto",
-
-              // [중요] 높이를 100%로 고정해야 부모 크기를 넘지 않고 스크롤 생김
-
-              height: "100%",
+              overflow: "hidden",
             }}
           >
+            {/* 왼쪽: 문제 목록 */}
+
+            <div
+              style={{
+                flex: 1,
+
+                borderRight: "1px solid #eee",
+
+                paddingRight: "20px",
+
+                marginRight: "10px",
+
+                overflowY: "auto",
+
+                height: "100%",
+              }}
+            >
             <h2 style={{ fontSize: "32px", marginBottom: "30px" }}>
               게임 결과 ({finalResults.length})
             </h2>
@@ -1217,27 +1249,27 @@ const GamePlayPage = () => {
                 </span>
               </div>
             ))}
-          </div>
+            </div>
 
-          {/* 오른쪽: 해설 상세 보기 */}
+            {/* 오른쪽: 해설 상세 보기 */}
 
-          <div
-            style={{
-              flex: 1,
+            <div
+              style={{
+                flex: 1,
 
-              paddingLeft: "30px",
+                paddingLeft: "30px",
 
-              display: "flex",
+                display: "flex",
 
-              justifyContent: "center",
+                justifyContent: "center",
 
-              alignItems: "center",
+                alignItems: "center",
 
-              height: "100%", // 높이 꽉 채우기
+                height: "100%",
 
-              overflow: "hidden", // 내부 박스에서 스크롤 하기 위해 여긴 hidden
-            }}
-          >
+                overflow: "hidden",
+              }}
+            >
             {selectedAnalysisId ? (
               <div
                 style={{
@@ -1339,6 +1371,60 @@ const GamePlayPage = () => {
                 문제와 해설을 확인하세요.
               </div>
             )}
+            </div>
+          </div>
+
+          <div
+            style={{
+              flexShrink: 0,
+
+              width: "100%",
+
+              marginTop: "20px",
+
+              paddingTop: "16px",
+
+              borderTop: "1px solid #eee",
+
+              display: "flex",
+
+              justifyContent: "flex-end",
+
+              alignItems: "center",
+
+              gap: "12px",
+            }}
+          >
+            <button
+              type="button"
+              style={{
+                ...buttonStyle,
+
+                marginTop: 0,
+
+                padding: "12px 28px",
+
+                fontSize: "20px",
+              }}
+              onClick={resetSessionForReplay}
+            >
+              게임 다시하기
+            </button>
+            <button
+              type="button"
+              style={{
+                ...pinkBtnStyle,
+
+                marginTop: 0,
+
+                padding: "12px 28px",
+
+                fontSize: "20px",
+              }}
+              onClick={handleEndGame}
+            >
+              게임 끝내기
+            </button>
           </div>
         </div>
       </div>

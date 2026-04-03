@@ -1,6 +1,8 @@
 // src/pages/LoginPage.jsx
 import React from "react";
 // useNavigate: React Router에서 제공하는 '페이지 이동'을 담당하는 함수(Hook)입니다.
+import LearningVillageLogo from "../assets/images/Learning_Village_Logo.png";
+import GoogleLogo from "../assets/images/google_logo.png";
 
 const LoginPage = () => {
   // ==========================================
@@ -32,48 +34,45 @@ const LoginPage = () => {
           justifyContent: "center", // 세로 기준 중앙 정렬
         }}
       >
-        {/* 로고 자리: 나중에 이미지 태그 <img>로 교체할 부분입니다 */}
-        <div className="logo-placeholder">Logo</div>
-
-        {/* 제목 텍스트 */}
-        <h1
+        {/* 로고 이미지 */}
+        <img
+          src={LearningVillageLogo}
+          alt="learning village 로고"
           style={{
-            color: "#FF69B4",
-            fontFamily: "cursive",
-            fontSize: "36px",
-            fontWeight: "bold",
+            width: "60%", // 부모 박스(white-box) 가로의 60%
+            height: "auto", // 비율 유지하면서 세로 자동
+            display: "block", // margin: auto가 적용되도록 block 처리
+            margin: "0 auto 20px", // 가로 중앙 정렬 + 아래 여백
           }}
-        >
-          learning village
-        </h1>
+        />
 
         {/* 구글 로그인 버튼 */}
         <button
           className="btn-primary"
           // 버튼 전용 스타일 오버라이딩 (덮어쓰기)
           style={{
-            width: "60%", // 박스 너비의 80%만 차지하게
-            height: "20%", // 박스 너비의 20%만 차지하게
-            margin: "30px auto", // 위아래 30px 띄우고, 좌우는 자동(중앙정렬)
+            width: "50%", // 박스 너비의 80%만 차지하게
+            height: "18%", // 박스 너비의 20%만 차지하게
+            margin: "28px auto", // 위아래 30px 띄우고, 좌우는 자동(중앙정렬)
             display: "flex", // 아이콘과 글자를 가로로 나란히 놓기 위해
             alignItems: "center", // 세로 중앙 정렬
             justifyContent: "center", // 가로 중앙 정렬
-            gap: "15px", // 아이콘과 글자 사이 간격
+            gap: "20px", // 아이콘과 글자 사이 간격
           }}
           // [중요] 클릭 시 '/signup' 주소로 이동! (React Router가 처리함)
           onClick={handleGoogleLogin}
         >
-          {/* 파란색 원 (구글 로고 임시 대용) */}
-          <div
-            style={{
-              width: 30,
-              height: 30,
-              borderRadius: "50%",
-              background: "blue",
-            }}
-          ></div>{" "}
+          {/* 구글 로고 아이콘 */}
+          <img
+            src={GoogleLogo}
+            alt="Google logo"
+            style={{ width: 50, height: 50, borderRadius: "50%" }}
+          />
+
           {/* 버튼 텍스트 */}
-          <h4 style={{ fontSize: "24px" }}>Google로 시작하기</h4>
+          <h4 style={{ fontSize: "28px", color: "rgb(240, 110, 151)" }}>
+            Google로 시작하기
+          </h4>
         </button>
       </div>
     </div>

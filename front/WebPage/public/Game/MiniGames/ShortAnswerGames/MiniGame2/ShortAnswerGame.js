@@ -1,8 +1,8 @@
 /* global Phaser */
 /**
  * ShortAnswerGame.js (단답형 = 도넛게임)
- * frontend ShortAnswerScene와 동일한 에셋·UI·로직. MainGame3용 1라운드 후 결과 보고.
- * 에셋 경로: assets/images/, assets/sounds/
+ * MiniGame2 버전: MainGame1에서 재사용하기 위해 MiniGames 디렉터리로 이동.
+ * 에셋 경로: ../../MiniGames/ShortAnswerGames/MiniGame2/assets/
  */
 class ShortAnswerGame extends Phaser.Scene {
   constructor() {
@@ -20,21 +20,21 @@ class ShortAnswerGame extends Phaser.Scene {
   }
 
   /**
-   * 도넛 BGM 완전히 끄기 (isPlaying 체크 없이 stop + destroy — 루프 BGM이 MainScene으로 남는 현상 방지)
+   * 도넛 BGM 완전히 끄기
    */
   stopDonutBgm() {
     if (!this.backgroundMusic) return;
     try {
       this.backgroundMusic.stop();
     } catch {
-      /* ignore */
+      // ignore stop error
     }
     try {
       if (typeof this.backgroundMusic.destroy === "function") {
         this.backgroundMusic.destroy();
       }
     } catch {
-      /* ignore */
+      // ignore destroy error
     }
     this.backgroundMusic = null;
   }
@@ -92,7 +92,7 @@ class ShortAnswerGame extends Phaser.Scene {
       if (this.hiddenInputEl.parentNode)
         this.hiddenInputEl.parentNode.removeChild(this.hiddenInputEl);
     } catch {
-      /* ignore */
+      // ignore DOM detach error
     }
     this.hiddenInputEl = null;
     this.handleHiddenInput = null;
@@ -100,15 +100,12 @@ class ShortAnswerGame extends Phaser.Scene {
   }
 
   preload() {
-    var base =
-      typeof window.MAINGAME3_ASSETS_BASE !== "undefined"
-        ? window.MAINGAME3_ASSETS_BASE
-        : "assets/";
-    this.load.image("alienWaiting", base + "images/도넛게임기다리는외계인.png");
-    this.load.image("alienHappy", base + "images/도넛게임웃는외계인.png");
-    this.load.image("alienAngry", base + "images/도넛게임화난외계인.png");
-    this.load.image("donut", base + "images/도넛게임도넛.png");
-    this.load.audio("donutBgMusic", base + "sounds/도넛게임배경음악.mp3");
+    this.load.setPath("../../MiniGames/ShortAnswerGames/MiniGame2/assets/");
+    this.load.image("alienWaiting", "images/도넛게임기다리는외계인.png");
+    this.load.image("alienHappy", "images/도넛게임웃는외계인.png");
+    this.load.image("alienAngry", "images/도넛게임화난외계인.png");
+    this.load.image("donut", "images/도넛게임도넛.png");
+    this.load.audio("donutBgMusic", "sounds/도넛게임배경음악.mp3");
   }
 
   create() {
@@ -141,19 +138,9 @@ class ShortAnswerGame extends Phaser.Scene {
       this.input.keyboard.once("keydown", playBg);
     }
 
-    // 씬이 어떤 이유로든 종료될 때 BGM이 남지 않도록 정리
+    // 씬 종료 시 정리
     this.events.once("shutdown", this.stopDonutBgm, this);
     this.events.once("shutdown", this.destroyHiddenInput, this);
-
-    // MainGame1에서는 생명(하트)을 메인씬이 관리하므로 미니게임 상단 하트 표시 제거
-    this.scoreText = this.add
-      .text(width - 30, 30, "맞힌 문제: 0", {
-        fontSize: "24px",
-        fill: "#FF6B9D",
-        fontFamily: "Arial",
-        fontStyle: "bold",
-      })
-      .setOrigin(1, 0);
 
     var questionBoxY = 100;
     var questionBoxWidth = width - 400;
@@ -368,12 +355,15 @@ class ShortAnswerGame extends Phaser.Scene {
     this.timerEvent = null;
     this.isTimerRunning = false;
 
+    // [설명] MiniMultiGame1과 동일한 아이디어로 speedLevel에 따라 제한시간을 조절
+    // - speedLevel이 1에서 5로 높아질수록 durationSec(초)가 점점 짧아짐
+    // - 최소 5초까지 줄어들도록 하여 난이도 상승 효과 부여
+
     // MainGame1에서 problem을 넘겨준 경우: 그 문제 1개만 사용
     if (this.currentProblem) {
       this.questions = [
         {
-          question:
-            (this.currentProblem && this.currentProblem.question) || "",
+          question: (this.currentProblem && this.currentProblem.question) || "",
           answer:
             this.currentProblem && this.currentProblem.correctAnswer != null
               ? String(this.currentProblem.correctAnswer)
@@ -406,7 +396,10 @@ class ShortAnswerGame extends Phaser.Scene {
       function (event) {
         if (!this.isTimerRunning) return;
         // 숨김 input이 포커스면 텍스트 입력은 input 이벤트가 처리
-        if (this.hiddenInputEl && document.activeElement === this.hiddenInputEl) {
+        if (
+          this.hiddenInputEl &&
+          document.activeElement === this.hiddenInputEl
+        ) {
           if (event.key === "Enter") {
             this.submitAnswer();
           }

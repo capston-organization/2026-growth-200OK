@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import LearningVillageLogoImage from "../assets/images/Learning_Village_Logo_ImageOnly.png";
+import LearningVillageLogoText from "../assets/images/Learning_Village_Logo_TextOnly.png";
 
 const AnalyzePage = () => {
   const navigate = useNavigate();
@@ -14,20 +16,6 @@ const AnalyzePage = () => {
   const currentTopics = activeCategory === "WORD" ? wordTopics : grammarTopics;
   const rankColors = ["#FF8E99", "#FFB3BA", "#FFE0E5"];
 
-  const handleNavClick = (target) => {
-    if (target === "home") {
-      navigate("/main", { state: { userName } });
-    } else if (target === "create") {
-      navigate("/create-game", { state: { userName } });
-    } else if (target === "analysis") {
-      navigate("/analyze", { state: { userName } });
-    } else if (target === "mypage") {
-      navigate("/mypage", { state: { userName } });
-    } else {
-      navigate("/main", { state: { userName } });
-    }
-  };
-
   const handleBack = () => {
     navigate("/main", { state: { userName } });
   };
@@ -41,88 +29,99 @@ const AnalyzePage = () => {
         boxSizing: "border-box",
       }}
     >
-      {/* 상단 네비게이션 바 (MainPage와 동일 스타일) */}
-      <div className="navbar">
-        {/* 왼쪽 로고 + 텍스트 */}
-        <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
-          <div
-            className="logo-placeholder"
-            style={{ width: 40, height: 40, margin: 0, fontSize: "12px" }}
-          >
-            Logo
-          </div>
-          <span
-            style={{ color: "#FF69B4", fontWeight: "bold", fontSize: "24px" }}
-          >
-            learning village
-          </span>
+      {/* 상단 네비게이션 바 (GameCreationPage와 동일) */}
+      <div className="navbar" style={{ justifyContent: "space-between" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            flexShrink: 0,
+            zIndex: 2,
+          }}
+        >
+          <img
+            src={LearningVillageLogoImage}
+            alt=""
+            style={{ height: 56, width: "auto", display: "block" }}
+          />
+          <img
+            src={LearningVillageLogoText}
+            alt="learning village"
+            style={{ height: 40, width: "auto", display: "block" }}
+          />
         </div>
 
-        {/* 중앙 메뉴 */}
-        <div className="nav-menu">
+        <div
+          className="nav-menu"
+          style={{
+            position: "absolute",
+            left: "50%",
+            transform: "translateX(calc(-40%))",
+            marginLeft: 0,
+            marginRight: 0,
+            zIndex: 1,
+          }}
+        >
           <span
-            style={{
-              cursor: "pointer",
-            }}
-            onClick={() => handleNavClick("home")}
+            style={{ cursor: "pointer" }}
+            onClick={() => navigate("/main", { state: { userName } })}
           >
             Home
           </span>
           <span
             style={{ cursor: "pointer" }}
-            onClick={() => handleNavClick("create")}
+            onClick={() => navigate("/create-game", { state: { userName } })}
           >
             게임 만들기
           </span>
           <span
             style={{ cursor: "pointer" }}
-            onClick={() => handleNavClick("share")}
+            onClick={() => navigate("/main", { state: { userName } })}
           >
             공유하기
           </span>
           <span
-            style={{ cursor: "pointer" }}
-            onClick={() => handleNavClick("play")}
-          >
-            게임하기
-          </span>
-          {/* 현재 페이지인 '분석하기'에만 분홍색 밑줄 강조 */}
-          <span
             style={{
               fontWeight: "bold",
               color: "#333",
-              borderBottom: "3px solid #FF69B4",
+              borderBottom: "3px solid rgb(240, 110, 151)",
               paddingBottom: "5px",
               cursor: "pointer",
             }}
-            onClick={() => handleNavClick("analysis")}
+            onClick={() => navigate("/analyze", { state: { userName } })}
           >
             분석하기
           </span>
           <span
             style={{ cursor: "pointer" }}
-            onClick={() => handleNavClick("grow")}
+            onClick={() => navigate("/main", { state: { userName } })}
           >
             육성하기
           </span>
-
           <span
-            style={{ color: "#FF69B4", fontWeight: "bold", marginLeft: "20px", cursor: "pointer" }}
-            onClick={() => handleNavClick("mypage")}
+            style={{
+              color: "#FF69B4",
+              fontWeight: "bold",
+              marginLeft: "20px",
+              cursor: "pointer",
+            }}
+            onClick={() => navigate("/mypage", { state: { userName } })}
           >
             [{userName} 님]
           </span>
         </div>
 
-        {/* 오른쪽 프로필 아이콘 */}
         <div
           style={{
             width: 40,
             height: 40,
             background: "#ddd",
             borderRadius: "50%",
+            flexShrink: 0,
+            zIndex: 2,
           }}
-        ></div>
+        />
       </div>
 
       {/* 메인 컨텐츠 */}
