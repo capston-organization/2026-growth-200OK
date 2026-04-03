@@ -19,19 +19,14 @@
       }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
-    <!-- MainGame3 미니게임 에셋 경로: MainGame1에서 실행 시 MainGame3/assets/ 기준으로 로드 -->
-    <script>
-      window.MAINGAME3_ASSETS_BASE = "../MainGame3/assets/";
-    </script>
-
     <script src="../../MiniGames/ShortAnswerGames/MiniGame1/MiniShortGame1.js"></script>
     <script src="../../MiniGames/MultiChoiceGames/MiniGame1/MiniMultiGame1.js"></script>
     <script src="../../MiniGames/OXGames/MiniGame1/MiniOXGame1.js"></script>
 
-    <!-- MainGame3에서 사용하던 미니게임 3종을 MainGame1에서도 재사용 -->
-    <script src="../MainGame3/games/MultiChoiceGame.js"></script>
-    <script src="../MainGame3/games/ShortAnswerGame.js"></script>
-    <script src="../MainGame3/games/TteokOXGame.js"></script>
+    <!-- MiniGame2용 미니게임 3종을 MainGame1에서도 재사용 -->
+    <script src="../../MiniGames/MultiChoiceGames/MiniGame2/MultiChoiceGame.js"></script>
+    <script src="../../MiniGames/ShortAnswerGames/MiniGame2/ShortAnswerGame.js"></script>
+    <script src="../../MiniGames/OXGames/MiniGame2/TteokOXGame.js"></script>
   </head>
   <body>
     <div

@@ -1,7 +1,8 @@
+/* global Phaser */
 /**
  * TteokOXGame.js (떡게임 = OX 게임)
- * frontend TteokGameScene와 동일한 에셋·UI·로직. MainGame3용 1라운드 후 결과 보고.
- * 에셋 경로: assets/images/, assets/sounds/ (frontend public/assets와 동일 구조)
+ * MiniGame2 버전: MainGame1에서 재사용하기 위해 MiniGames 디렉터리로 이동.
+ * 에셋 경로: ../../MiniGames/OXGames/MiniGame2/assets/
  */
 class TteokOXGame extends Phaser.Scene {
   constructor() {
@@ -15,23 +16,20 @@ class TteokOXGame extends Phaser.Scene {
   }
 
   preload() {
-    var base =
-      typeof window.MAINGAME3_ASSETS_BASE !== "undefined"
-        ? window.MAINGAME3_ASSETS_BASE
-        : "assets/";
-    this.load.image("그냥떡", base + "images/그냥떡.png");
-    this.load.image("망치떡", base + "images/망치떡.png");
-    this.load.image("물떡", base + "images/물떡.png");
-    this.load.image("망치기본토끼", base + "images/망치기본토끼.png");
-    this.load.image("망치망치토끼", base + "images/망치망치토끼.png");
-    this.load.image("물기본토끼", base + "images/물기본토끼.png");
-    this.load.image("물물토끼", base + "images/물물토끼.png");
-    this.load.audio("backgroundMusic", base + "sounds/떡게임배경소리.mp3");
-    this.load.audio("hey", base + "sounds/hey.mp3");
-    this.load.audio("one", base + "sounds/one.mp3");
-    this.load.audio("two", base + "sounds/two.mp3");
-    this.load.audio("three", base + "sounds/three.mp3");
-    this.load.audio("four", base + "sounds/four.mp3");
+    this.load.setPath("../../MiniGames/OXGames/MiniGame2/assets/");
+    this.load.image("그냥떡", "images/그냥떡.png");
+    this.load.image("망치떡", "images/망치떡.png");
+    this.load.image("물떡", "images/물떡.png");
+    this.load.image("망치기본토끼", "images/망치기본토끼.png");
+    this.load.image("망치망치토끼", "images/망치망치토끼.png");
+    this.load.image("물기본토끼", "images/물기본토끼.png");
+    this.load.image("물물토끼", "images/물물토끼.png");
+    this.load.audio("backgroundMusic", "sounds/떡게임배경소리.mp3");
+    this.load.audio("hey", "sounds/hey.mp3");
+    this.load.audio("one", "sounds/one.mp3");
+    this.load.audio("two", "sounds/two.mp3");
+    this.load.audio("three", "sounds/three.mp3");
+    this.load.audio("four", "sounds/four.mp3");
   }
 
   create() {
@@ -41,10 +39,33 @@ class TteokOXGame extends Phaser.Scene {
     this.cameras.main.setBackgroundColor("#FFF8E7");
     this.hearts = 3;
     this.questionStartTime = 0;
-    this.countStartTime = 6000;
-    this.rhythmStartTime = 8000;
-    this.rhythmEndTime = 10000;
-    this.beatInterval = 500;
+
+    // [변경] MiniMultiGame1과 비슷하게, "문제 제시 후 첫 리듬이 나오기 전까지의 대기 시간"만 speedLevel에 따라 조절
+    // - 원본(MainGame3) 기준 값: countStartTime=6000, rhythmStartTime=8000, rhythmEndTime=10000
+    // - speedLevel이 높을수록 '처음 비트가 시작될 때까지의 딜레이'가 짧아지지만,
+    //   실제 리듬 구간(4번의 박자) 길이와 박자 간 간격(beatInterval=500ms)은 그대로 유지
+    var level = this.speedLevel || 1;
+    var scaleFactor = 1 - (level - 1) * 0.15; // 1, 0.85, 0.7, 0.55, 0.4 ...
+    if (scaleFactor < 0.4) scaleFactor = 0.4;
+
+    // 원본 타이밍 상수
+    var baseCountStart = 6000;
+    var baseRhythmStart = 8000;
+    var baseRhythmEnd = 10000;
+
+    // [핵심] "처음 카운트가 시작되기까지의 대기 시간"만 scaleFactor로 줄임
+    this.countStartTime = baseCountStart * scaleFactor;
+
+    // 카운트 시작 후 첫 리듬 시작까지의 간격(원본: 2000ms)과,
+    // 리듬 구간 자체의 길이(원본: 2000ms)는 그대로 유지
+    var gapBeforeRhythm = baseRhythmStart - baseCountStart; // 2000
+    var rhythmDuration = baseRhythmEnd - baseRhythmStart; // 2000
+
+    this.rhythmStartTime = this.countStartTime + gapBeforeRhythm;
+    this.rhythmEndTime = this.rhythmStartTime + rhythmDuration;
+
+    this.beatInterval = 500; // 리듬 안의 4번 박자 간격은 항상 동일(500ms)
+
     this.isQuestionActive = false;
     this.questionChoice = null;
     this.showResult = false;
@@ -60,8 +81,7 @@ class TteokOXGame extends Phaser.Scene {
 
       this.questions = [
         {
-          question:
-            (this.currentProblem && this.currentProblem.question) || "",
+          question: (this.currentProblem && this.currentProblem.question) || "",
           answer: answerBool,
         },
       ];
@@ -115,16 +135,6 @@ class TteokOXGame extends Phaser.Scene {
         wordWrap: { width: questionBoxWidth - 40 },
       })
       .setOrigin(0.5);
-
-    // MainGame1에서는 생명(하트)을 메인씬이 관리하므로 미니게임 상단 하트 표시 제거
-    this.scoreText = this.add
-      .text(width - 50, 30, "맞힌 문제: 0", {
-        fontSize: "24px",
-        fill: "#4A6B8B",
-        fontFamily: "Arial",
-        fontStyle: "bold",
-      })
-      .setOrigin(1, 0);
 
     var tteokY = height / 2 + 80;
     this.tteok = this.add.image(width / 2, tteokY, "그냥떡");
