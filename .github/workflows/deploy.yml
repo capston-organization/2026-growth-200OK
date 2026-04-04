@@ -48,6 +48,9 @@ jobs:
     name: Deploy
     runs-on: ubuntu-latest
     environment: production
+    defaults:
+      run:
+        working-directory: backend
 
     steps:
     - name: Checkout
@@ -78,7 +81,7 @@ jobs:
         host: ${{ secrets.EC2_HOST }}
         username: ${{ secrets.EC2_USERNAME }}
         key: ${{ secrets.EC2_SSH_KEY }}
-        source: "build/libs/*.jar"
+        source: "backend/build/libs/*.jar"
         target: "/home/${{ secrets.EC2_USERNAME }}/app"
 
     - name: Deploy on EC2
