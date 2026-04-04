@@ -57,11 +57,7 @@ jobs:
         username: ${{ secrets.EC2_USERNAME }}
         key: ${{ secrets.EC2_SSH_KEY }}
         script: |
-            mkdir -p /home/${{ secrets.EC2_USERNAME }}/app
-            cd /home/${{ secrets.EC2_USERNAME }}/app
-
+            mkdir -p /home/${{ secrets.EC2_USERNAME }}/app/backend/build/libs
+            cd /home/${{ secrets.EC2_USERNAME }}/app/backend/build/libs
             pkill -f 'java -jar' || true
-
-            JAR_NAME=$(ls -t *.jar | head -n 1)
-
-            nohup java -jar "$JAR_NAME" > app.log 2>&1 &
+            nohup java -jar backend-0.0.1-SNAPSHOT.jar > app.log 2>&1 &
