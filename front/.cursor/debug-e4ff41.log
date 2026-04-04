@@ -1,0 +1,3 @@
+{"sessionId":"e4ff41","runId":"pre-fix","hypothesisId":"H1","location":"GameCreationPage.jsx:handleCreateGame:start","message":"handleCreateGame start","data":{"filesLength":0,"hasText":true},"timestamp":1773137236643}
+{"sessionId":"e4ff41","runId":"pre-fix","hypothesisId":"H1","location":"GameCreationPage.jsx:handleCreateGame:start","message":"handleCreateGame start","data":{"filesLength":1,"hasText":true},"timestamp":1773137293669}
+{"sessionId":"e4ff41","runId":"pre-fix","hypothesisId":"H2","location":"GameCreationPage.jsx:handleCreateGame:after-file-source","message":"file source upload response","data":{"ok":true,"status":200},"timestamp":1773137293743}
