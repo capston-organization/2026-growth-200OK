@@ -286,7 +286,21 @@ const GamePlayPage = () => {
     setIframeReloadKey((k) => k + 1);
   };
 
-  const handleEndGame = () => {
+  const handleEndGame = async () => {
+    const token = localStorage.getItem("accessToken");
+    if (gameId != null && token) {
+      try {
+        const res = await fetch(`/games/${gameId}/reward/coin`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) {
+          console.warn("코인 지급 요청 실패:", res.status);
+        }
+      } catch (e) {
+        console.error("코인 지급 요청 오류:", e);
+      }
+    }
     navigate("/analyze", { state: { userName } });
   };
 
