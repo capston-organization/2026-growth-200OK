@@ -1,7 +1,8 @@
+/* global Phaser */
 /**
  * ShortAnswerGame.js (단답형 = 도넛게임)
- * frontend ShortAnswerScene와 동일한 에셋·UI·로직. MainGame3용 1라운드 후 결과 보고.
- * 에셋 경로: assets/images/, assets/sounds/
+ * MiniGame2 버전: MainGame1에서 재사용하기 위해 MiniGames 디렉터리로 이동.
+ * 에셋 경로: ../../MiniGames/ShortAnswerGames/MiniGame2/assets/
  */
 class ShortAnswerGame extends Phaser.Scene {
   constructor() {
@@ -11,18 +12,100 @@ class ShortAnswerGame extends Phaser.Scene {
   init(data) {
     this.mainScene = data.parent;
     this.speedLevel = data.speedLevel || 1;
+    this.currentProblem = data.problem || null; // MainGame1에서 넘겨준 1개의 문제
+    this.backgroundMusic = null;
+    this.hiddenInputEl = null;
+    this.handleHiddenInput = null;
+    this.handleHiddenKeydown = null;
+  }
+
+  /**
+   * 도넛 BGM 완전히 끄기
+   */
+  stopDonutBgm() {
+    if (!this.backgroundMusic) return;
+    try {
+      this.backgroundMusic.stop();
+    } catch {
+      // ignore stop error
+    }
+    try {
+      if (typeof this.backgroundMusic.destroy === "function") {
+        this.backgroundMusic.destroy();
+      }
+    } catch {
+      // ignore destroy error
+    }
+    this.backgroundMusic = null;
+  }
+
+  // 한글 IME 입력을 안정적으로 받기 위한 숨김 input
+  setupHiddenInput(maxLength) {
+    var self = this;
+    this.destroyHiddenInput();
+    var input = document.createElement("input");
+    input.type = "text";
+    input.autocomplete = "off";
+    input.autocapitalize = "off";
+    input.spellcheck = false;
+    input.maxLength = maxLength;
+    input.value = this.inputText || "";
+    input.style.position = "fixed";
+    input.style.left = "-9999px";
+    input.style.top = "0";
+    input.style.opacity = "0";
+    input.style.pointerEvents = "none";
+    document.body.appendChild(input);
+
+    this.handleHiddenInput = function () {
+      self.inputText = input.value.slice(0, maxLength);
+      self.inputDisplayText.setText(self.inputText);
+    };
+    this.handleHiddenKeydown = function (e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        self.submitAnswer();
+      }
+    };
+
+    input.addEventListener("input", this.handleHiddenInput);
+    input.addEventListener("keydown", this.handleHiddenKeydown);
+    this.hiddenInputEl = input;
+    setTimeout(function () {
+      if (self.hiddenInputEl) self.hiddenInputEl.focus();
+    }, 0);
+    this.input.on("pointerdown", function () {
+      if (self.hiddenInputEl) self.hiddenInputEl.focus();
+    });
+  }
+
+  destroyHiddenInput() {
+    if (!this.hiddenInputEl) return;
+    try {
+      if (this.handleHiddenInput)
+        this.hiddenInputEl.removeEventListener("input", this.handleHiddenInput);
+      if (this.handleHiddenKeydown)
+        this.hiddenInputEl.removeEventListener(
+          "keydown",
+          this.handleHiddenKeydown,
+        );
+      if (this.hiddenInputEl.parentNode)
+        this.hiddenInputEl.parentNode.removeChild(this.hiddenInputEl);
+    } catch {
+      // ignore DOM detach error
+    }
+    this.hiddenInputEl = null;
+    this.handleHiddenInput = null;
+    this.handleHiddenKeydown = null;
   }
 
   preload() {
-    var base =
-      typeof window.MAINGAME3_ASSETS_BASE !== "undefined"
-        ? window.MAINGAME3_ASSETS_BASE
-        : "assets/";
-    this.load.image("alienWaiting", base + "images/도넛게임기다리는외계인.png");
-    this.load.image("alienHappy", base + "images/도넛게임웃는외계인.png");
-    this.load.image("alienAngry", base + "images/도넛게임화난외계인.png");
-    this.load.image("donut", base + "images/도넛게임도넛.png");
-    this.load.audio("donutBgMusic", base + "sounds/도넛게임배경음악.mp3");
+    this.load.setPath("../../MiniGames/ShortAnswerGames/MiniGame2/assets/");
+    this.load.image("alienWaiting", "images/도넛게임기다리는외계인.png");
+    this.load.image("alienHappy", "images/도넛게임웃는외계인.png");
+    this.load.image("alienAngry", "images/도넛게임화난외계인.png");
+    this.load.image("donut", "images/도넛게임도넛.png");
+    this.load.audio("donutBgMusic", "sounds/도넛게임배경음악.mp3");
   }
 
   create() {
@@ -55,21 +138,9 @@ class ShortAnswerGame extends Phaser.Scene {
       this.input.keyboard.once("keydown", playBg);
     }
 
-    this.scoreText = this.add
-      .text(width - 30, 30, "맞힌 문제: 0", {
-        fontSize: "24px",
-        fill: "#FF6B9D",
-        fontFamily: "Arial",
-        fontStyle: "bold",
-      })
-      .setOrigin(1, 0);
-
-    this.heartsText = this.add
-      .text(width - 30, 65, "❤️❤️❤️", {
-        fontSize: "32px",
-        fontFamily: "Arial",
-      })
-      .setOrigin(1, 0);
+    // 씬 종료 시 정리
+    this.events.once("shutdown", this.stopDonutBgm, this);
+    this.events.once("shutdown", this.destroyHiddenInput, this);
 
     var questionBoxY = 100;
     var questionBoxWidth = width - 400;
@@ -283,38 +354,78 @@ class ShortAnswerGame extends Phaser.Scene {
     this.inputText = "";
     this.timerEvent = null;
     this.isTimerRunning = false;
-    this.questions = [
-      { question: "What is the comparative form of 'good'?", answer: "better" },
-      {
-        question: "What is the third person singular form of 'have'?",
-        answer: "has",
-      },
-      {
-        question: "What is the past participle of 'write'?",
-        answer: "written",
-      },
-      { question: "What is the plural of 'tooth'?", answer: "teeth" },
-      { question: "What is the past tense of 'swim'?", answer: "swam" },
-    ];
+
+    // [설명] MiniMultiGame1과 동일한 아이디어로 speedLevel에 따라 제한시간을 조절
+    // - speedLevel이 1에서 5로 높아질수록 durationSec(초)가 점점 짧아짐
+    // - 최소 5초까지 줄어들도록 하여 난이도 상승 효과 부여
+
+    // MainGame1에서 problem을 넘겨준 경우: 그 문제 1개만 사용
+    if (this.currentProblem) {
+      this.questions = [
+        {
+          question: (this.currentProblem && this.currentProblem.question) || "",
+          answer:
+            this.currentProblem && this.currentProblem.correctAnswer != null
+              ? String(this.currentProblem.correctAnswer)
+              : "",
+        },
+      ];
+    } else {
+      // 기존 MainGame3용 Mock 데이터 (문제 여러 개)
+      this.questions = [
+        {
+          question: "What is the comparative form of 'good'?",
+          answer: "better",
+        },
+        {
+          question: "What is the third person singular form of 'have'?",
+          answer: "has",
+        },
+        {
+          question: "What is the past participle of 'write'?",
+          answer: "written",
+        },
+        { question: "What is the plural of 'tooth'?", answer: "teeth" },
+        { question: "What is the past tense of 'swim'?", answer: "swam" },
+      ];
+    }
     this.currentQuestionIndex = 0;
 
     this.input.keyboard.on(
       "keydown",
       function (event) {
         if (!this.isTimerRunning) return;
+        // 숨김 input이 포커스면 텍스트 입력은 input 이벤트가 처리
+        if (
+          this.hiddenInputEl &&
+          document.activeElement === this.hiddenInputEl
+        ) {
+          if (event.key === "Enter") {
+            this.submitAnswer();
+          }
+          return;
+        }
         if (event.key === "Backspace") {
           this.inputText = this.inputText.slice(0, -1);
           this.inputDisplayText.setText(this.inputText);
         } else if (event.key === "Enter") {
           this.submitAnswer();
-        } else if (event.key.length === 1 && event.key.match(/[a-zA-Z0-9\s]/)) {
-          this.inputText += event.key;
+        } else {
+          if (event.isComposing || event.key === "Process") return;
+          if (event.ctrlKey || event.metaKey || event.altKey) return;
+          if (event.key === "Dead" || event.key === "Unidentified") return;
+          var k = event.key;
+          if (k.length < 1 || k.length > 4) return;
+          var code = k.charCodeAt(0);
+          if (code <= 31 || code === 127) return;
+          this.inputText += k;
           this.inputDisplayText.setText(this.inputText);
         }
       },
       this,
     );
 
+    this.setupHiddenInput(40);
     this.showQuestion();
   }
 
@@ -443,14 +554,16 @@ class ShortAnswerGame extends Phaser.Scene {
 
     this.resultText.setVisible(true);
     this.gameResult = isCorrect;
-    if (this.backgroundMusic && this.backgroundMusic.isPlaying)
-      this.backgroundMusic.stop();
+    this.stopDonutBgm();
     this.time.delayedCall(2000, this.finishGame, [], this);
   }
 
   finishGame() {
+    this.destroyHiddenInput();
+    this.stopDonutBgm();
     if (this.mainScene && this.mainScene.handleMiniGameResult) {
-      this.mainScene.handleMiniGameResult(this.gameResult);
+      // MainGame1 흐름: 결과와 함께 어떤 문제였는지도 넘겨줌
+      this.mainScene.handleMiniGameResult(this.gameResult, this.currentProblem);
     }
     this.scene.stop();
   }

@@ -112,12 +112,24 @@ body {
 /* 네비게이션 메뉴 (Home, 게임만들기...) */
 .nav-menu {
   display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
   gap: 80px; /* [수정] 메뉴 글자들 사이 간격을 20px -> 40px로 넓힘 */
   font-size: 24px; /* [수정] 글자 크기를 14px -> 18px로 키움 */
   font-weight: 400; /* [추가] 글자를 약간 두껍게 해서 잘 보이게 함 */
   color: #555;
 
+  /* absolute + left:50% 일 때 shrink-to-fit 폭이 너무 좁아지면 한글 라벨이 '게임 만들|기'처럼 줄바꿈됨 */
+  width: max-content;
+  max-width: calc(100vw - 48px);
+  box-sizing: border-box;
+
   /* [핵심 위치 조정] */
   margin-left: 160px; /* 로고와 메뉴 사이의 간격 (원하는 만큼 숫자 조절) */
   margin-right: auto; /* ★ 오른쪽 여백을 자동으로 다 채워서, 프로필 아이콘을 맨 오른쪽 끝으로 밀어버림 */
+}
+
+.nav-menu > span {
+  flex-shrink: 0;
+  white-space: nowrap;
 }

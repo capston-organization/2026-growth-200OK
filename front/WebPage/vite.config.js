@@ -19,6 +19,10 @@ export default defineConfig({
         target: "http://localhost:8080", // 실제 백엔드 주소
         changeOrigin: true,
       },
+      "/users": {
+        target: "http://localhost:8080",
+        changeOrigin: true,
+      },
     },
   },
 });

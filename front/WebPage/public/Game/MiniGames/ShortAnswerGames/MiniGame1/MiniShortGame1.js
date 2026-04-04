@@ -27,6 +27,9 @@ class MiniShortGame1 extends Phaser.Scene {
     this.baseWidth = 1280;
     this.baseHeight = 720;
     this.globalScale = 1;
+    this.hiddenInputEl = null;
+    this.handleHiddenInput = null;
+    this.handleHiddenKeydown = null;
   }
 
   // [에셋 로드] 게임에 필요한 이미지 리소스 불러오기
@@ -121,6 +124,7 @@ class MiniShortGame1 extends Phaser.Scene {
 
     // 7. 키보드 입력 리스너 등록
     this.setupInputListener();
+    this.setupHiddenInput(15);
 
     // 8. 레이아웃 배치 (반응형 대응)
     // ★ 반응형 이벤트 등록
@@ -245,6 +249,11 @@ class MiniShortGame1 extends Phaser.Scene {
     this.input.keyboard.on("keydown", (event) => {
       // 게임 종료 상태면 입력 무시
       if (this.isResolved || !this.isGameActive) return;
+      // 숨김 input이 포커스면 텍스트 입력은 input 이벤트가 처리
+      if (this.hiddenInputEl && document.activeElement === this.hiddenInputEl) {
+        if (event.key === "Enter") this.checkAnswer();
+        return;
+      }
 
       if (event.key === "Enter") {
         this.checkAnswer(); // 엔터키로 제출
@@ -254,15 +263,80 @@ class MiniShortGame1 extends Phaser.Scene {
           this.userInputValue = this.userInputValue.slice(0, -1);
           this.updateInputDisplay();
         }
-      } else if (event.key.length === 1 && this.userInputValue.length < 15) {
-        // 일반 문자 입력 (영문/숫자만 허용, 최대 15자)
-        const regex = /^[a-zA-Z0-9]$/;
-        if (regex.test(event.key)) {
-          this.userInputValue += event.key;
-          this.updateInputDisplay();
-        }
+      } else if (this.userInputValue.length < 15) {
+        // 한글 IME 조합 중에는 글자를 넣지 않음 (중복/깨짐 방지)
+        if (event.isComposing || event.key === "Process") return;
+        if (event.ctrlKey || event.metaKey || event.altKey) return;
+        if (event.key === "Dead" || event.key === "Unidentified") return;
+        // 영문·숫자·한글·공백·일반 기호 등 출력 가능 문자 허용
+        const k = event.key;
+        if (k.length < 1 || k.length > 4) return;
+        if (/^[\x00-\x1F\x7F]$/.test(k)) return;
+        this.userInputValue += k;
+        this.updateInputDisplay();
       }
     });
+  }
+
+  // 한글 IME 입력을 안정적으로 받기 위한 숨김 input
+  setupHiddenInput(maxLength) {
+    this.destroyHiddenInput();
+    const input = document.createElement("input");
+    input.type = "text";
+    input.autocomplete = "off";
+    input.autocapitalize = "off";
+    input.spellcheck = false;
+    input.maxLength = maxLength;
+    input.value = this.userInputValue || "";
+    input.style.position = "fixed";
+    input.style.left = "-9999px";
+    input.style.top = "0";
+    input.style.opacity = "0";
+    input.style.pointerEvents = "none";
+    document.body.appendChild(input);
+
+    this.handleHiddenInput = () => {
+      this.userInputValue = input.value.slice(0, maxLength);
+      this.updateInputDisplay();
+    };
+    this.handleHiddenKeydown = (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        this.checkAnswer();
+      }
+    };
+    input.addEventListener("input", this.handleHiddenInput);
+    input.addEventListener("keydown", this.handleHiddenKeydown);
+    this.hiddenInputEl = input;
+    setTimeout(() => {
+      if (this.hiddenInputEl) this.hiddenInputEl.focus();
+    }, 0);
+    this.input.on("pointerdown", () => {
+      if (this.hiddenInputEl) this.hiddenInputEl.focus();
+    });
+  }
+
+  destroyHiddenInput() {
+    if (!this.hiddenInputEl) return;
+    try {
+      if (this.handleHiddenInput) {
+        this.hiddenInputEl.removeEventListener("input", this.handleHiddenInput);
+      }
+      if (this.handleHiddenKeydown) {
+        this.hiddenInputEl.removeEventListener(
+          "keydown",
+          this.handleHiddenKeydown,
+        );
+      }
+      if (this.hiddenInputEl.parentNode) {
+        this.hiddenInputEl.parentNode.removeChild(this.hiddenInputEl);
+      }
+    } catch (e) {
+      /* ignore */
+    }
+    this.hiddenInputEl = null;
+    this.handleHiddenInput = null;
+    this.handleHiddenKeydown = null;
   }
 
   // [UI] 입력된 텍스트 화면 갱신 및 커서 이동
@@ -419,6 +493,7 @@ class MiniShortGame1 extends Phaser.Scene {
   finishGame() {
     this.isGameActive = false;
     this.scale.off("resize", this.refreshLayout, this);
+    this.destroyHiddenInput();
 
     // 실행 중인 애니메이션 정지
     if (this.loadingSprite && this.loadingSprite.anims) {

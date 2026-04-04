@@ -2,6 +2,8 @@
 
 import React, { useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom"; // 페이지 이동 및 데이터 전달받기용
+import LearningVillageLogoImage from "../assets/images/Learning_Village_Logo_ImageOnly.png";
+import LearningVillageLogoText from "../assets/images/Learning_Village_Logo_TextOnly.png";
 
 const GameCreationPage = () => {
   const navigate = useNavigate();
@@ -201,6 +203,7 @@ const GameCreationPage = () => {
           gameId: gameId,
           previewData: previewData, // 3번 API에서 받은 학습 목표/내용
           problems: problemData.problems, // 4번 API에서 받은 실제 문제 배열
+          userName,
         },
       });
     } catch (error) {
@@ -223,24 +226,49 @@ const GameCreationPage = () => {
       {/* =======================
           상단 네비게이션 바
       ======================== */}
-      <div className="navbar">
-        {/* 왼쪽 로고 영역 */}
-        <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
-          <div
-            className="logo-placeholder"
-            style={{ width: 40, height: 40, margin: 0, fontSize: "12px" }}
-          >
-            Logo
-          </div>
-          <span
-            style={{ color: "#FF69B4", fontWeight: "bold", fontSize: "24px" }}
-          >
-            learning village
-          </span>
+      <div className="navbar" style={{ justifyContent: "space-between" }}>
+        {/* 왼쪽: 일러스트 + 텍스트 로고 (가로 배치) */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            flexShrink: 0,
+            zIndex: 2,
+          }}
+        >
+          <img
+            src={LearningVillageLogoImage}
+            alt=""
+            style={{
+              height: 56,
+              width: "auto",
+              display: "block",
+            }}
+          />
+          <img
+            src={LearningVillageLogoText}
+            alt="learning village"
+            style={{
+              height: 40,
+              width: "auto",
+              display: "block",
+            }}
+          />
         </div>
 
-        {/* 중앙 메뉴 (현재 페이지 표시) */}
-        <div className="nav-menu">
+        {/* 메뉴: 화면 가로 기준 중앙 (로고·프로필 제외) */}
+        <div
+          className="nav-menu"
+          style={{
+            position: "absolute",
+            left: "50%",
+            transform: "translateX(calc(-40%))",
+            marginLeft: 0,
+            marginRight: 0,
+            zIndex: 1,
+          }}
+        >
           <span
             style={{ cursor: "pointer" }}
             onClick={() => navigate("/main", { state: { userName } })}
@@ -252,7 +280,7 @@ const GameCreationPage = () => {
             style={{
               fontWeight: "bold",
               color: "#333",
-              borderBottom: "3px solid #FF69B4",
+              borderBottom: "3px solid rgb(240, 110, 151)",
               paddingBottom: "5px",
               cursor: "pointer",
             }}
@@ -268,13 +296,7 @@ const GameCreationPage = () => {
           </span>
           <span
             style={{ cursor: "pointer" }}
-            onClick={() => navigate("/main", { state: { userName } })}
-          >
-            게임하기
-          </span>
-          <span
-            style={{ cursor: "pointer" }}
-            onClick={() => navigate("/main", { state: { userName } })}
+            onClick={() => navigate("/analyze", { state: { userName } })}
           >
             분석하기
           </span>
@@ -285,9 +307,14 @@ const GameCreationPage = () => {
             육성하기
           </span>
 
-          {/* 환영 문구 (가져온 userName 사용) */}
           <span
-            style={{ color: "#FF69B4", fontWeight: "bold", marginLeft: "20px" }}
+            style={{
+              color: "#FF69B4",
+              fontWeight: "bold",
+              marginLeft: "20px",
+              cursor: "pointer",
+            }}
+            onClick={() => navigate("/mypage", { state: { userName } })}
           >
             [{userName} 님]
           </span>
@@ -300,6 +327,8 @@ const GameCreationPage = () => {
             height: 40,
             background: "#ddd",
             borderRadius: "50%",
+            flexShrink: 0,
+            zIndex: 2,
           }}
         ></div>
       </div>
