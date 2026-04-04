@@ -1,6 +1,5 @@
 spring:
   application:
-    name: aim
   datasource:
     url: jdbc:postgresql://localhost:5432/capston
     username: ${DB_NAME}
@@ -19,10 +18,6 @@ spring:
       max-file-size: 10MB
       max-request-size: 10MB
 
-# FastAPI 서버 URL
-fastapi:
-  url: http://localhost:8000
-
 logging:
   level:
     org.springframework.security: TRACE
@@ -32,7 +27,7 @@ oauth:
   google:
     token-uri: https://oauth2.googleapis.com/token
     user-info-uri: https://www.googleapis.com/oauth2/v3/userinfo
-    redirect-uri: http://localhost:8080/auth/google
+    redirect-uri: ${REDIRECT_URI}
     client-id: ${GOOGLE_CLIENT_ID}
     client-secret: ${GOOGLE_CLIENT_SECRET}
 
