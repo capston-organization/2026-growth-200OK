@@ -56,8 +56,14 @@ jobs:
         host: ${{ secrets.EC2_HOST }}
         username: ${{ secrets.EC2_USERNAME }}
         key: ${{ secrets.EC2_SSH_KEY }}
+        timeout: 60s
+        request_pty: false
         script: |
-            mkdir -p /home/${{ secrets.EC2_USERNAME }}/app/backend/build/libs
-            cd /home/${{ secrets.EC2_USERNAME }}/app/backend/build/libs
-            pkill -f 'java -jar' || true
-            nohup java -jar backend-0.0.1-SNAPSHOT.jar > app.log 2>&1 &
+            LIBS=/home/${{ secrets.EC2_USERNAME }}/app/backend/build/libs
+            mkdir -p "$LIBS"
+            cd "$LIBS"
+            for pid in $(pidof java 2>/dev/null); do kill "$pid" 2>/dev/null || true; done
+            echo "$(date -Is) deploy" >> "$LIBS/app.log"
+            nohup java -jar backend-0.0.1-SNAPSHOT.jar >> "$LIBS/app.log" 2>&1 </dev/null &
+            sleep 2
+            exit 0
