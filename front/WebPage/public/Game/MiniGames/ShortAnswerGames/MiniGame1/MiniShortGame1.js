@@ -34,7 +34,9 @@ class MiniShortGame1 extends Phaser.Scene {
 
   // [에셋 로드] 게임에 필요한 이미지 리소스 불러오기
   preload() {
-    this.load.setPath("../../MiniGames/ShortAnswerGames/MiniGame1/assets/");
+    this.load.setPath(
+      "../../MiniGames/ShortAnswerGames/MiniGame1/assets/images/",
+    );
 
     // 기본 UI 이미지
     this.load.image("background", "Background1.png");
@@ -53,6 +55,13 @@ class MiniShortGame1 extends Phaser.Scene {
     this.load.image("loading3", "Loading3.png");
     this.load.image("successEmo", "SuccessEmo.png");
     this.load.image("failedEmo", "FailedEmo.png");
+
+    this.load.setPath(
+      "../../MiniGames/ShortAnswerGames/MiniGame1/assets/sounds/",
+    );
+    this.load.audio("miniShortBgm", "Background_Music.mp3");
+    this.load.audio("successPopSfx", "SuccessPop.mp3");
+    this.load.audio("failedPopSfx", "FailedPop.mp3");
   }
 
   // [게임 생성] 화면 구성 및 로직 초기화
@@ -130,6 +139,87 @@ class MiniShortGame1 extends Phaser.Scene {
     // ★ 반응형 이벤트 등록
     this.scale.on("resize", this.refreshLayout, this);
     this.refreshLayout(); // 초기 실행
+
+    this.bgmMusic = null;
+    this._bgmFadeTween = null;
+    this._bgmUnlockHandler = null;
+    this.startBackgroundMusicFadeIn();
+  }
+
+  /**
+   * BGM: 볼륨 0에서 재생 후 페이드 인. 브라우저 정책상 첫 입력 후 재생될 수 있음.
+   */
+  startBackgroundMusicFadeIn() {
+    if (!this.cache.audio.exists("miniShortBgm")) return;
+    try {
+      const targetVolume = 0.45;
+      const fadeMs = 1400;
+      this.bgmMusic = this.sound.add("miniShortBgm", {
+        loop: true,
+        volume: 0,
+      });
+
+      const runFadeIn = () => {
+        if (!this.bgmMusic || !this.scene.isActive()) return;
+        if (!this.bgmMusic.isPlaying) this.bgmMusic.play();
+        if (this._bgmFadeTween) this._bgmFadeTween.stop();
+        this._bgmFadeTween = this.tweens.add({
+          targets: this.bgmMusic,
+          volume: targetVolume,
+          duration: fadeMs,
+          ease: "Sine.easeIn",
+        });
+      };
+
+      const tryStart = () => {
+        if (!this.bgmMusic) return;
+        const ctx = this.sound.context;
+        if (ctx && ctx.state === "suspended") {
+          ctx.resume().then(runFadeIn).catch(() => {});
+        } else {
+          runFadeIn();
+        }
+      };
+
+      tryStart();
+
+      const unlock = () => {
+        tryStart();
+        this.input.off("pointerdown", unlock);
+        if (this.input.keyboard)
+          this.input.keyboard.off("keydown", this._bgmUnlockHandler);
+        this._bgmUnlockHandler = null;
+      };
+      this._bgmUnlockHandler = unlock;
+      this.input.on("pointerdown", unlock);
+      if (this.input.keyboard) this.input.keyboard.on("keydown", unlock);
+    } catch (e) {
+      console.warn("MiniShortGame1 BGM 로드/재생 실패:", e);
+    }
+  }
+
+  stopBackgroundMusic() {
+    if (this._bgmFadeTween) {
+      this._bgmFadeTween.stop();
+      this._bgmFadeTween = null;
+    }
+    if (this._bgmUnlockHandler) {
+      this.input.off("pointerdown", this._bgmUnlockHandler);
+      if (this.input.keyboard)
+        this.input.keyboard.off("keydown", this._bgmUnlockHandler);
+      this._bgmUnlockHandler = null;
+    }
+    if (this.sound && this.sound.stopByKey) {
+      this.sound.stopByKey("miniShortBgm");
+    }
+    if (this.bgmMusic) {
+      try {
+        this.bgmMusic.stop();
+      } catch (err) {
+        console.warn("MiniShortGame1 BGM 정지 실패:", err);
+      }
+      this.bgmMusic = null;
+    }
   }
 
   // [UI] 채팅 말풍선 및 결과/로딩 이미지 생성
@@ -271,7 +361,10 @@ class MiniShortGame1 extends Phaser.Scene {
         // 영문·숫자·한글·공백·일반 기호 등 출력 가능 문자 허용
         const k = event.key;
         if (k.length < 1 || k.length > 4) return;
-        if (/^[\x00-\x1F\x7F]$/.test(k)) return;
+        if (k.length === 1) {
+          const c = k.charCodeAt(0);
+          if (c < 32 || c === 127) return;
+        }
         this.userInputValue += k;
         this.updateInputDisplay();
       }
@@ -331,7 +424,7 @@ class MiniShortGame1 extends Phaser.Scene {
       if (this.hiddenInputEl.parentNode) {
         this.hiddenInputEl.parentNode.removeChild(this.hiddenInputEl);
       }
-    } catch (e) {
+    } catch {
       /* ignore */
     }
     this.hiddenInputEl = null;
@@ -406,7 +499,15 @@ class MiniShortGame1 extends Phaser.Scene {
 
   // [로직] 정답 체크
   checkAnswer() {
-    if (this.isResolved) return; // 이미 제출했으면 무시
+    if (this.isResolved || !this.isGameActive) return; // 이미 제출·종료면 무시
+
+    try {
+      if (this.cache.audio.exists("successPopSfx")) {
+        this.sound.play("successPopSfx", { volume: 1 });
+      }
+    } catch (err) {
+      console.warn("MiniShortGame1 SuccessPop(제출) 실패:", err);
+    }
 
     this.isResolved = true;
     const userAnswer = this.userInputValue.trim().toLowerCase();
@@ -482,8 +583,22 @@ class MiniShortGame1 extends Phaser.Scene {
       this.loadingSprite.setVisible(false); // 로딩 숨김
 
       if (isSuccess) {
+        try {
+          if (this.cache.audio.exists("successPopSfx")) {
+            this.sound.play("successPopSfx", { volume: 1 });
+          }
+        } catch (err) {
+          console.warn("MiniShortGame1 SuccessPop(이모지) 실패:", err);
+        }
         this.successEmo.setVisible(true); // 성공 이모지
       } else {
+        try {
+          if (this.cache.audio.exists("failedPopSfx")) {
+            this.sound.play("failedPopSfx", { volume: 1 });
+          }
+        } catch (err) {
+          console.warn("MiniShortGame1 FailedPop 실패:", err);
+        }
         this.failedEmo.setVisible(true); // 실패 이모지
       }
     });
@@ -491,6 +606,8 @@ class MiniShortGame1 extends Phaser.Scene {
 
   // [종료] 게임 마무리 및 상위 씬 통지
   finishGame() {
+    this.stopBackgroundMusic();
+
     this.isGameActive = false;
     this.scale.off("resize", this.refreshLayout, this);
     this.destroyHiddenInput();
