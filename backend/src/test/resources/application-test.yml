@@ -1,39 +1,36 @@
-spring:
-  datasource:
-    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
-  jpa:
-    hibernate:
-      ddl-auto: create-drop
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.H2Dialect
-    show-sql: true
-  main:
-    allow-bean-definition-overriding: true
-  autoconfigure:
-    exclude:
-      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
-      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
-
-DB_NAME: test
-DB_PASSWORD: test
-GOOGLE_CLIENT_ID: dummy
-GOOGLE_CLIENT_SECRET: dummy
-JWT_SECRET: dummy
-
-jwt:
-  secret: test-secret-for-tests
-
-oauth:
-  google:
-    token-uri: http://localhost/dummy
-    user-info-uri: http://localhost/dummy
-    redirect-uri: http://localhost/dummy
-    client-id: dummy
-    client-secret: dummy
-
-fastapi:
-  url: http://localhost/dummy
+#spring:
+#  datasource:
+#    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+#    driver-class-name: org.h2.Driver
+#    username: sa
+#    password:
+#  jpa:
+#    hibernate:
+#      ddl-auto: create-drop
+#    properties:
+#      hibernate:
+#        dialect: org.hibernate.dialect.H2Dialect
+#    show-sql: true
+#  main:
+#    allow-bean-definition-overriding: true
+#  autoconfigure:
+#    exclude:
+#      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+#      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+#
+#DB_NAME: test
+#DB_PASSWORD: test
+#GOOGLE_CLIENT_ID: dummy
+#GOOGLE_CLIENT_SECRET: dummy
+#JWT_SECRET: dummy
+#
+#jwt:
+#  secret: test-secret-for-tests
+#
+#oauth:
+#  google:
+#    token-uri: http://localhost/dummy
+#    user-info-uri: http://localhost/dummy
+#    redirect-uri: http://localhost/dummy
+#    client-id: dummy
+#    client-secret: dummy
