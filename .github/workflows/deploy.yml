@@ -27,9 +27,11 @@ jobs:
         java-version: '17'
 
     - name: Create application.yml
+      env:
+        APPLICATION_YML: ${{ secrets.APPLICATION_YML }}
       run: |
         mkdir -p src/main/resources
-        echo "${{ secrets.APPLICATION_YML }}" > src/main/resources/application.yml
+        printf '%s\n' "$APPLICATION_YML" > src/main/resources/application.yml
 
     - name: Build with Gradle
       run: |
