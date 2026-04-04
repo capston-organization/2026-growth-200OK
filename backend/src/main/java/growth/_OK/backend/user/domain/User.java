@@ -52,6 +52,9 @@ public class User extends BaseEntity {
     @Column(nullable = false)
     private int level = 0;
 
+    @Column(name = "google_classroom_refresh_token", length = 2048)
+    private String googleClassroomRefreshToken;
+
     @Builder
     public User(String username, String providerId, String profileImage, Provider provider, Role role) {
         this.name = username;
@@ -112,6 +115,10 @@ public class User extends BaseEntity {
 
     public void levelUp() {
         this.level += 1;
+    }
+
+    public void setGoogleClassroomRefreshToken(String googleClassroomRefreshToken) {
+        this.googleClassroomRefreshToken = googleClassroomRefreshToken;
     }
 
 }
