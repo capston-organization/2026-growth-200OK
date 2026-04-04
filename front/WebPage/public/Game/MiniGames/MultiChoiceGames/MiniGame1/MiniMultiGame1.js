@@ -31,7 +31,9 @@ class MiniMultiGame1 extends Phaser.Scene {
   // [1] Preload
   // =================================================================
   preload() {
-    this.load.setPath("../../MiniGames/MultiChoiceGames/MiniGame1/assets/");
+    this.load.setPath(
+      "../../MiniGames/MultiChoiceGames/MiniGame1/assets/images/",
+    );
 
     this.load.image("bg1", "Background1.png");
     this.load.image("bg2", "Background2.png");
@@ -51,6 +53,14 @@ class MiniMultiGame1 extends Phaser.Scene {
     for (let i = 1; i <= 3; i++) {
       this.load.image(`successGift${i}`, `SuccessGift${i}.png`);
     }
+
+    this.load.setPath(
+      "../../MiniGames/MultiChoiceGames/MiniGame1/assets/sounds/",
+    );
+    this.load.audio("miniMultiBgm", "Background_Music.mp3");
+    this.load.audio("shootSfx", "Shoot.mp3");
+    this.load.audio("targetShootSfx", "Taget_Shoot.mp3");
+    this.load.audio("tadaSfx", "Tada.mp3");
   }
 
   // =================================================================
@@ -136,9 +146,103 @@ class MiniMultiGame1 extends Phaser.Scene {
     this.createTargets();
     this.setProblem();
 
+    this.bgmMusic = null;
+    this._bgmFadeTween = null;
+    this._bgmUnlockHandler = null;
+    this.startBackgroundMusicFadeIn();
+
+    // 클릭 시 Shoot 효과음 (진행 중일 때만; 성공/실패 후 isGameActive false면 무음)
+    this._onAnyClickForShoot = () => {
+      if (!this.isGameActive) return;
+      try {
+        if (this.cache.audio.exists("shootSfx")) {
+          this.sound.play("shootSfx", { volume: 0.8 });
+        }
+      } catch (err) {
+        console.warn("MiniMultiGame1 Shoot SFX 실패:", err);
+      }
+    };
+    this.input.on("pointerdown", this._onAnyClickForShoot, this);
+
     // 6. ★ 반응형 이벤트 등록 (MiniOXGame1과 동일)
     this.scale.on("resize", this.refreshLayout, this);
     this.refreshLayout(); // 초기 실행
+  }
+
+  /**
+   * BGM: 볼륨 0에서 재생 후 페이드 인. 브라우저 정책상 첫 입력 후 재생될 수 있음.
+   */
+  startBackgroundMusicFadeIn() {
+    if (!this.cache.audio.exists("miniMultiBgm")) return;
+    try {
+      const targetVolume = 0.45;
+      const fadeMs = 1400;
+      this.bgmMusic = this.sound.add("miniMultiBgm", {
+        loop: true,
+        volume: 0,
+      });
+
+      const runFadeIn = () => {
+        if (!this.bgmMusic || !this.scene.isActive()) return;
+        if (!this.bgmMusic.isPlaying) this.bgmMusic.play();
+        if (this._bgmFadeTween) this._bgmFadeTween.stop();
+        this._bgmFadeTween = this.tweens.add({
+          targets: this.bgmMusic,
+          volume: targetVolume,
+          duration: fadeMs,
+          ease: "Sine.easeIn",
+        });
+      };
+
+      const tryStart = () => {
+        if (!this.bgmMusic) return;
+        const ctx = this.sound.context;
+        if (ctx && ctx.state === "suspended") {
+          ctx.resume().then(runFadeIn).catch(() => {});
+        } else {
+          runFadeIn();
+        }
+      };
+
+      tryStart();
+
+      const unlock = () => {
+        tryStart();
+        this.input.off("pointerdown", unlock);
+        if (this.input.keyboard)
+          this.input.keyboard.off("keydown", this._bgmUnlockHandler);
+        this._bgmUnlockHandler = null;
+      };
+      this._bgmUnlockHandler = unlock;
+      this.input.on("pointerdown", unlock);
+      if (this.input.keyboard) this.input.keyboard.on("keydown", unlock);
+    } catch (e) {
+      console.warn("MiniMultiGame1 BGM 로드/재생 실패:", e);
+    }
+  }
+
+  stopBackgroundMusic() {
+    if (this._bgmFadeTween) {
+      this._bgmFadeTween.stop();
+      this._bgmFadeTween = null;
+    }
+    if (this._bgmUnlockHandler) {
+      this.input.off("pointerdown", this._bgmUnlockHandler);
+      if (this.input.keyboard)
+        this.input.keyboard.off("keydown", this._bgmUnlockHandler);
+      this._bgmUnlockHandler = null;
+    }
+    if (this.sound && this.sound.stopByKey) {
+      this.sound.stopByKey("miniMultiBgm");
+    }
+    if (this.bgmMusic) {
+      try {
+        this.bgmMusic.stop();
+      } catch (err) {
+        console.warn("MiniMultiGame1 BGM 정지 실패:", err);
+      }
+      this.bgmMusic = null;
+    }
   }
 
   // =================================================================
@@ -261,6 +365,14 @@ class MiniMultiGame1 extends Phaser.Scene {
   onTargetClick(target) {
     if (!this.isGameActive || target.clicked) return;
 
+    try {
+      if (this.cache.audio.exists("targetShootSfx")) {
+        this.sound.play("targetShootSfx", { volume: 1 });
+      }
+    } catch (err) {
+      console.warn("MiniMultiGame1 Target_Shoot SFX 실패:", err);
+    }
+
     target.clicked = true;
     target.image.setTexture(`target${target.id}Shot`);
 
@@ -278,6 +390,14 @@ class MiniMultiGame1 extends Phaser.Scene {
   // [6] Success / Fail
   // =================================================================
   triggerSuccess() {
+    try {
+      if (this.cache.audio.exists("tadaSfx")) {
+        this.sound.play("tadaSfx", { volume: 1 });
+      }
+    } catch (err) {
+      console.warn("MiniMultiGame1 Tada SFX 실패:", err);
+    }
+
     this.isGameActive = false;
     this.gameResult = true;
 
@@ -336,6 +456,13 @@ class MiniMultiGame1 extends Phaser.Scene {
   }
 
   finishGame() {
+    if (this._onAnyClickForShoot) {
+      this.input.off("pointerdown", this._onAnyClickForShoot, this);
+      this._onAnyClickForShoot = null;
+    }
+
+    this.stopBackgroundMusic();
+
     this.scale.off("resize", this.refreshLayout, this);
     this.input.setDefaultCursor("default");
 

@@ -37,7 +37,7 @@ class MiniOXGame1 extends Phaser.Scene {
   // [Preload] 이미지 리소스 로드
   // =================================================================
   preload() {
-    this.load.setPath("../../MiniGames/OXGames/MiniGame1/assets/");
+    this.load.setPath("../../MiniGames/OXGames/MiniGame1/assets/images/");
 
     // 1. 타이머 UI (게이지 바, 아이콘)
     this.load.image("timerIcon", "Timer.png");
@@ -72,6 +72,10 @@ class MiniOXGame1 extends Phaser.Scene {
     for (let i = 1; i <= 5; i++) {
       this.load.image(`panel${i}`, `Panel${i}.png`);
     }
+
+    this.load.setPath("../../MiniGames/OXGames/MiniGame1/assets/sounds/");
+    this.load.audio("miniOxBgm", "Background_Music.mp3");
+    this.load.audio("oxButtonPressSfx", "ButtonPress.mp3");
   }
 
   // =================================================================
@@ -154,6 +158,87 @@ class MiniOXGame1 extends Phaser.Scene {
 
     // 첫 번째 아이템(패널) 생성 시작
     this.spawnConveyorItem();
+
+    this.bgmMusic = null;
+    this._bgmFadeTween = null;
+    this._bgmUnlockHandler = null;
+    this.startBackgroundMusicFadeIn();
+  }
+
+  /**
+   * BGM: 볼륨 0에서 재생 후 페이드 인. 브라우저 정책상 첫 입력 후 재생될 수 있음.
+   */
+  startBackgroundMusicFadeIn() {
+    if (!this.cache.audio.exists("miniOxBgm")) return;
+    try {
+      const targetVolume = 0.45;
+      const fadeMs = 1400;
+      this.bgmMusic = this.sound.add("miniOxBgm", {
+        loop: true,
+        volume: 0,
+      });
+
+      const runFadeIn = () => {
+        if (!this.bgmMusic || !this.scene.isActive()) return;
+        if (!this.bgmMusic.isPlaying) this.bgmMusic.play();
+        if (this._bgmFadeTween) this._bgmFadeTween.stop();
+        this._bgmFadeTween = this.tweens.add({
+          targets: this.bgmMusic,
+          volume: targetVolume,
+          duration: fadeMs,
+          ease: "Sine.easeIn",
+        });
+      };
+
+      const tryStart = () => {
+        if (!this.bgmMusic) return;
+        const ctx = this.sound.context;
+        if (ctx && ctx.state === "suspended") {
+          ctx.resume().then(runFadeIn).catch(() => {});
+        } else {
+          runFadeIn();
+        }
+      };
+
+      tryStart();
+
+      const unlock = () => {
+        tryStart();
+        this.input.off("pointerdown", unlock);
+        if (this.input.keyboard)
+          this.input.keyboard.off("keydown", this._bgmUnlockHandler);
+        this._bgmUnlockHandler = null;
+      };
+      this._bgmUnlockHandler = unlock;
+      this.input.on("pointerdown", unlock);
+      if (this.input.keyboard) this.input.keyboard.on("keydown", unlock);
+    } catch (e) {
+      console.warn("MiniOXGame1 BGM 로드/재생 실패:", e);
+    }
+  }
+
+  stopBackgroundMusic() {
+    if (this._bgmFadeTween) {
+      this._bgmFadeTween.stop();
+      this._bgmFadeTween = null;
+    }
+    if (this._bgmUnlockHandler) {
+      this.input.off("pointerdown", this._bgmUnlockHandler);
+      if (this.input.keyboard)
+        this.input.keyboard.off("keydown", this._bgmUnlockHandler);
+      this._bgmUnlockHandler = null;
+    }
+    if (this.sound && this.sound.stopByKey) {
+      this.sound.stopByKey("miniOxBgm");
+    }
+    if (this.bgmMusic) {
+      try {
+        this.bgmMusic.stop();
+      } catch (err) {
+        console.warn("MiniOXGame1 BGM 정지 실패:", err);
+      }
+      this.bgmMusic = null;
+    }
   }
 
   // O, X 버튼 생성 및 이벤트 연결
@@ -361,6 +446,14 @@ class MiniOXGame1 extends Phaser.Scene {
   handleAnswer(userChoseO) {
     if (this.isResolved || !this.isGameActive) return;
 
+    try {
+      if (this.cache.audio.exists("oxButtonPressSfx")) {
+        this.sound.play("oxButtonPressSfx", { volume: 1 });
+      }
+    } catch (err) {
+      console.warn("MiniOXGame1 ButtonPress SFX 실패:", err);
+    }
+
     this.isResolved = true; // 중복 클릭 방지
     const isCorrect = userChoseO === this.problemData.isCorrect;
 
@@ -385,6 +478,8 @@ class MiniOXGame1 extends Phaser.Scene {
 
   // 게임 종료 및 결과 전송
   finishGame() {
+    this.stopBackgroundMusic();
+
     this.isGameActive = false;
     this.scale.off("resize", this.refreshLayout, this); // 리사이즈 리스너 해제
 
