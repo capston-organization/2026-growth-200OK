@@ -29,6 +29,8 @@ oauth:
     token-uri: https://oauth2.googleapis.com/token
     user-info-uri: https://www.googleapis.com/oauth2/v3/userinfo
     redirect-uri: ${REDIRECT_URI}
+    # 클래스룸 연동 시 프론트에서 사용한 redirect와 동일해야 합니다. 미설정 시 redirect-uri와 동일하게 사용됩니다.
+    classroom-redirect-uri: ${CLASSROOM_REDIRECT_URI:}
     client-id: ${GOOGLE_CLIENT_ID}
     client-secret: ${GOOGLE_CLIENT_SECRET}
 
@@ -39,3 +41,7 @@ gemini:
   api-key: ${GEMINI_API_KEY}
   model: gemini-2.5-flash
   generate-content-url: https://generativelanguage.googleapis.com/v1beta/models
+
+app:
+  # 클래스룸 과제 설명에 포함되는 게임 플레이 URL의 origin (경로는 /games/{id} 로 붙습니다)
+  frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
