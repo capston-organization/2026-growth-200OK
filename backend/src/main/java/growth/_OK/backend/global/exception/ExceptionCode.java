@@ -22,6 +22,11 @@ public enum ExceptionCode {
     INVALID_SOURCE_FILE(HttpStatus.BAD_REQUEST, ClientExceptionCode.INVALID_SOURCE_FILE, "PDF 또는 텍스트 파일만 업로드 가능합니다."),
     SOURCE_CONTENT_EMPTY(HttpStatus.BAD_REQUEST, ClientExceptionCode.SOURCE_CONTENT_EMPTY, "소스 파일에서 추출된 내용이 없습니다. 파일을 확인하거나 다른 파일을 업로드해 주세요."),
     GEMINI_QUOTA_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, ClientExceptionCode.GEMINI_QUOTA_EXCEEDED, "AI 생성 요청 한도를 초과했습니다. 잠시 후 다시 시도해 주세요."),
+    CLASSROOM_NOT_LINKED(HttpStatus.BAD_REQUEST, ClientExceptionCode.CLASSROOM_NOT_LINKED, "Google Classroom 연동이 필요합니다. 클래스룸 권한으로 인증 코드를 다시 연결해 주세요."),
+    GOOGLE_TOKEN_EXCHANGE_FAILED(HttpStatus.BAD_GATEWAY, ClientExceptionCode.GOOGLE_TOKEN_EXCHANGE_FAILED, "Google 토큰 교환에 실패했습니다. 코드 또는 리다이렉트 URI를 확인해 주세요."),
+    CLASSROOM_API_ERROR(HttpStatus.BAD_GATEWAY, ClientExceptionCode.CLASSROOM_API_ERROR, "Google Classroom API 호출에 실패했습니다."),
+    CLASSROOM_REFRESH_TOKEN_MISSING(HttpStatus.BAD_REQUEST, ClientExceptionCode.CLASSROOM_REFRESH_TOKEN_MISSING, "리프레시 토큰을 받지 못했습니다. Google 인증 시 access_type=offline, prompt=consent 로 다시 시도해 주세요."),
+    CLASSROOM_SCOPE_MISSING(HttpStatus.BAD_REQUEST, ClientExceptionCode.CLASSROOM_SCOPE_MISSING, "Google Classroom 권한(scope)이 포함되지 않은 인증 코드입니다."),
     ;
     private final HttpStatus httpStatus;
     private final ClientExceptionCode clientExceptionCode;
