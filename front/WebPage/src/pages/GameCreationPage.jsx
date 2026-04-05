@@ -2,6 +2,7 @@
 
 import React, { useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom"; // 페이지 이동 및 데이터 전달받기용
+import { apiUrl } from "../config/api";
 import LearningVillageLogoImage from "../assets/images/Learning_Village_Logo_ImageOnly.png";
 import LearningVillageLogoText from "../assets/images/Learning_Village_Logo_TextOnly.png";
 
@@ -107,11 +108,10 @@ const GameCreationPage = () => {
       // 로컬 스토리지에서 액세스 토큰 가져오기 (로그인 후 저장된 토큰)
       const token = localStorage.getItem("accessToken") || "임시토큰";
       const headers = { Authorization: `Bearer ${token}` };
-      const BASE_URL = ""; // 실제 백엔드 주소로 변경 필요. 프록시 사용 중이므로 아직은 빈 칸이어도 됨
 
       // [1번 API] 게임 기본 설정
       const mappedType = selectedType === "Grammar" ? "GRAMMAR" : "VOCAB";
-      const createGameRes = await fetch(`${BASE_URL}/games`, {
+      const createGameRes = await fetch(apiUrl("/games"), {
         method: "POST",
         headers: { ...headers, "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -138,7 +138,7 @@ const GameCreationPage = () => {
         files.forEach((file) => {
           formData.append("file", file);
         });
-        const sourceRes = await fetch(`${BASE_URL}/games/${gameId}/sources`, {
+        const sourceRes = await fetch(apiUrl(`/games/${gameId}/sources`), {
           method: "POST",
           headers: headers, // FormData는 브라우저가 자동으로 boundary와 함께 Content-Type을 세팅함
           body: formData,
@@ -150,7 +150,7 @@ const GameCreationPage = () => {
       // [2-1번 API] 소스 텍스트 업로드 (직접 입력한 텍스트가 있을 때만)
       if (textInput.trim()) {
         const textSourceRes = await fetch(
-          `${BASE_URL}/games/${gameId}/sources/text`,
+          apiUrl(`/games/${gameId}/sources/text`),
           {
             method: "POST",
             headers: {
@@ -166,7 +166,7 @@ const GameCreationPage = () => {
 
       // [3번 API] 미리보기 생성
       const previewRes = await fetch(
-        `${BASE_URL}/games/${gameId}/generate/preview`,
+        apiUrl(`/games/${gameId}/generate/preview`),
         {
           method: "POST",
           headers: headers,
@@ -185,7 +185,7 @@ const GameCreationPage = () => {
         .map((q) => typeMapping[q]);
 
       const problemRes = await fetch(
-        `${BASE_URL}/games/${gameId}/generate/problems`,
+        apiUrl(`/games/${gameId}/generate/problems`),
         {
           method: "POST",
           headers: { ...headers, "Content-Type": "application/json" },

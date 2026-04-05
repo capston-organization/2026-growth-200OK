@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { apiUrl } from "../config/api";
 import LearningVillageLogoImage from "../assets/images/Learning_Village_Logo_ImageOnly.png";
 import LearningVillageLogoText from "../assets/images/Learning_Village_Logo_TextOnly.png";
 
@@ -55,7 +56,7 @@ const MyPage = () => {
 
     const fetchProfile = async () => {
       try {
-        const res = await fetch("/auth/me", { method: "GET", headers });
+        const res = await fetch(apiUrl("/auth/me"), { method: "GET", headers });
         if (!res.ok) return;
         const d = await res.json();
         setName(d.name || "");
@@ -100,7 +101,10 @@ const MyPage = () => {
 
     const fetchMyGames = async () => {
       try {
-        const res = await fetch("/users/me/games", { method: "GET", headers });
+        const res = await fetch(apiUrl("/users/me/games"), {
+          method: "GET",
+          headers,
+        });
         if (!res.ok) return;
         const d = await res.json();
         if (d && Array.isArray(d.games)) setMyGames(d.games);
@@ -111,7 +115,7 @@ const MyPage = () => {
 
     const fetchLikedGames = async () => {
       try {
-        const res = await fetch("/games/likes/me", {
+        const res = await fetch(apiUrl("/games/likes/me"), {
           method: "GET",
           headers,
         });
@@ -154,7 +158,7 @@ const MyPage = () => {
 
     const token = localStorage.getItem("accessToken");
     try {
-      const res = await fetch("/auth/me", {
+      const res = await fetch(apiUrl("/auth/me"), {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -193,7 +197,7 @@ const MyPage = () => {
     if (!selectedMyGame) return;
     const token = localStorage.getItem("accessToken");
     try {
-      const res = await fetch(`/games/${selectedMyGame.id}`, {
+      const res = await fetch(apiUrl(`/games/${selectedMyGame.id}`), {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -234,7 +238,7 @@ const MyPage = () => {
     if (!confirm("정말로 이 게임을 삭제하시겠습니까?")) return;
     const token = localStorage.getItem("accessToken");
     try {
-      const res = await fetch(`/games/${selectedMyGame.id}`, {
+      const res = await fetch(apiUrl(`/games/${selectedMyGame.id}`), {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });

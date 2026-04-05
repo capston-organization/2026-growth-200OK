@@ -9,14 +9,25 @@ const LoginPage = () => {
   // 🏃‍♂️ 1단계: 구글 로그인 창으로 이동시키는 함수
   // ==========================================
   const handleGoogleLogin = () => {
-    // 백엔드 정보
-    const clientId =
-      "** 구글 API 콘솔에서 발급받은 클라이언트 ID를 여기에 입력하세요 **";
+    const clientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID ?? "").trim();
+    const fromEnv = (import.meta.env.VITE_GOOGLE_REDIRECT_URI ?? "").trim();
     const redirectUri =
-      "** 구글 로그인 후 리디렉션될 URI를 여기에 입력하세요 **";
-    const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=email profile`;
+      fromEnv || `${window.location.origin}/auth/callback`;
 
-    window.location.href = googleAuthUrl;
+    if (!clientId) {
+      window.alert(
+        "Google 클라이언트 ID가 설정되지 않았습니다. .env의 VITE_GOOGLE_CLIENT_ID를 확인하세요.",
+      );
+      return;
+    }
+
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      response_type: "code",
+      scope: "email profile",
+    });
+    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
   };
 
   return (
