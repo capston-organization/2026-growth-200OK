@@ -2,6 +2,7 @@
 
 import React, { useState } from "react"; // [중요] 화면의 상태(데이터)를 저장하기 위해 useState를 불러옴
 import { useNavigate } from "react-router-dom"; // 페이지 이동을 도와주는 훅(Hook)
+import { apiUrl } from "../config/api";
 
 const SignUpPage = () => {
   // 1. 페이지 이동 함수 생성 (이걸로 다른 페이지로 점프할 수 있음)
@@ -85,8 +86,31 @@ const SignUpPage = () => {
     // ----------------------------------------------------
     const token = localStorage.getItem("accessToken");
 
+    // #region agent log
+    fetch("http://127.0.0.1:7799/ingest/32d44241-1ed0-4af0-9c5b-dce23183abf7", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Debug-Session-Id": "fca452",
+      },
+      body: JSON.stringify({
+        sessionId: "fca452",
+        runId: "pre-fix",
+        hypothesisId: "H2-H5",
+        location: "SignUpPage.jsx:before-patch",
+        message: "PATCH /auth/me preflight",
+        data: {
+          hasToken: !!token,
+          tokenLen: token ? token.length : 0,
+          looksLikeNullString: token === "null",
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+
     try {
-      const response = await fetch("/auth/me", {
+      const response = await fetch(apiUrl("/auth/me"), {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -202,7 +226,9 @@ const SignUpPage = () => {
                 value={birthDate.split("/")[0] || ""}
                 onChange={(e) => {
                   const day = birthDate.split("/")[1] || "";
-                  setBirthDate(e.target.value ? `${e.target.value}/${day}` : "");
+                  setBirthDate(
+                    e.target.value ? `${e.target.value}/${day}` : "",
+                  );
                 }}
               >
                 <option value="">월</option>
@@ -217,7 +243,9 @@ const SignUpPage = () => {
                 value={birthDate.split("/")[1] || ""}
                 onChange={(e) => {
                   const month = birthDate.split("/")[0] || "";
-                  setBirthDate(month ? `${month}/${e.target.value}` : `/${e.target.value}`);
+                  setBirthDate(
+                    month ? `${month}/${e.target.value}` : `/${e.target.value}`,
+                  );
                 }}
               >
                 <option value="">일</option>
@@ -265,13 +293,19 @@ const SignUpPage = () => {
         </div>
 
         {/* --- 하단 버튼 영역 --- */}
-        <div style={{ textAlign: "right", marginTop: "20px" }}>
+        <div
+          style={{
+            textAlign: "right",
+            marginTop: "20px",
+            color: "rgb(240, 110, 151)",
+          }}
+        >
           <button
             className="btn-primary"
             // [핵심 기능] 버튼 클릭 시 동작
             onClick={handleSubmit}
           >
-            &gt; 회원 가입 완료
+            회원 가입 완료
           </button>
         </div>
       </div>

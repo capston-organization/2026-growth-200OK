@@ -152,16 +152,25 @@ class MiniShortGame1 extends Phaser.Scene {
   startBackgroundMusicFadeIn() {
     if (!this.cache.audio.exists("miniShortBgm")) return;
     try {
+      if (this.sound && typeof this.sound.unlock === "function") {
+        this.sound.unlock();
+      }
       const targetVolume = 0.45;
       const fadeMs = 1400;
       this.bgmMusic = this.sound.add("miniShortBgm", {
         loop: true,
-        volume: 0,
+        volume: 0.02,
       });
 
       const runFadeIn = () => {
         if (!this.bgmMusic || !this.scene.isActive()) return;
-        if (!this.bgmMusic.isPlaying) this.bgmMusic.play();
+        if (!this.bgmMusic.isPlaying) {
+          try {
+            this.bgmMusic.play();
+          } catch (err) {
+            console.warn("MiniShortGame1 BGM play:", err);
+          }
+        }
         if (this._bgmFadeTween) this._bgmFadeTween.stop();
         this._bgmFadeTween = this.tweens.add({
           targets: this.bgmMusic,
@@ -172,16 +181,18 @@ class MiniShortGame1 extends Phaser.Scene {
       };
 
       const tryStart = () => {
-        if (!this.bgmMusic) return;
+        if (!this.bgmMusic || !this.scene.isActive()) return;
         const ctx = this.sound.context;
         if (ctx && ctx.state === "suspended") {
-          ctx.resume().then(runFadeIn).catch(() => {});
+          ctx.resume().then(runFadeIn).catch(() => runFadeIn());
         } else {
           runFadeIn();
         }
       };
 
       tryStart();
+      this.time.delayedCall(0, tryStart);
+      this.time.delayedCall(50, tryStart);
 
       const unlock = () => {
         tryStart();
