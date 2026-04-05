@@ -28,6 +28,12 @@ class MultiChoiceGame extends Phaser.Scene {
   create() {
     var width = this.cameras.main.width;
     var height = this.cameras.main.height;
+    /** 이미지 스프라이트만 확대 (위치·앵커는 그대로). 조절 시 이 값만 변경 */
+    var spriteDisplayMul = 1.5;
+    /** 로봇·북 줄을 통째로 위로 올림(px) — 하단 텍스트 가림 완화 */
+    var robotDrumLiftPx = 145;
+    /** 로봇(기본/왼손/오른손)만 추가 축소 — 북은 그대로 */
+    var robotOnlyScaleMul = 0.9;
 
     this.cameras.main.setBackgroundColor("#1a1a2e");
 
@@ -77,7 +83,7 @@ class MultiChoiceGame extends Phaser.Scene {
     }
 
     var questionBoxWidth = width - 400;
-    var questionBoxHeight = 100;
+    var questionBoxHeight = 120;
     var questionBoxY = 100;
 
     this.questionBoxBg = this.add.graphics();
@@ -100,7 +106,7 @@ class MultiChoiceGame extends Phaser.Scene {
 
     this.questionText = this.add
       .text(width / 2, questionBoxY, "", {
-        fontSize: "32px",
+        fontSize: "38px",
         fill: "#00d4ff",
         fontFamily: "Arial",
         fontStyle: "bold",
@@ -128,7 +134,7 @@ class MultiChoiceGame extends Phaser.Scene {
         .setInteractive({ useHandCursor: true });
       var txt = this.add
         .text(px, py, "", {
-          fontSize: "20px",
+          fontSize: "28px",
           fill: "#00d4ff",
           fontFamily: "Arial",
           fontStyle: "bold",
@@ -163,7 +169,7 @@ class MultiChoiceGame extends Phaser.Scene {
       }).call(this, btn);
     }
 
-    var robotY = height - 180;
+    var robotY = height - 180 - robotDrumLiftPx;
     var robotStartX = width / 2;
     this.robot = this.add
       .image(robotStartX, robotY, "robotBase")
@@ -174,14 +180,14 @@ class MultiChoiceGame extends Phaser.Scene {
       robotMaxW / this.robot.width,
       robotMaxH / this.robot.height,
     );
-    this.robot.setScale(robotScale);
+    this.robot.setScale(robotScale * spriteDisplayMul * robotOnlyScaleMul);
     this.robot.setDepth(10);
     this.robot
       .setInteractive({ useHandCursor: true })
       .on("pointerdown", this.hitRobot, this);
     this.robotPosition = 0;
 
-    var drumY = height - 240;
+    var drumY = height - 240 - robotDrumLiftPx;
     var drumWidth = (width - 20) / 5;
     var drumStartX = 10;
     var drumMaxW = drumWidth;
@@ -191,7 +197,7 @@ class MultiChoiceGame extends Phaser.Scene {
       var drumX = drumStartX + d * drumWidth + drumWidth / 2;
       var drum = this.add.image(drumX, drumY, "drumImg").setOrigin(0.5, 0.5);
       var drumScale = Math.min(drumMaxW / drum.width, drumMaxH / drum.height);
-      drum.setScale(drumScale);
+      drum.setScale(drumScale * spriteDisplayMul);
       drum.setDepth(0);
       (function (drumObj) {
         drum
@@ -213,7 +219,7 @@ class MultiChoiceGame extends Phaser.Scene {
       }).call(this, drum);
       var label = this.add
         .text(drumX, drumY, String.fromCharCode(65 + d), {
-          fontSize: "32px",
+          fontSize: "48px",
           fill: "#00d4ff",
           fontFamily: "Arial",
           fontStyle: "bold",
@@ -225,10 +231,16 @@ class MultiChoiceGame extends Phaser.Scene {
       this.drums.push({ drum: drum, label: label, index: d });
     }
 
+    var timingGuideY = height - 64;
+    var arrowAboveGuideOffset = 52;
+    var arrowRowY = timingGuideY - arrowAboveGuideOffset;
+    var arrowScaleMul = 1.1;
+
     var leftArrowX = robotStartX - 100;
-    var arrowY = robotY + 80;
     this.leftArrow = this.add
-      .polygon(leftArrowX, arrowY, [-30, 0, 10, -20, 10, 20], 0x00d4ff, 1)
+      .polygon(leftArrowX, arrowRowY, [-30, 0, 10, -20, 10, 20], 0x00d4ff, 1)
+      .setScale(arrowScaleMul)
+      .setDepth(25)
       .setInteractive({
         useHandCursor: true,
         hitArea: new Phaser.Geom.Polygon([-30, 0, 10, -20, 10, 20]),
@@ -258,7 +270,9 @@ class MultiChoiceGame extends Phaser.Scene {
 
     var rightArrowX = robotStartX + 100;
     this.rightArrow = this.add
-      .polygon(rightArrowX, arrowY, [30, 0, -10, -20, -10, 20], 0x00d4ff, 1)
+      .polygon(rightArrowX, arrowRowY, [30, 0, -10, -20, -10, 20], 0x00d4ff, 1)
+      .setScale(arrowScaleMul)
+      .setDepth(25)
       .setInteractive({
         useHandCursor: true,
         hitArea: new Phaser.Geom.Polygon([30, 0, -10, -20, -10, 20]),
@@ -287,28 +301,34 @@ class MultiChoiceGame extends Phaser.Scene {
       );
 
     this.resultText = this.add
-      .text(width / 2, height - 30, "", {
-        fontSize: "32px",
+      .text(width / 2, height - 28, "", {
+        fontSize: "38px",
         fill: "#00d4ff",
         fontFamily: "Arial",
         fontStyle: "bold",
+        wordWrap: { width: width - 80 },
+        align: "center",
       })
       .setOrigin(0.5)
+      .setDepth(30)
       .setVisible(false);
 
     this.timingGuideText = this.add
       .text(
         width / 2,
-        height - 60,
+        timingGuideY,
         "화살표로 이동 후 로봇을 4번 클릭해서 북을 치세요!",
         {
-          fontSize: "20px",
+          fontSize: "26px",
           fill: "#00d4ff",
           fontFamily: "Arial",
           fontStyle: "bold",
+          wordWrap: { width: width - 80 },
+          align: "center",
         },
       )
-      .setOrigin(0.5);
+      .setOrigin(0.5)
+      .setDepth(30);
 
     // MainGame1에서 problem을 넘겨준 경우: 그 문제 1개로만 라운드 구성
     if (this.currentProblem) {

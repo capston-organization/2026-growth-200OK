@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { apiUrl } from "../config/api";
 import LearningVillageLogoImage from "../assets/images/Learning_Village_Logo_ImageOnly.png";
 import LearningVillageLogoText from "../assets/images/Learning_Village_Logo_TextOnly.png";
 
@@ -29,7 +30,6 @@ const MainPage = () => {
   const [isGreetingLoading, setIsGreetingLoading] = useState(false);
 
   useEffect(() => {
-    const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
     const token = localStorage.getItem("accessToken");
     if (!token) return;
 
@@ -66,7 +66,7 @@ const MainPage = () => {
     const fetchGreeting = async () => {
       try {
         setIsGreetingLoading(true);
-        const res = await fetch(`${BASE_URL}/users/me/greeting`, {
+        const res = await fetch(apiUrl("/users/me/greeting"), {
           method: "GET",
           headers: commonHeaders,
         });
@@ -89,7 +89,7 @@ const MainPage = () => {
 
     const fetchStreak = async () => {
       try {
-        const res = await fetch(`${BASE_URL}/users/me/streak?days=123`, {
+        const res = await fetch(apiUrl("/users/me/streak?days=123"), {
           method: "GET",
           headers: commonHeaders,
         });
@@ -122,7 +122,7 @@ const MainPage = () => {
 
     const fetchRecentGames = async () => {
       try {
-        const res = await fetch(`${BASE_URL}/users/me/games/recent`, {
+        const res = await fetch(apiUrl("/users/me/games/recent"), {
           method: "GET",
           headers: commonHeaders,
         });

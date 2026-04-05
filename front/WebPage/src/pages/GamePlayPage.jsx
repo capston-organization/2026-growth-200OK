@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom"; // 💡 1. useLocation 임포트 필수!
+import { apiUrl } from "../config/api";
 // --- Renders ---
 
 const ScrollBarStyle = () => (
@@ -116,6 +117,17 @@ const pinkBtnStyle = {
   border: "none",
 };
 
+/** GAME 단계: iframe을 뷰포트 전체에 맞출 때 사용 */
+const GAME_IFRAME_FULLSCREEN_STYLE = {
+  position: "absolute",
+  top: 0,
+  left: 0,
+  width: "100%",
+  height: "100%",
+  border: "none",
+  display: "block",
+};
+
 // =================================================================================
 // [1. 메인 컴포넌트 시작]
 // 화면에 보이는 모든 기능이 여기 모여 있습니다.
@@ -148,6 +160,14 @@ const GamePlayPage = () => {
 
   const iframeRef = useRef(null);
   const [iframeReloadKey, setIframeReloadKey] = useState(0);
+  const prevPhaseRef = useRef(phase);
+
+  useEffect(() => {
+    if (phase === "GAME" && prevPhaseRef.current !== "GAME") {
+      setIsGameOver(false);
+    }
+    prevPhaseRef.current = phase;
+  }, [phase]);
 
   const [retryIndex, setRetryIndex] = useState(0);
 
@@ -230,7 +250,7 @@ const GamePlayPage = () => {
       const fetchAnalysisData = async () => {
         try {
           // 💡 API 4: 오답 결과와 전체 문제 해설 조회
-          const response = await fetch(`/games/${gameId}/problems`, {
+          const response = await fetch(apiUrl(`/games/${gameId}/problems`), {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
             },
@@ -290,7 +310,7 @@ const GamePlayPage = () => {
     const token = localStorage.getItem("accessToken");
     if (gameId != null && token) {
       try {
-        const res = await fetch(`/games/${gameId}/reward/coin`, {
+        const res = await fetch(apiUrl(`/games/${gameId}/reward/coin`), {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -322,7 +342,9 @@ const GamePlayPage = () => {
       ) {
         try {
           const response = await fetch(
-            `/games/${gameId}/problems/${selectedAnalysisId}/explanation`,
+            apiUrl(
+              `/games/${gameId}/problems/${selectedAnalysisId}/explanation`,
+            ),
             {
               headers: {
                 Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
@@ -361,7 +383,7 @@ const GamePlayPage = () => {
       // 2. 모든 문제(특히 틀린 문제 우선)의 해설을 병렬로 요청
       // API 3의 특성(없으면 생성, 있으면 조회)을 이용해 미리 "찌르기" 작업을 합니다.
       const preparationTasks = gameProblems.map((problem) =>
-        fetch(`/games/${gameId}/problems/${problem.id}/explanation`, {
+        fetch(apiUrl(`/games/${gameId}/problems/${problem.id}/explanation`), {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
           },
@@ -400,14 +422,17 @@ const GamePlayPage = () => {
 
     try {
       // 💡 API 1: 정답 제출
-      await fetch(`/games/${gameId}/problems/${currentProblem.id}/submit`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+      await fetch(
+        apiUrl(`/games/${gameId}/problems/${currentProblem.id}/submit`),
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+          },
+          body: JSON.stringify({ correct: isCorrect }),
         },
-        body: JSON.stringify({ correct: isCorrect }),
-      });
+      );
 
       if (isCorrect) {
         setRetryStatus((prev) => ({
@@ -430,7 +455,7 @@ const GamePlayPage = () => {
 
         // 💡 API 3: 해설 단 건 조회 (틀렸을 때 팝업용)
         const expRes = await fetch(
-          `/games/${gameId}/problems/${currentProblem.id}/explanation`,
+          apiUrl(`/games/${gameId}/problems/${currentProblem.id}/explanation`),
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
@@ -692,79 +717,70 @@ const GamePlayPage = () => {
     // 💡 URL 뒤에 파라미터로 gameId를 붙여줄 수도 있습니다.
     const gameUrl = `/Game/MainGames/MainGame1/MainGame1.html?gameId=${gameId}`;
 
-    // 💡 iframe이 로드되면 게임 쪽으로 문제 데이터를 쏴주는 함수
+    // iframe onLoad 직후 Phaser create()보다 먼저일 수 있어, MainGame1에서 메시지를 버퍼링함.
+    // 그래도 짧은 지연으로 몇 번 더내면(이미 처리됐으면 게임 쪽에서 무시) 안정적임.
     const handleIframeLoad = () => {
-      // 💡 로컬 스토리지에서 토큰을 가져옵니다.
       const token = localStorage.getItem("accessToken");
-      if (iframeRef.current && iframeRef.current.contentWindow) {
-        iframeRef.current.contentWindow.postMessage(
-          {
-            type: "START_GAME",
-            gameId: gameId,
-            problems: gameProblems, // 안 쓰이던 문제 데이터를 여기서 넘깁니다!
-            accessToken: token, // JWT 토큰
-          },
-          "*",
-        );
-      }
+      const payload = {
+        type: "START_GAME",
+        gameId,
+        problems: gameProblems,
+        accessToken: token,
+      };
+      const win = iframeRef.current?.contentWindow;
+      if (!win) return;
+      const send = () => win.postMessage(payload, "*");
+      send();
+      setTimeout(send, 250);
+      setTimeout(send, 700);
     };
 
     return (
-      <div style={{ ...containerStyle, background: "black" }}>
-        <div
-          style={{ position: "absolute", top: 10, left: 10, color: "white" }}
-        >
-          Game Play
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          background: "#000",
+          overflow: "hidden",
+          zIndex: 1000,
+        }}
+      >
+        <div style={{ position: "absolute", inset: 0 }}>
+          <iframe
+            key={iframeReloadKey}
+            ref={iframeRef}
+            src={gameUrl}
+            title="Phaser Game"
+            onLoad={handleIframeLoad}
+            style={GAME_IFRAME_FULLSCREEN_STYLE}
+          />
         </div>
 
-        <iframe
-          key={iframeReloadKey}
-          ref={iframeRef}
-          src={gameUrl}
-          title="Phaser Game"
-          onLoad={handleIframeLoad} // 💡 추가된 부분: 로딩 완료 시 데이터 전송
-          style={{
-            width: "100%",
-
-            height: "80vh",
-
-            maxWidth: "1280px",
-
-            border: "none",
-          }}
-        />
-
-        <button
-          onClick={handleCheckWrongAnswers}
-          disabled={!isGameOver}
-          style={{
-            position: "absolute",
-
-            bottom: "30px",
-
-            right: "30px",
-
-            padding: "20px 40px",
-
-            fontSize: "28px",
-
-            borderRadius: "10px",
-
-            background: isGameOver ? "#FF4081" : "#555",
-
-            color: "white",
-
-            border: "none",
-
-            cursor: isGameOver ? "pointer" : "not-allowed",
-
-            fontWeight: "bold",
-
-            boxShadow: "0 4px 10px rgba(0,0,0,0.3)",
-          }}
-        >
-          {isGameOver ? "오답 확인 하기" : "게임 진행 중..."}
-        </button>
+        {isGameOver ? (
+          <button
+            type="button"
+            onClick={handleCheckWrongAnswers}
+            style={{
+              position: "absolute",
+              right: "24px",
+              bottom: "24px",
+              zIndex: 1001,
+              padding: "20px 32px",
+              fontSize: "40px",
+              borderRadius: "10px",
+              background: "#FF4081",
+              color: "white",
+              border: "none",
+              cursor: "pointer",
+              fontWeight: "bold",
+              boxShadow: "0 4px 14px rgba(0,0,0,0.45)",
+            }}
+          >
+            오답 확인 하기
+          </button>
+        ) : null}
       </div>
     );
   }
@@ -1160,109 +1176,109 @@ const GamePlayPage = () => {
                 height: "100%",
               }}
             >
-            <h2 style={{ fontSize: "32px", marginBottom: "30px" }}>
-              게임 결과 ({finalResults.length})
-            </h2>
+              <h2 style={{ fontSize: "32px", marginBottom: "30px" }}>
+                게임 결과 ({finalResults.length})
+              </h2>
 
-            {finalResults.map((res, idx) => (
-              <div
-                key={idx}
-                onClick={() => setSelectedAnalysisId(res.id)}
-                style={{
-                  display: "flex",
-
-                  alignItems: "center",
-
-                  padding: "15px",
-
-                  marginBottom: "15px",
-
-                  borderRadius: "15px",
-
-                  cursor: "pointer",
-
-                  fontSize: "24px",
-
-                  border:
-                    selectedAnalysisId === res.id
-                      ? "2px solid #FF4081"
-                      : "1px solid #eee",
-
-                  background: "white",
-
-                  boxShadow: "0 2px 5px rgba(0,0,0,0.05)",
-
-                  transition: "background 0.2s",
-                }}
-              >
-                {/* 번호 및 상태 색상 */}
-
+              {finalResults.map((res, idx) => (
                 <div
+                  key={idx}
+                  onClick={() => setSelectedAnalysisId(res.id)}
                   style={{
-                    width: "50px",
-
-                    height: "50px",
-
-                    borderRadius: "50%",
-
-                    background:
-                      res.status === "blue"
-                        ? "#81D4FA"
-                        : res.status === "yellow"
-                          ? "#FFF59D"
-                          : "#FFCDD2",
-
                     display: "flex",
-
-                    justifyContent: "center",
 
                     alignItems: "center",
 
-                    marginRight: "20px",
+                    padding: "15px",
 
-                    fontWeight: "bold",
+                    marginBottom: "15px",
 
-                    color: "#555",
+                    borderRadius: "15px",
 
-                    flexShrink: 0, // 아이콘 크기 줄어들지 않게 고정
-                  }}
-                >
-                  {idx + 1}
-                </div>
+                    cursor: "pointer",
 
-                <span
-                  style={{
                     fontSize: "24px",
 
-                    fontWeight: "bold",
+                    border:
+                      selectedAnalysisId === res.id
+                        ? "2px solid #FF4081"
+                        : "1px solid #eee",
 
-                    color: "#333",
+                    background: "white",
 
-                    whiteSpace: "nowrap", // 제목이 길어도 줄바꿈 안 함
+                    boxShadow: "0 2px 5px rgba(0,0,0,0.05)",
 
-                    overflow: "hidden",
-
-                    textOverflow: "ellipsis", // 말줄임표(...)
-
-                    maxWidth: "200px", // 제목 최대 길이 제한
+                    transition: "background 0.2s",
                   }}
                 >
-                  {res.title}
-                </span>
+                  {/* 번호 및 상태 색상 */}
 
-                <span
-                  style={{
-                    marginLeft: "auto",
+                  <div
+                    style={{
+                      width: "50px",
 
-                    fontSize: "20px",
+                      height: "50px",
 
-                    color: "#ccc",
-                  }}
-                >
-                  &gt;
-                </span>
-              </div>
-            ))}
+                      borderRadius: "50%",
+
+                      background:
+                        res.status === "blue"
+                          ? "#81D4FA"
+                          : res.status === "yellow"
+                            ? "#FFF59D"
+                            : "#FFCDD2",
+
+                      display: "flex",
+
+                      justifyContent: "center",
+
+                      alignItems: "center",
+
+                      marginRight: "20px",
+
+                      fontWeight: "bold",
+
+                      color: "#555",
+
+                      flexShrink: 0, // 아이콘 크기 줄어들지 않게 고정
+                    }}
+                  >
+                    {idx + 1}
+                  </div>
+
+                  <span
+                    style={{
+                      fontSize: "24px",
+
+                      fontWeight: "bold",
+
+                      color: "#333",
+
+                      whiteSpace: "nowrap", // 제목이 길어도 줄바꿈 안 함
+
+                      overflow: "hidden",
+
+                      textOverflow: "ellipsis", // 말줄임표(...)
+
+                      maxWidth: "200px", // 제목 최대 길이 제한
+                    }}
+                  >
+                    {res.title}
+                  </span>
+
+                  <span
+                    style={{
+                      marginLeft: "auto",
+
+                      fontSize: "20px",
+
+                      color: "#ccc",
+                    }}
+                  >
+                    &gt;
+                  </span>
+                </div>
+              ))}
             </div>
 
             {/* 오른쪽: 해설 상세 보기 */}
@@ -1284,107 +1300,107 @@ const GamePlayPage = () => {
                 overflow: "hidden",
               }}
             >
-            {selectedAnalysisId ? (
-              <div
-                style={{
-                  width: "100%",
-
-                  height: "100%", // 부모 높이만큼 꽉 채움
-
-                  background: "white",
-
-                  borderRadius: "20px",
-
-                  padding: "30px",
-
-                  border: "2px solid #f8bbd0",
-
-                  display: "flex",
-
-                  flexDirection: "column",
-
-                  // [중요] 내용이 많을 때 여기서 스크롤 발생
-
-                  overflowY: "auto",
-                }}
-              >
-                <h2
+              {selectedAnalysisId ? (
+                <div
                   style={{
-                    fontSize: "32px",
+                    width: "100%",
 
-                    marginBottom: "30px",
+                    height: "100%", // 부모 높이만큼 꽉 채움
 
-                    color: "#FF8E99",
+                    background: "white",
 
-                    textAlign: "left",
+                    borderRadius: "20px",
 
-                    flexShrink: 0, // 스크롤 시에도 제목 영역 찌그러짐 방지
+                    padding: "30px",
+
+                    border: "2px solid #f8bbd0",
+
+                    display: "flex",
+
+                    flexDirection: "column",
+
+                    // [중요] 내용이 많을 때 여기서 스크롤 발생
+
+                    overflowY: "auto",
                   }}
                 >
-                  문제 해설
-                </h2>
+                  <h2
+                    style={{
+                      fontSize: "32px",
 
-                {(() => {
-                  const selectedResult = finalResults.find(
-                    (r) => r.id === selectedAnalysisId,
-                  );
+                      marginBottom: "30px",
 
-                  return (
-                    <>
-                      <div
-                        style={{
-                          background: "#f5f5f5",
+                      color: "#FF8E99",
 
-                          padding: "20px",
+                      textAlign: "left",
 
-                          borderRadius: "15px",
+                      flexShrink: 0, // 스크롤 시에도 제목 영역 찌그러짐 방지
+                    }}
+                  >
+                    문제 해설
+                  </h2>
 
-                          marginBottom: "30px",
+                  {(() => {
+                    const selectedResult = finalResults.find(
+                      (r) => r.id === selectedAnalysisId,
+                    );
 
-                          fontSize: "24px",
+                    return (
+                      <>
+                        <div
+                          style={{
+                            background: "#f5f5f5",
 
-                          fontWeight: "bold",
+                            padding: "20px",
 
-                          lineHeight: "1.5",
+                            borderRadius: "15px",
 
-                          textAlign: "left",
+                            marginBottom: "30px",
 
-                          borderLeft: "5px solid #555",
+                            fontSize: "24px",
 
-                          flexShrink: 0, // 문제 박스 크기 유지
-                        }}
-                      >
-                        Q. {selectedResult?.question}
-                      </div>
+                            fontWeight: "bold",
 
-                      <p
-                        style={{
-                          fontSize: "24px",
+                            lineHeight: "1.5",
 
-                          lineHeight: "1.8",
+                            textAlign: "left",
 
-                          wordBreak: "break-word", // 긴 단어 줄바꿈
+                            borderLeft: "5px solid #555",
 
-                          textAlign: "left",
+                            flexShrink: 0, // 문제 박스 크기 유지
+                          }}
+                        >
+                          Q. {selectedResult?.question}
+                        </div>
 
-                          color: "#333",
+                        <p
+                          style={{
+                            fontSize: "24px",
 
-                          whiteSpace: "pre-line", // 줄바꿈 문자(\n) 적용
-                        }}
-                      >
-                        {selectedResult?.explanation}
-                      </p>
-                    </>
-                  );
-                })()}
-              </div>
-            ) : (
-              <div style={{ color: "#aaa", fontSize: "20px" }}>
-                왼쪽 목록에서 문제를 선택하여
-                <br />
-                문제와 해설을 확인하세요.
-              </div>
-            )}
+                            lineHeight: "1.8",
+
+                            wordBreak: "break-word", // 긴 단어 줄바꿈
+
+                            textAlign: "left",
+
+                            color: "#333",
+
+                            whiteSpace: "pre-line", // 줄바꿈 문자(\n) 적용
+                          }}
+                        >
+                          {selectedResult?.explanation}
+                        </p>
+                      </>
+                    );
+                  })()}
+                </div>
+              ) : (
+                <div style={{ color: "#aaa", fontSize: "20px" }}>
+                  왼쪽 목록에서 문제를 선택하여
+                  <br />
+                  문제와 해설을 확인하세요.
+                </div>
+              )}
             </div>
           </div>
 
