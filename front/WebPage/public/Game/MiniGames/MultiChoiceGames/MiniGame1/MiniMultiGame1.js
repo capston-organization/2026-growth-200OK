@@ -146,11 +146,6 @@ class MiniMultiGame1 extends Phaser.Scene {
     this.createTargets();
     this.setProblem();
 
-    this.bgmMusic = null;
-    this._bgmFadeTween = null;
-    this._bgmUnlockHandler = null;
-    this.startBackgroundMusicFadeIn();
-
     // 클릭 시 Shoot 효과음 (진행 중일 때만; 성공/실패 후 isGameActive false면 무음)
     this._onAnyClickForShoot = () => {
       if (!this.isGameActive) return;
@@ -164,6 +159,11 @@ class MiniMultiGame1 extends Phaser.Scene {
     };
     this.input.on("pointerdown", this._onAnyClickForShoot, this);
 
+    this.bgmMusic = null;
+    this._bgmFadeTween = null;
+    this._bgmUnlockHandler = null;
+    this.startBackgroundMusicFadeIn();
+
     // 6. ★ 반응형 이벤트 등록 (MiniOXGame1과 동일)
     this.scale.on("resize", this.refreshLayout, this);
     this.refreshLayout(); // 초기 실행
@@ -175,16 +175,25 @@ class MiniMultiGame1 extends Phaser.Scene {
   startBackgroundMusicFadeIn() {
     if (!this.cache.audio.exists("miniMultiBgm")) return;
     try {
+      if (this.sound && typeof this.sound.unlock === "function") {
+        this.sound.unlock();
+      }
       const targetVolume = 0.45;
       const fadeMs = 1400;
       this.bgmMusic = this.sound.add("miniMultiBgm", {
         loop: true,
-        volume: 0,
+        volume: 0.02,
       });
 
       const runFadeIn = () => {
         if (!this.bgmMusic || !this.scene.isActive()) return;
-        if (!this.bgmMusic.isPlaying) this.bgmMusic.play();
+        if (!this.bgmMusic.isPlaying) {
+          try {
+            this.bgmMusic.play();
+          } catch (err) {
+            console.warn("MiniMultiGame1 BGM play:", err);
+          }
+        }
         if (this._bgmFadeTween) this._bgmFadeTween.stop();
         this._bgmFadeTween = this.tweens.add({
           targets: this.bgmMusic,
@@ -195,16 +204,18 @@ class MiniMultiGame1 extends Phaser.Scene {
       };
 
       const tryStart = () => {
-        if (!this.bgmMusic) return;
+        if (!this.bgmMusic || !this.scene.isActive()) return;
         const ctx = this.sound.context;
         if (ctx && ctx.state === "suspended") {
-          ctx.resume().then(runFadeIn).catch(() => {});
+          ctx.resume().then(runFadeIn).catch(() => runFadeIn());
         } else {
           runFadeIn();
         }
       };
 
       tryStart();
+      this.time.delayedCall(0, tryStart);
+      this.time.delayedCall(50, tryStart);
 
       const unlock = () => {
         tryStart();

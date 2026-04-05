@@ -35,6 +35,16 @@ class TteokOXGame extends Phaser.Scene {
   create() {
     var width = this.cameras.main.width;
     var height = this.cameras.main.height;
+    /** 이미지 스프라이트만 확대 (위치는 그대로). 조절 시 이 값만 변경 */
+    var imgMul = 1.5;
+    var tteokW = Math.round(300 * imgMul);
+    var tteokH = Math.round(200 * imgMul);
+    var rabbitW = Math.round(200 * imgMul);
+    var rabbitH = Math.round(250 * imgMul);
+    this._tteokDispW = tteokW;
+    this._tteokDispH = tteokH;
+    this._rabbitDispW = rabbitW;
+    this._rabbitDispH = rabbitH;
 
     this.cameras.main.setBackgroundColor("#FFF8E7");
     this.hearts = 3;
@@ -126,7 +136,7 @@ class TteokOXGame extends Phaser.Scene {
 
     this.questionLabelText = this.add
       .text(width / 2, questionBoxY, "", {
-        fontSize: "32px",
+        fontSize: "36px",
         fill: "#FFFFFF",
         fontFamily: "Arial",
         fontStyle: "bold",
@@ -136,9 +146,16 @@ class TteokOXGame extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    var tteokY = height / 2 + 80;
+    var tteokY = height / 2 + 160;
     this.tteok = this.add.image(width / 2, tteokY, "그냥떡");
-    this.tteok.setDisplaySize(300, 200);
+    this.tteok.setDisplaySize(tteokW, tteokH);
+    /** 결과 문구(Perfect/틀림 등) — 떡 PNG 하단과 겹치지 않게 픽셀 간격 (조절은 이 값만) */
+    var resultTextGapBelowTteok = 40;
+    var tteokBottomY = tteokY + tteokH * 0.5;
+    var resultTextY = Math.min(
+      tteokBottomY + resultTextGapBelowTteok,
+      height - 100,
+    );
 
     var hammerRabbitX = width / 2 - 250;
     var hammerRabbitY = height / 2 + 30;
@@ -150,7 +167,7 @@ class TteokOXGame extends Phaser.Scene {
       hammerRabbitY,
       "망치기본토끼",
     );
-    this.hammerRabbit.setDisplaySize(200, 250);
+    this.hammerRabbit.setDisplaySize(rabbitW, rabbitH);
     this.hammerRabbit.setDepth(1);
     this.hammerRabbit
       .setInteractive({ useHandCursor: true })
@@ -213,7 +230,7 @@ class TteokOXGame extends Phaser.Scene {
     );
 
     this.waterRabbit = this.add.image(waterRabbitX, waterRabbitY, "물기본토끼");
-    this.waterRabbit.setDisplaySize(200, 250);
+    this.waterRabbit.setDisplaySize(rabbitW, rabbitH);
     this.waterRabbit.setDepth(1);
     this.waterRabbit
       .setInteractive({ useHandCursor: true })
@@ -257,7 +274,7 @@ class TteokOXGame extends Phaser.Scene {
       );
 
     this.resultText = this.add
-      .text(width / 2, height / 2 + 250, "", {
+      .text(width / 2, resultTextY, "", {
         fontSize: "36px",
         fill: "#6B8B9B",
         fontFamily: "Arial",
@@ -272,7 +289,7 @@ class TteokOXGame extends Phaser.Scene {
         height - 30,
         "원투쓰리포 후 헤이 4번에 맞춰 모두 눌러주세요!",
         {
-          fontSize: "20px",
+          fontSize: "32px",
           fill: "#D2B48C",
           fontFamily: "Arial",
           fontStyle: "bold",
@@ -321,7 +338,7 @@ class TteokOXGame extends Phaser.Scene {
     var question = this.questions[this.currentQuestionIndex];
     this.questionLabelText.setText(question.question);
     this.tteok.setTexture("그냥떡");
-    this.tteok.setDisplaySize(300, 200);
+    this.tteok.setDisplaySize(this._tteokDispW, this._tteokDispH);
     this.hammerRabbit.setTexture("망치기본토끼");
     this.waterRabbit.setTexture("물기본토끼");
     this.beatInputs = { 1: null, 2: null, 3: null, 4: null };
@@ -463,14 +480,14 @@ class TteokOXGame extends Phaser.Scene {
     if (lockedAnswer) {
       this.hammerRabbit.setTexture("망치망치토끼");
       this.tteok.setTexture("망치떡");
-      this.tteok.setDisplaySize(300, 200);
+      this.tteok.setDisplaySize(this._tteokDispW, this._tteokDispH);
       this.time.delayedCall(
         300,
         function () {
           if (!this.showResult) {
             this.hammerRabbit.setTexture("망치기본토끼");
             this.tteok.setTexture("그냥떡");
-            this.tteok.setDisplaySize(300, 200);
+            this.tteok.setDisplaySize(this._tteokDispW, this._tteokDispH);
           }
         },
         [],
@@ -479,14 +496,14 @@ class TteokOXGame extends Phaser.Scene {
     } else {
       this.waterRabbit.setTexture("물물토끼");
       this.tteok.setTexture("물떡");
-      this.tteok.setDisplaySize(300, 200);
+      this.tteok.setDisplaySize(this._tteokDispW, this._tteokDispH);
       this.time.delayedCall(
         300,
         function () {
           if (!this.showResult) {
             this.waterRabbit.setTexture("물기본토끼");
             this.tteok.setTexture("그냥떡");
-            this.tteok.setDisplaySize(300, 200);
+            this.tteok.setDisplaySize(this._tteokDispW, this._tteokDispH);
           }
         },
         [],
@@ -520,11 +537,11 @@ class TteokOXGame extends Phaser.Scene {
       if (correctAnswer) {
         this.hammerRabbit.setTexture("망치망치토끼");
         this.tteok.setTexture("망치떡");
-        this.tteok.setDisplaySize(300, 200);
+        this.tteok.setDisplaySize(this._tteokDispW, this._tteokDispH);
       } else {
         this.waterRabbit.setTexture("물물토끼");
         this.tteok.setTexture("물떡");
-        this.tteok.setDisplaySize(300, 200);
+        this.tteok.setDisplaySize(this._tteokDispW, this._tteokDispH);
       }
     } else {
       this.resultText.setText("틀렸습니다! ✗");

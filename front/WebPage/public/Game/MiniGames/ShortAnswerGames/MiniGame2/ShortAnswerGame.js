@@ -113,6 +113,10 @@ class ShortAnswerGame extends Phaser.Scene {
     var height = this.cameras.main.height;
     this.width = width;
     this.height = height;
+    /** 도넛 등 기타 스프라이트 배율 */
+    var spriteDisplayMul = 1.5;
+    /** 기다리는/웃는 외계인 등 — 기존 0.5×spriteDisplayMul 대비 추가 배율 (≈120%) */
+    var alienSpriteExtraMul = 1;
 
     this.cameras.main.setBackgroundColor("#1a0a2e");
 
@@ -144,7 +148,7 @@ class ShortAnswerGame extends Phaser.Scene {
 
     var questionBoxY = 100;
     var questionBoxWidth = width - 400;
-    var questionBoxHeight = 100;
+    var questionBoxHeight = 120;
 
     this.questionBoxBg = this.add.graphics();
     this.questionBoxBg.fillStyle(0x8b5cf6, 1);
@@ -166,7 +170,7 @@ class ShortAnswerGame extends Phaser.Scene {
 
     this.questionText = this.add
       .text(width / 2, questionBoxY, "", {
-        fontSize: "28px",
+        fontSize: "36px",
         fill: "#FFFFFF",
         fontFamily: "Arial",
         fontStyle: "bold",
@@ -193,33 +197,36 @@ class ShortAnswerGame extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    var alienY = timerY + 170;
-    var alienSpacing = 180;
+    var alienY = timerY + 230;
+    var alienSpacing = 240;
     var alienPositions = [timerX - alienSpacing, timerX, timerX + alienSpacing];
+    var alienScale = 0.5 * spriteDisplayMul * alienSpriteExtraMul;
 
     this.aliens = [];
     for (var i = 0; i < 3; i++) {
       var alien = this.add.image(alienPositions[i], alienY, "alienWaiting");
-      alien.setScale(0.5);
+      alien.setScale(alienScale);
       this.aliens.push(alien);
     }
 
-    this.inputY = alienY + 200;
+    var inputBoxHalfH = 40;
+    this.inputBoxHalfH = inputBoxHalfH;
+    this.inputY = alienY + 260;
     this.inputBackground = this.add.graphics();
     this.inputBackground.fillStyle(0x1a1a2e, 1);
     this.inputBackground.fillRoundedRect(
       width / 2 - 250,
-      this.inputY - 40,
+      this.inputY - inputBoxHalfH,
       500,
-      80,
+      inputBoxHalfH * 2,
       15,
     );
     this.inputBackground.lineStyle(4, 0x00ff88, 1);
     this.inputBackground.strokeRoundedRect(
       width / 2 - 250,
-      this.inputY - 40,
+      this.inputY - inputBoxHalfH,
       500,
-      80,
+      inputBoxHalfH * 2,
       15,
     );
 
@@ -232,7 +239,8 @@ class ShortAnswerGame extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    var submitY = this.inputY + 80;
+    var submitGapBelowInput = 56;
+    var submitY = this.inputY + inputBoxHalfH + submitGapBelowInput;
     this.submitButton = this.add.graphics();
     this.submitButton.fillStyle(0x00ff88, 1);
     this.submitButton.fillRoundedRect(
@@ -314,7 +322,7 @@ class ShortAnswerGame extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.resultText = this.add
-      .text(width / 2, submitY + 50, "", {
+      .text(width / 2, submitY + 58, "", {
         fontSize: "36px",
         fill: "#00FF88",
         fontFamily: "Arial",
@@ -326,7 +334,7 @@ class ShortAnswerGame extends Phaser.Scene {
       .setVisible(false);
 
     var donutY = height + 150;
-    var donutScale = 0.45;
+    var donutScale = 0.45 * spriteDisplayMul;
     var donutGap = 130;
     this.add
       .image(-60, donutY, "donut")
@@ -445,17 +453,17 @@ class ShortAnswerGame extends Phaser.Scene {
     this.inputBackground.fillStyle(0x1a1a2e, 1);
     this.inputBackground.fillRoundedRect(
       this.width / 2 - 250,
-      this.inputY - 40,
+      this.inputY - this.inputBoxHalfH,
       500,
-      80,
+      this.inputBoxHalfH * 2,
       15,
     );
     this.inputBackground.lineStyle(4, 0x00ff88, 1);
     this.inputBackground.strokeRoundedRect(
       this.width / 2 - 250,
-      this.inputY - 40,
+      this.inputY - this.inputBoxHalfH,
       500,
-      80,
+      this.inputBoxHalfH * 2,
       15,
     );
 
@@ -505,17 +513,17 @@ class ShortAnswerGame extends Phaser.Scene {
       this.inputBackground.fillStyle(0x00ff88, 0.3);
       this.inputBackground.fillRoundedRect(
         this.width / 2 - 250,
-        this.inputY - 40,
+        this.inputY - this.inputBoxHalfH,
         500,
-        80,
+        this.inputBoxHalfH * 2,
         15,
       );
       this.inputBackground.lineStyle(4, 0x39ff14, 1);
       this.inputBackground.strokeRoundedRect(
         this.width / 2 - 250,
-        this.inputY - 40,
+        this.inputY - this.inputBoxHalfH,
         500,
-        80,
+        this.inputBoxHalfH * 2,
         15,
       );
       for (var a = 0; a < this.aliens.length; a++)
@@ -529,23 +537,23 @@ class ShortAnswerGame extends Phaser.Scene {
         ease: "Power2",
       });
     } else {
-      this.resultText.setText("틀렸습니다! 정답: " + question.answer + " ✗");
+      this.resultText.setText("틀렸습니다! ✗");
       this.resultText.setFill("#FF6B00");
       this.inputBackground.clear();
       this.inputBackground.fillStyle(0xff4444, 0.3);
       this.inputBackground.fillRoundedRect(
         this.width / 2 - 250,
-        this.inputY - 40,
+        this.inputY - this.inputBoxHalfH,
         500,
-        80,
+        this.inputBoxHalfH * 2,
         15,
       );
       this.inputBackground.lineStyle(4, 0xff6b00, 1);
       this.inputBackground.strokeRoundedRect(
         this.width / 2 - 250,
-        this.inputY - 40,
+        this.inputY - this.inputBoxHalfH,
         500,
-        80,
+        this.inputBoxHalfH * 2,
         15,
       );
       for (var b = 0; b < this.aliens.length; b++)
