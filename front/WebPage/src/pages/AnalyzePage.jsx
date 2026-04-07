@@ -68,7 +68,6 @@ const AnalyzePage = () => {
   const [scopeWrongRates, setScopeWrongRates] = useState(
     INITIAL_SCOPE_WRONG_RATES,
   );
-  const [detail, setDetail] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [reviewProblemCount, setReviewProblemCount] = useState(10);
@@ -79,14 +78,11 @@ const AnalyzePage = () => {
     [activeCategory, scopeWrongRates],
   );
   const hasAnyWrongData = useMemo(() => {
-    if (detail && typeof detail.totalWrongCount === "number") {
-      return detail.totalWrongCount > 0;
-    }
     return (
       (scopeWrongRates.WORD && scopeWrongRates.WORD.length > 0) ||
       (scopeWrongRates.GRAMMAR && scopeWrongRates.GRAMMAR.length > 0)
     );
-  }, [detail, scopeWrongRates]);
+  }, [scopeWrongRates]);
 
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
@@ -100,16 +96,10 @@ const AnalyzePage = () => {
     const fetchAnalyzeData = async () => {
       try {
         setIsLoading(true);
-        const [overviewRes, detailRes] = await Promise.all([
-          fetch(apiUrl("/analysis/me/overview"), {
-            method: "GET",
-            headers: commonHeaders,
-          }),
-          fetch(apiUrl("/analysis/me/detail"), {
-            method: "GET",
-            headers: commonHeaders,
-          }),
-        ]);
+        const overviewRes = await fetch(apiUrl("/analysis/me/overview"), {
+          method: "GET",
+          headers: commonHeaders,
+        });
 
         if (overviewRes.ok) {
           const overview = await safeParseJson(overviewRes, "analysisOverview");
@@ -127,10 +117,6 @@ const AnalyzePage = () => {
           }
         }
 
-        if (detailRes.ok) {
-          const detailData = await safeParseJson(detailRes, "analysisDetail");
-          if (detailData) setDetail(detailData);
-        }
       } catch (e) {
         console.error("Failed to fetch analyze data:", e);
       } finally {
@@ -379,34 +365,6 @@ const AnalyzePage = () => {
                 ? "가장 취약한 범위를 확인하고, 바로 복습 게임을 만들 수 있어요."
                 : "아직 오답 데이터가 없어요. 게임을 플레이하면 분석이 시작됩니다."}
           </div>
-
-          {detail && (
-            <div
-              style={{
-                background: "#FFF7F9",
-                borderRadius: "20px",
-                padding: "16px 20px",
-                border: "1px solid #FFE0EB",
-                marginBottom: "24px",
-                display: "grid",
-                gridTemplateColumns: "repeat(4, 1fr)",
-                gap: "12px",
-              }}
-            >
-              <div style={{ fontSize: "18px", fontWeight: "600" }}>
-                시도 {detail.totalAttempts ?? 0}회
-              </div>
-              <div style={{ fontSize: "18px", fontWeight: "600" }}>
-                오답률 {detail.wrongRate ?? 0}%
-              </div>
-              <div style={{ fontSize: "18px", fontWeight: "600" }}>
-                평균 풀이시간 {detail.avgResponseTimeMs ?? 0}ms
-              </div>
-              <div style={{ fontSize: "18px", fontWeight: "600" }}>
-                힌트 사용률 {detail.hintUseRate ?? 0}%
-              </div>
-            </div>
-          )}
 
           {/* 본문 2단 레이아웃 */}
           <div
