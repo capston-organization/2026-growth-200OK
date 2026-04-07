@@ -13,11 +13,7 @@ const AnalyzePage = () => {
   const [activeCategory, setActiveCategory] = useState("WORD");
 
   const rankColors = ["#FF8E99", "#FFB3BA", "#FFE0E5"];
-  const [weakTop3, setWeakTop3] = useState([
-    "which/who/that의 구분",
-    "동의어 맞추기",
-    "it ~ to v 문법",
-  ]);
+  const [weakTop3, setWeakTop3] = useState([]);
   const [scopeWrongRates, setScopeWrongRates] = useState({
     WORD: [],
     GRAMMAR: [],
@@ -370,7 +366,9 @@ const AnalyzePage = () => {
           >
             {isLoading
               ? "분석 데이터를 불러오는 중이에요..."
-              : "가장 취약한 범위를 확인하고, 바로 복습 게임을 만들 수 있어요."}
+              : hasAnyWrongData
+                ? "가장 취약한 범위를 확인하고, 바로 복습 게임을 만들 수 있어요."
+                : "아직 오답 데이터가 없어요. 게임을 플레이하면 분석이 시작됩니다."}
           </div>
 
           {detail && (
@@ -446,7 +444,8 @@ const AnalyzePage = () => {
               </div>
               {/* 랭킹 리스트 */}
 
-              {weakTop3.map((title, index) => (
+              {hasAnyWrongData &&
+                weakTop3.map((title, index) => (
                 <div
                   key={title}
                   style={{
@@ -503,7 +502,22 @@ const AnalyzePage = () => {
                     복습 게임 생성하기
                   </button>
                 </div>
-              ))}
+                ))}
+              {!hasAnyWrongData && (
+                <div
+                  style={{
+                    background: "#FFF8FA",
+                    border: "1px dashed #F8BBD0",
+                    borderRadius: "16px",
+                    padding: "18px",
+                    fontSize: "20px",
+                    color: "#777",
+                    textAlign: "center",
+                  }}
+                >
+                  오답이 생기면 취약한 학습 범위 TOP3가 표시됩니다.
+                </div>
+              )}
             </div>
 
             {/* 오른쪽: 슬라이더 + 오답률 그래프 */}
@@ -695,24 +709,26 @@ const AnalyzePage = () => {
               메인으로 돌아가기
             </button>
 
-            <button
-              style={{
-                borderRadius: "24px",
-                border: "2px solid #F8BBD0",
-                background: "#FFE4F1",
-                padding: "12px 28px",
-                fontSize: "22px",
-                fontWeight: "700",
-                cursor: "pointer",
-                color: "#D36BA3",
-              }}
-              onClick={() => handleCreateReviewGame(weakTop3[0])}
-              disabled={isCreating}
-            >
-              {isCreating
-                ? "복습 게임 생성 중..."
-                : `${weakTop3[0]} 복습 게임 만들기`}
-            </button>
+            {hasAnyWrongData && weakTop3.length > 0 && (
+              <button
+                style={{
+                  borderRadius: "24px",
+                  border: "2px solid #F8BBD0",
+                  background: "#FFE4F1",
+                  padding: "12px 28px",
+                  fontSize: "22px",
+                  fontWeight: "700",
+                  cursor: "pointer",
+                  color: "#D36BA3",
+                }}
+                onClick={() => handleCreateReviewGame(weakTop3[0])}
+                disabled={isCreating}
+              >
+                {isCreating
+                  ? "복습 게임 생성 중..."
+                  : `${weakTop3[0]} 복습 게임 만들기`}
+              </button>
+            )}
           </div>
         </div>
       </div>
