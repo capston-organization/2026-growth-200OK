@@ -44,21 +44,19 @@ const AnalyzePage = () => {
   };
 
   const current = categoryStyle[activeCategory];
-  const currentWrongRates = useMemo(() => {
-    const fromApi = scopeWrongRates[activeCategory];
-    if (fromApi && fromApi.length > 0) return fromApi;
-    return activeCategory === "WORD"
-      ? [
-          { scope: "뜻 맞추기", wrongRate: 68 },
-          { scope: "맥락에 맞는 단어 찾기", wrongRate: 57 },
-          { scope: "동의어 찾기", wrongRate: 49 },
-        ]
-      : [
-          { scope: "조건문", wrongRate: 71 },
-          { scope: "가주어 it", wrongRate: 62 },
-          { scope: "소유격", wrongRate: 44 },
-        ];
-  }, [activeCategory, scopeWrongRates]);
+  const currentWrongRates = useMemo(
+    () => scopeWrongRates[activeCategory] || [],
+    [activeCategory, scopeWrongRates],
+  );
+  const hasAnyWrongData = useMemo(() => {
+    if (detail && typeof detail.totalWrongCount === "number") {
+      return detail.totalWrongCount > 0;
+    }
+    return (
+      (scopeWrongRates.WORD && scopeWrongRates.WORD.length > 0) ||
+      (scopeWrongRates.GRAMMAR && scopeWrongRates.GRAMMAR.length > 0)
+    );
+  }, [detail, scopeWrongRates]);
 
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
@@ -570,67 +568,104 @@ const AnalyzePage = () => {
                   padding: "18px 16px",
                 }}
               >
-                <div
-                  style={{
-                    fontSize: "20px",
-                    fontWeight: "700",
-                    marginBottom: "14px",
-                    color: "#4A4A4A",
-                  }}
-                >
-                  학습 범위별 오답률 그래프 ({current.label})
-                </div>
+                  {hasAnyWrongData ? (
+                    <>
+                      <div
+                        style={{
+                          fontSize: "20px",
+                          fontWeight: "700",
+                          marginBottom: "14px",
+                          color: "#4A4A4A",
+                        }}
+                      >
+                        학습 범위별 오답률 그래프 ({current.label})
+                      </div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                  {currentWrongRates.map((item) => (
-                    <button
-                      key={item.scope}
-                      onClick={() => handleClickWrongAnswers(item.scope)}
-                      style={{
-                        border: "none",
-                        width: "100%",
-                        background: "rgba(255, 255, 255, 0.72)",
-                        borderRadius: "14px",
-                        padding: "10px 12px",
-                        cursor: "pointer",
-                        textAlign: "left",
-                      }}
-                    >
                       <div
                         style={{
                           display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          marginBottom: "8px",
+                          flexDirection: "column",
+                          gap: "12px",
                         }}
                       >
-                        <span style={{ fontSize: "18px", fontWeight: "600", color: "#333" }}>
-                          {item.scope}
-                        </span>
-                        <span style={{ fontSize: "18px", fontWeight: "700", color: "#555" }}>
-                          {item.wrongRate}%
-                        </span>
+                        {currentWrongRates.map((item) => (
+                          <button
+                            key={item.scope}
+                            onClick={() => handleClickWrongAnswers(item.scope)}
+                            style={{
+                              border: "none",
+                              width: "100%",
+                              background: "rgba(255, 255, 255, 0.72)",
+                              borderRadius: "14px",
+                              padding: "10px 12px",
+                              cursor: "pointer",
+                              textAlign: "left",
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                marginBottom: "8px",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  fontSize: "18px",
+                                  fontWeight: "600",
+                                  color: "#333",
+                                }}
+                              >
+                                {item.scope}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: "18px",
+                                  fontWeight: "700",
+                                  color: "#555",
+                                }}
+                              >
+                                {item.wrongRate}%
+                              </span>
+                            </div>
+                            <div
+                              style={{
+                                height: "12px",
+                                borderRadius: "999px",
+                                background: "rgba(255,255,255,0.65)",
+                                overflow: "hidden",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: `${item.wrongRate}%`,
+                                  height: "100%",
+                                  borderRadius: "999px",
+                                  background: current.barColor,
+                                }}
+                              />
+                            </div>
+                          </button>
+                        ))}
                       </div>
-                      <div
-                        style={{
-                          height: "12px",
-                          borderRadius: "999px",
-                          background: "rgba(255,255,255,0.65)",
-                          overflow: "hidden",
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: `${item.wrongRate}%`,
-                            height: "100%",
-                            borderRadius: "999px",
-                            background: current.barColor,
-                          }}
-                        />
-                      </div>
-                    </button>
-                  ))}
-                </div>
+                    </>
+                  ) : (
+                    <div
+                      style={{
+                        minHeight: "230px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "22px",
+                        fontWeight: "600",
+                        color: "#777",
+                        textAlign: "center",
+                      }}
+                    >
+                      아직 오답 데이터가 없어서 그래프를 표시하지 않아요.
+                    </div>
+                  )}
               </div>
             </div>
           </div>
