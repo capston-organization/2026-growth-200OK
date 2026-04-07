@@ -4,6 +4,58 @@ import { apiUrl } from "../config/api";
 import LearningVillageLogoImage from "../assets/images/Learning_Village_Logo_ImageOnly.png";
 import LearningVillageLogoText from "../assets/images/Learning_Village_Logo_TextOnly.png";
 
+const RANK_COLORS = ["#FF8E99", "#FFB3BA", "#FFE0E5"];
+const INITIAL_SCOPE_WRONG_RATES = { WORD: [], GRAMMAR: [] };
+const CATEGORY_STYLE = {
+  WORD: {
+    label: "영단어",
+    panelBg: "#EDE7F6",
+    barColor: "linear-gradient(135deg, rgba(103,58,183,0.45), rgba(156,39,176,0.8))",
+    toggleBorder: "2px solid #B39DDB",
+    toggleBg: "#EDE7F6",
+  },
+  GRAMMAR: {
+    label: "영문법",
+    panelBg: "#FFF9C4",
+    barColor: "linear-gradient(135deg, rgba(255,193,7,0.45), rgba(255,160,0,0.85))",
+    toggleBorder: "2px solid #FFECB3",
+    toggleBg: "#FFF8E1",
+  },
+};
+
+const normalizeCategoryFromRow = (row) => {
+  const raw = row?.category;
+  if (raw === "GRAMMAR") return "GRAMMAR";
+  if (raw === "WORD" || raw === "VOCAB") return "WORD";
+  return null;
+};
+
+const safeParseJson = async (res, apiName) => {
+  const contentType = res.headers.get("content-type") || "";
+  const rawText = await res.text();
+
+  if (!contentType.includes("application/json")) {
+    console.warn(`[${apiName}] JSON이 아닌 응답 수신`, {
+      status: res.status,
+      contentType,
+      preview: rawText.slice(0, 120),
+      url: res.url,
+    });
+    return null;
+  }
+
+  try {
+    return JSON.parse(rawText);
+  } catch {
+    console.warn(`[${apiName}] JSON 파싱 실패`, {
+      status: res.status,
+      preview: rawText.slice(0, 120),
+      url: res.url,
+    });
+    return null;
+  }
+};
+
 const AnalyzePage = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -12,35 +64,16 @@ const AnalyzePage = () => {
   // 현재 선택된 분석 카테고리: WORD(영단어) / GRAMMAR(영문법)
   const [activeCategory, setActiveCategory] = useState("WORD");
 
-  const rankColors = ["#FF8E99", "#FFB3BA", "#FFE0E5"];
   const [weakTop3, setWeakTop3] = useState([]);
-  const [scopeWrongRates, setScopeWrongRates] = useState({
-    WORD: [],
-    GRAMMAR: [],
-  });
+  const [scopeWrongRates, setScopeWrongRates] = useState(
+    INITIAL_SCOPE_WRONG_RATES,
+  );
   const [detail, setDetail] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [reviewProblemCount, setReviewProblemCount] = useState(10);
 
-  const categoryStyle = {
-    WORD: {
-      label: "영단어",
-      panelBg: "#EDE7F6",
-      barColor: "linear-gradient(135deg, rgba(103,58,183,0.45), rgba(156,39,176,0.8))",
-      toggleBorder: "2px solid #B39DDB",
-      toggleBg: "#EDE7F6",
-    },
-    GRAMMAR: {
-      label: "영문법",
-      panelBg: "#FFF9C4",
-      barColor: "linear-gradient(135deg, rgba(255,193,7,0.45), rgba(255,160,0,0.85))",
-      toggleBorder: "2px solid #FFECB3",
-      toggleBg: "#FFF8E1",
-    },
-  };
-
-  const current = categoryStyle[activeCategory];
+  const current = CATEGORY_STYLE[activeCategory];
   const currentWrongRates = useMemo(
     () => scopeWrongRates[activeCategory] || [],
     [activeCategory, scopeWrongRates],
@@ -62,32 +95,6 @@ const AnalyzePage = () => {
     const commonHeaders = {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
-    };
-
-    const safeParseJson = async (res, apiName) => {
-      const contentType = res.headers.get("content-type") || "";
-      const rawText = await res.text();
-
-      if (!contentType.includes("application/json")) {
-        console.warn(`[${apiName}] JSON이 아닌 응답 수신`, {
-          status: res.status,
-          contentType,
-          preview: rawText.slice(0, 120),
-          url: res.url,
-        });
-        return null;
-      }
-
-      try {
-        return JSON.parse(rawText);
-      } catch {
-        console.warn(`[${apiName}] JSON 파싱 실패`, {
-          status: res.status,
-          preview: rawText.slice(0, 120),
-          url: res.url,
-        });
-        return null;
-      }
     };
 
     const fetchAnalyzeData = async () => {
@@ -112,9 +119,9 @@ const AnalyzePage = () => {
           if (Array.isArray(overview?.scopeWrongRates)) {
             const grouped = { WORD: [], GRAMMAR: [] };
             overview.scopeWrongRates.forEach((row) => {
-              if (row?.category === "WORD" || row?.category === "GRAMMAR") {
-                grouped[row.category] = Array.isArray(row.scopes) ? row.scopes : [];
-              }
+              const category = normalizeCategoryFromRow(row);
+              if (!category) return;
+              grouped[category] = Array.isArray(row.scopes) ? row.scopes : [];
             });
             setScopeWrongRates(grouped);
           }
@@ -454,7 +461,7 @@ const AnalyzePage = () => {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
-                    background: rankColors[index],
+                    background: RANK_COLORS[index],
                     borderRadius: "16px",
                     padding: "12px 18px",
                     marginBottom: "10px",
@@ -537,14 +544,14 @@ const AnalyzePage = () => {
                   style={{
                     padding: "4px 12px",
                     borderRadius: "16px",
-                      border:
-                        activeCategory === "WORD"
-                          ? categoryStyle.WORD.toggleBorder
-                          : "1px solid #DDD",
+                    border:
+                      activeCategory === "WORD"
+                        ? CATEGORY_STYLE.WORD.toggleBorder
+                        : "1px solid #DDD",
                     backgroundColor:
-                        activeCategory === "WORD"
-                          ? categoryStyle.WORD.toggleBg
-                          : "white",
+                      activeCategory === "WORD"
+                        ? CATEGORY_STYLE.WORD.toggleBg
+                        : "white",
                     fontSize: "20px",
                     fontWeight: "600",
                     cursor: "pointer",
@@ -557,13 +564,14 @@ const AnalyzePage = () => {
                   style={{
                     padding: "4px 12px",
                     borderRadius: "16px",
-                      border: activeCategory === "GRAMMAR"
-                        ? categoryStyle.GRAMMAR.toggleBorder
+                    border:
+                      activeCategory === "GRAMMAR"
+                        ? CATEGORY_STYLE.GRAMMAR.toggleBorder
                         : "1px solid #DDD",
                     backgroundColor:
-                        activeCategory === "GRAMMAR"
-                          ? categoryStyle.GRAMMAR.toggleBg
-                          : "white",
+                      activeCategory === "GRAMMAR"
+                        ? CATEGORY_STYLE.GRAMMAR.toggleBg
+                        : "white",
                     fontSize: "20px",
                     fontWeight: "600",
                     cursor: "pointer",
