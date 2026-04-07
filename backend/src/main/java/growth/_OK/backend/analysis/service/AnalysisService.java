@@ -105,18 +105,6 @@ public class AnalysisService {
         int totalWrongCount = (int) attempts.stream().filter(a -> !a.isCorrect()).count();
         int wrongRate = totalAttempts == 0 ? 0 : (int) Math.round(totalWrongCount * 100.0 / totalAttempts);
 
-        int avgResponseTimeMs = (int) Math.round(
-                attempts.stream()
-                        .map(ProblemAttempt::getResponseTimeMs)
-                        .filter(Objects::nonNull)
-                        .mapToInt(Integer::intValue)
-                        .average()
-                        .orElse(0)
-        );
-
-        int hintUseCount = (int) attempts.stream().filter(ProblemAttempt::isHintUsed).count();
-        int hintUseRate = totalAttempts == 0 ? 0 : (int) Math.round(hintUseCount * 100.0 / totalAttempts);
-
         Map<String, List<ProblemAttempt>> grouped = attempts.stream()
                 .collect(Collectors.groupingBy(a ->
                                 toCategory(a.getProblem().getGame().getType()) + "||" + normalizeScope(a.getProblem()),
@@ -132,19 +120,12 @@ public class AnalysisService {
                     int attemptsCount = rows.size();
                     int wrongCount = (int) rows.stream().filter(a -> !a.isCorrect()).count();
                     int rate = attemptsCount == 0 ? 0 : (int) Math.round(wrongCount * 100.0 / attemptsCount);
-                    int scopeAvgMs = (int) Math.round(rows.stream()
-                            .map(ProblemAttempt::getResponseTimeMs)
-                            .filter(Objects::nonNull)
-                            .mapToInt(Integer::intValue)
-                            .average()
-                            .orElse(0));
                     return ScopeInsightDto.builder()
                             .category(category)
                             .scope(scope)
                             .attemptCount(attemptsCount)
                             .wrongCount(wrongCount)
                             .wrongRate(rate)
-                            .avgResponseTimeMs(scopeAvgMs)
                             .build();
                 })
                 .sorted((a, b) -> Integer.compare(b.getWrongRate(), a.getWrongRate()))
@@ -155,8 +136,6 @@ public class AnalysisService {
                 .totalAttempts(totalAttempts)
                 .totalWrongCount(totalWrongCount)
                 .wrongRate(wrongRate)
-                .avgResponseTimeMs(avgResponseTimeMs)
-                .hintUseRate(hintUseRate)
                 .scopeInsights(scopeInsights)
                 .build();
     }
