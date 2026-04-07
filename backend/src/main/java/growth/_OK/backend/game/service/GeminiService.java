@@ -83,7 +83,12 @@ public class GeminiService {
         }
     }
 
-    public List<RawGeneratedProblem> generateProblemsFromSource(String sourceText, int count, List<ProblemType> types) {
+    public List<RawGeneratedProblem> generateProblemsFromSource(
+            String sourceText,
+            int count,
+            List<ProblemType> types,
+            String personalizationContext
+    ) {
         if (sourceText == null || sourceText.isBlank()) {
             throw new CapstonException(ExceptionCode.SOURCE_CONTENT_EMPTY);
         }
@@ -94,6 +99,15 @@ public class GeminiService {
                 ? List.of("MULTIPLE_CHOICE", "OX", "SHORT_ANSWER")
                 : types.stream().map(Enum::name).collect(Collectors.toList());
         String typeStr = String.join(", ", typeNames);
+        String contextBlock = (personalizationContext != null && !personalizationContext.isBlank())
+                ? """
+                [개인화 컨텍스트]
+                %s
+                
+                위 컨텍스트를 반드시 반영해서, 취약 개념/낮은 정확도 유형 중심으로 문제를 구성하세요.
+                
+                """.formatted(personalizationContext)
+                : "";
         String prompt = """
                 아래 소스 텍스트를 바탕으로 정확히 %d개의 퀴즈 문제를 만들어 주세요.
                 
@@ -118,9 +132,11 @@ public class GeminiService {
                 
                 JSON 배열만 출력하고 설명 금지. 선택지에 ①② 기호 붙이지 마세요.
                 
+                %s
+                
                 소스 텍스트:
                 %s
-                """.formatted(count, typeStr, truncated);
+                """.formatted(count, typeStr, contextBlock, truncated);
         String raw = geminiClient.generateText(prompt);
         return parseProblemsResponse(raw);
     }

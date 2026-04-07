@@ -95,7 +95,12 @@ public class GameGenerateService {
                 : game.getAllowedProblemTypes().isEmpty() ? List.of(ProblemType.MULTIPLE_CHOICE) : game.getAllowedProblemTypes();
 
         String sourceText = game.getSource().getExtractedText();
-        List<GeminiService.RawGeneratedProblem> rawList = geminiService.generateProblemsFromSource(sourceText, count, types);
+        List<GeminiService.RawGeneratedProblem> rawList = geminiService.generateProblemsFromSource(
+                sourceText,
+                count,
+                types,
+                game.getLearningObjectives()
+        );
         if (rawList.size() > count) {
             rawList = new ArrayList<>(rawList.subList(0, count));
         }
