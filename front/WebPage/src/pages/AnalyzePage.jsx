@@ -112,8 +112,18 @@ const AnalyzePage = () => {
           if (Array.isArray(overview?.scopeWrongRates)) {
             const grouped = { WORD: [], GRAMMAR: [] };
             overview.scopeWrongRates.forEach((row) => {
-              if (row?.category === "WORD" || row?.category === "GRAMMAR") {
-                grouped[row.category] = Array.isArray(row.scopes) ? row.scopes : [];
+              const normalizedCategory =
+                row?.category === "VOCAB"
+                  ? "WORD"
+                  : row?.category === "GRAMMAR"
+                    ? "GRAMMAR"
+                    : row?.category === "WORD"
+                      ? "WORD"
+                      : null;
+              if (normalizedCategory) {
+                grouped[normalizedCategory] = Array.isArray(row.scopes)
+                  ? row.scopes
+                  : [];
               }
             });
             setScopeWrongRates(grouped);
