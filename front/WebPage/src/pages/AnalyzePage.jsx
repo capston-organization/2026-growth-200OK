@@ -21,6 +21,7 @@ const AnalyzePage = () => {
   const [detail, setDetail] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [reviewProblemCount, setReviewProblemCount] = useState(10);
 
   const categoryStyle = {
     WORD: {
@@ -168,6 +169,7 @@ const AnalyzePage = () => {
         body: JSON.stringify({
           category: activeCategory,
           scope,
+          problemCount: reviewProblemCount,
         }),
       });
 
@@ -710,24 +712,44 @@ const AnalyzePage = () => {
             </button>
 
             {hasAnyWrongData && weakTop3.length > 0 && (
-              <button
-                style={{
-                  borderRadius: "24px",
-                  border: "2px solid #F8BBD0",
-                  background: "#FFE4F1",
-                  padding: "12px 28px",
-                  fontSize: "22px",
-                  fontWeight: "700",
-                  cursor: "pointer",
-                  color: "#D36BA3",
-                }}
-                onClick={() => handleCreateReviewGame(weakTop3[0])}
-                disabled={isCreating}
-              >
-                {isCreating
-                  ? "복습 게임 생성 중..."
-                  : `${weakTop3[0]} 복습 게임 만들기`}
-              </button>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <select
+                  value={reviewProblemCount}
+                  onChange={(e) => setReviewProblemCount(Number(e.target.value))}
+                  style={{
+                    borderRadius: "16px",
+                    border: "2px solid #F8BBD0",
+                    background: "white",
+                    padding: "10px 12px",
+                    fontSize: "18px",
+                    fontWeight: "600",
+                    color: "#555",
+                  }}
+                >
+                  <option value={5}>5문제</option>
+                  <option value={10}>10문제</option>
+                  <option value={15}>15문제</option>
+                  <option value={20}>20문제</option>
+                </select>
+                <button
+                  style={{
+                    borderRadius: "24px",
+                    border: "2px solid #F8BBD0",
+                    background: "#FFE4F1",
+                    padding: "12px 28px",
+                    fontSize: "22px",
+                    fontWeight: "700",
+                    cursor: "pointer",
+                    color: "#D36BA3",
+                  }}
+                  onClick={() => handleCreateReviewGame(weakTop3[0])}
+                  disabled={isCreating}
+                >
+                  {isCreating
+                    ? "복습 게임 생성 중..."
+                    : `${weakTop3[0]} ${reviewProblemCount}문제 복습 게임 만들기`}
+                </button>
+              </div>
             )}
           </div>
         </div>

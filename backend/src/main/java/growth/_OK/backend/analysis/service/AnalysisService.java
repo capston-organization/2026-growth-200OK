@@ -204,6 +204,9 @@ public class AnalysisService {
         String scope = (request != null && request.getScope() != null && !request.getScope().isBlank())
                 ? request.getScope().trim()
                 : "핵심 개념";
+        int problemCount = (request != null && request.getProblemCount() != null && request.getProblemCount() > 0)
+                ? request.getProblemCount()
+                : 10;
 
         String title = "[복습] " + scope;
         String description = analysisGeminiService.generateReviewDescription(category, scope);
@@ -214,7 +217,7 @@ public class AnalysisService {
                 .description(description)
                 .learningObjectives(scope + " 중심 오답 복습")
                 .isPublic(false)
-                .problemCount(10)
+                .problemCount(problemCount)
                 .build();
 
         GameResponseDto game = gameService.createGame(createRequest, userDetails);
