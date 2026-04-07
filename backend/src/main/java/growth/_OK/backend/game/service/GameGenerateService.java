@@ -96,6 +96,9 @@ public class GameGenerateService {
 
         String sourceText = game.getSource().getExtractedText();
         List<GeminiService.RawGeneratedProblem> rawList = geminiService.generateProblemsFromSource(sourceText, count, types);
+        if (rawList.size() > count) {
+            rawList = new ArrayList<>(rawList.subList(0, count));
+        }
 
         List<Problem> saved = new ArrayList<>();
         for (int i = 0; i < rawList.size(); i++) {
