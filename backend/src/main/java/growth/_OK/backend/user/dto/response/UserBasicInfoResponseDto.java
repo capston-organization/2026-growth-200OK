@@ -23,6 +23,7 @@ public class UserBasicInfoResponseDto {
     private final String school;
     private final Gender gender;
     private final Role role;
+    private final boolean onboardingCompleted;
 
     public static UserBasicInfoResponseDto from(User user) {
         return UserBasicInfoResponseDto.builder()
@@ -36,6 +37,7 @@ public class UserBasicInfoResponseDto {
                 .school(user.getSchool())
                 .gender(user.getGender())
                 .role(user.getRole())
+                .onboardingCompleted(user.isOnboardingCompleted())
                 .build();
     }
 }
