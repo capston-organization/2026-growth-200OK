@@ -13,11 +13,7 @@ const AnalyzePage = () => {
   const [activeCategory, setActiveCategory] = useState("WORD");
 
   const rankColors = ["#FF8E99", "#FFB3BA", "#FFE0E5"];
-  const [weakTop3, setWeakTop3] = useState([
-    "which/who/that의 구분",
-    "동의어 맞추기",
-    "it ~ to v 문법",
-  ]);
+  const [weakTop3, setWeakTop3] = useState([]);
   const [scopeWrongRates, setScopeWrongRates] = useState({
     WORD: [],
     GRAMMAR: [],
@@ -25,6 +21,7 @@ const AnalyzePage = () => {
   const [detail, setDetail] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [reviewProblemCount, setReviewProblemCount] = useState(10);
 
   const categoryStyle = {
     WORD: {
@@ -44,21 +41,19 @@ const AnalyzePage = () => {
   };
 
   const current = categoryStyle[activeCategory];
-  const currentWrongRates = useMemo(() => {
-    const fromApi = scopeWrongRates[activeCategory];
-    if (fromApi && fromApi.length > 0) return fromApi;
-    return activeCategory === "WORD"
-      ? [
-          { scope: "뜻 맞추기", wrongRate: 68 },
-          { scope: "맥락에 맞는 단어 찾기", wrongRate: 57 },
-          { scope: "동의어 찾기", wrongRate: 49 },
-        ]
-      : [
-          { scope: "조건문", wrongRate: 71 },
-          { scope: "가주어 it", wrongRate: 62 },
-          { scope: "소유격", wrongRate: 44 },
-        ];
-  }, [activeCategory, scopeWrongRates]);
+  const currentWrongRates = useMemo(
+    () => scopeWrongRates[activeCategory] || [],
+    [activeCategory, scopeWrongRates],
+  );
+  const hasAnyWrongData = useMemo(() => {
+    if (detail && typeof detail.totalWrongCount === "number") {
+      return detail.totalWrongCount > 0;
+    }
+    return (
+      (scopeWrongRates.WORD && scopeWrongRates.WORD.length > 0) ||
+      (scopeWrongRates.GRAMMAR && scopeWrongRates.GRAMMAR.length > 0)
+    );
+  }, [detail, scopeWrongRates]);
 
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
@@ -174,6 +169,7 @@ const AnalyzePage = () => {
         body: JSON.stringify({
           category: activeCategory,
           scope,
+          problemCount: reviewProblemCount,
         }),
       });
 
@@ -372,7 +368,9 @@ const AnalyzePage = () => {
           >
             {isLoading
               ? "분석 데이터를 불러오는 중이에요..."
-              : "가장 취약한 범위를 확인하고, 바로 복습 게임을 만들 수 있어요."}
+              : hasAnyWrongData
+                ? "가장 취약한 범위를 확인하고, 바로 복습 게임을 만들 수 있어요."
+                : "아직 오답 데이터가 없어요. 게임을 플레이하면 분석이 시작됩니다."}
           </div>
 
           {detail && (
@@ -448,7 +446,8 @@ const AnalyzePage = () => {
               </div>
               {/* 랭킹 리스트 */}
 
-              {weakTop3.map((title, index) => (
+              {hasAnyWrongData &&
+                weakTop3.map((title, index) => (
                 <div
                   key={title}
                   style={{
@@ -505,7 +504,22 @@ const AnalyzePage = () => {
                     복습 게임 생성하기
                   </button>
                 </div>
-              ))}
+                ))}
+              {!hasAnyWrongData && (
+                <div
+                  style={{
+                    background: "#FFF8FA",
+                    border: "1px dashed #F8BBD0",
+                    borderRadius: "16px",
+                    padding: "18px",
+                    fontSize: "20px",
+                    color: "#777",
+                    textAlign: "center",
+                  }}
+                >
+                  오답이 생기면 취약한 학습 범위 TOP3가 표시됩니다.
+                </div>
+              )}
             </div>
 
             {/* 오른쪽: 슬라이더 + 오답률 그래프 */}
@@ -570,67 +584,104 @@ const AnalyzePage = () => {
                   padding: "18px 16px",
                 }}
               >
-                <div
-                  style={{
-                    fontSize: "20px",
-                    fontWeight: "700",
-                    marginBottom: "14px",
-                    color: "#4A4A4A",
-                  }}
-                >
-                  학습 범위별 오답률 그래프 ({current.label})
-                </div>
+                  {hasAnyWrongData ? (
+                    <>
+                      <div
+                        style={{
+                          fontSize: "20px",
+                          fontWeight: "700",
+                          marginBottom: "14px",
+                          color: "#4A4A4A",
+                        }}
+                      >
+                        학습 범위별 오답률 그래프 ({current.label})
+                      </div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                  {currentWrongRates.map((item) => (
-                    <button
-                      key={item.scope}
-                      onClick={() => handleClickWrongAnswers(item.scope)}
-                      style={{
-                        border: "none",
-                        width: "100%",
-                        background: "rgba(255, 255, 255, 0.72)",
-                        borderRadius: "14px",
-                        padding: "10px 12px",
-                        cursor: "pointer",
-                        textAlign: "left",
-                      }}
-                    >
                       <div
                         style={{
                           display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          marginBottom: "8px",
+                          flexDirection: "column",
+                          gap: "12px",
                         }}
                       >
-                        <span style={{ fontSize: "18px", fontWeight: "600", color: "#333" }}>
-                          {item.scope}
-                        </span>
-                        <span style={{ fontSize: "18px", fontWeight: "700", color: "#555" }}>
-                          {item.wrongRate}%
-                        </span>
+                        {currentWrongRates.map((item) => (
+                          <button
+                            key={item.scope}
+                            onClick={() => handleClickWrongAnswers(item.scope)}
+                            style={{
+                              border: "none",
+                              width: "100%",
+                              background: "rgba(255, 255, 255, 0.72)",
+                              borderRadius: "14px",
+                              padding: "10px 12px",
+                              cursor: "pointer",
+                              textAlign: "left",
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                marginBottom: "8px",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  fontSize: "18px",
+                                  fontWeight: "600",
+                                  color: "#333",
+                                }}
+                              >
+                                {item.scope}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: "18px",
+                                  fontWeight: "700",
+                                  color: "#555",
+                                }}
+                              >
+                                {item.wrongRate}%
+                              </span>
+                            </div>
+                            <div
+                              style={{
+                                height: "12px",
+                                borderRadius: "999px",
+                                background: "rgba(255,255,255,0.65)",
+                                overflow: "hidden",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: `${item.wrongRate}%`,
+                                  height: "100%",
+                                  borderRadius: "999px",
+                                  background: current.barColor,
+                                }}
+                              />
+                            </div>
+                          </button>
+                        ))}
                       </div>
-                      <div
-                        style={{
-                          height: "12px",
-                          borderRadius: "999px",
-                          background: "rgba(255,255,255,0.65)",
-                          overflow: "hidden",
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: `${item.wrongRate}%`,
-                            height: "100%",
-                            borderRadius: "999px",
-                            background: current.barColor,
-                          }}
-                        />
-                      </div>
-                    </button>
-                  ))}
-                </div>
+                    </>
+                  ) : (
+                    <div
+                      style={{
+                        minHeight: "230px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "22px",
+                        fontWeight: "600",
+                        color: "#777",
+                        textAlign: "center",
+                      }}
+                    >
+                      아직 오답 데이터가 없어서 그래프를 표시하지 않아요.
+                    </div>
+                  )}
               </div>
             </div>
           </div>
@@ -660,24 +711,46 @@ const AnalyzePage = () => {
               메인으로 돌아가기
             </button>
 
-            <button
-              style={{
-                borderRadius: "24px",
-                border: "2px solid #F8BBD0",
-                background: "#FFE4F1",
-                padding: "12px 28px",
-                fontSize: "22px",
-                fontWeight: "700",
-                cursor: "pointer",
-                color: "#D36BA3",
-              }}
-              onClick={() => handleCreateReviewGame(weakTop3[0])}
-              disabled={isCreating}
-            >
-              {isCreating
-                ? "복습 게임 생성 중..."
-                : `${weakTop3[0]} 복습 게임 만들기`}
-            </button>
+            {hasAnyWrongData && weakTop3.length > 0 && (
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <select
+                  value={reviewProblemCount}
+                  onChange={(e) => setReviewProblemCount(Number(e.target.value))}
+                  style={{
+                    borderRadius: "16px",
+                    border: "2px solid #F8BBD0",
+                    background: "white",
+                    padding: "10px 12px",
+                    fontSize: "18px",
+                    fontWeight: "600",
+                    color: "#555",
+                  }}
+                >
+                  <option value={5}>5문제</option>
+                  <option value={10}>10문제</option>
+                  <option value={15}>15문제</option>
+                  <option value={20}>20문제</option>
+                </select>
+                <button
+                  style={{
+                    borderRadius: "24px",
+                    border: "2px solid #F8BBD0",
+                    background: "#FFE4F1",
+                    padding: "12px 28px",
+                    fontSize: "22px",
+                    fontWeight: "700",
+                    cursor: "pointer",
+                    color: "#D36BA3",
+                  }}
+                  onClick={() => handleCreateReviewGame(weakTop3[0])}
+                  disabled={isCreating}
+                >
+                  {isCreating
+                    ? "복습 게임 생성 중..."
+                    : `${weakTop3[0]} ${reviewProblemCount}문제 복습 게임 만들기`}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

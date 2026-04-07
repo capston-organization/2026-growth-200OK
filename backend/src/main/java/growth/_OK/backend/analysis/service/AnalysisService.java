@@ -47,23 +47,24 @@ public class AnalysisService {
     public AnalysisOverviewResponseDto getOverview(CustomUserDetails userDetails) {
         User user = findUser(userDetails);
         BaseAnalysisData base = buildBaseData(user);
+        List<ProblemAttempt> attempts = problemAttemptRepository.findByUserOrderByCreatedAtAsc(user);
 
         Map<String, Integer> totalByCategory = new LinkedHashMap<>();
         totalByCategory.put("WORD", 0);
         totalByCategory.put("GRAMMAR", 0);
 
-        for (ProblemAttempt first : base.firstAttempts().values()) {
-            String category = toCategory(first.getProblem().getGame().getType());
-            totalByCategory.put(category, totalByCategory.get(category) + 1);
-        }
-
         Map<String, Map<String, Integer>> wrongScopeCountByCategory = new LinkedHashMap<>();
         wrongScopeCountByCategory.put("WORD", new LinkedHashMap<>());
         wrongScopeCountByCategory.put("GRAMMAR", new LinkedHashMap<>());
 
-        for (WrongSeed wrong : base.wrongs()) {
-            String scope = base.scopeByProblem().getOrDefault(wrong.problemId(), "기타");
-            Map<String, Integer> scopeMap = wrongScopeCountByCategory.get(wrong.category());
+        for (ProblemAttempt attempt : attempts) {
+            String category = toCategory(attempt.getProblem().getGame().getType());
+            totalByCategory.put(category, totalByCategory.getOrDefault(category, 0) + 1);
+
+            if (attempt.isCorrect()) continue;
+
+            String scope = normalizeScope(attempt.getProblem());
+            Map<String, Integer> scopeMap = wrongScopeCountByCategory.get(category);
             scopeMap.put(scope, scopeMap.getOrDefault(scope, 0) + 1);
         }
 
@@ -203,6 +204,9 @@ public class AnalysisService {
         String scope = (request != null && request.getScope() != null && !request.getScope().isBlank())
                 ? request.getScope().trim()
                 : "핵심 개념";
+        int problemCount = (request != null && request.getProblemCount() != null && request.getProblemCount() > 0)
+                ? request.getProblemCount()
+                : 10;
 
         String title = "[복습] " + scope;
         String description = analysisGeminiService.generateReviewDescription(category, scope);
@@ -213,7 +217,7 @@ public class AnalysisService {
                 .description(description)
                 .learningObjectives(scope + " 중심 오답 복습")
                 .isPublic(false)
-                .problemCount(10)
+                .problemCount(problemCount)
                 .build();
 
         GameResponseDto game = gameService.createGame(createRequest, userDetails);

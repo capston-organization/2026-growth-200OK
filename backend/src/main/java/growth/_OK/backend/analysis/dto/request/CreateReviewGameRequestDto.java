@@ -10,4 +10,5 @@ import lombok.NoArgsConstructor;
 public class CreateReviewGameRequestDto {
     private String category; // WORD | GRAMMAR
     private String scope;
+    private Integer problemCount;
 }
