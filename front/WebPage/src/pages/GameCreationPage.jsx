@@ -621,9 +621,6 @@ const GameCreationPage = () => {
               <h3 style={{ fontSize: "28px", margin: 0 }}>
                 게임에 삽입될 문제의 유형을 선택하세요.
               </h3>
-              <p style={{ color: "#888", fontSize: "20px" }}>
-                (1개 ~ 4개 선택 가능)
-              </p>
 
               <div
                 style={{
