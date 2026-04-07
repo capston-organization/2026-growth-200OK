@@ -24,6 +24,7 @@ const GameCreationPage = () => {
   const [gameName, setGameName] = useState(""); // Step 3: 게임 이름과 설명
   const [gameDescription, setGameDescription] = useState("");
   const [selectedQuestions, setSelectedQuestions] = useState([]); // Step 4: 선택된 문제 유형들 (여러 개 가능)
+  const [problemCount, setProblemCount] = useState(10); // Step 4: 생성할 문제 개수
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef(null); // 숨겨진 파일 입력창을 클릭해줄 리모콘
 
@@ -119,6 +120,7 @@ const GameCreationPage = () => {
           title: gameName,
           description: gameDescription,
           isPublic: true,
+          problemCount: problemCount,
         }),
       });
       const gameData = await createGameRes.json();
@@ -191,7 +193,7 @@ const GameCreationPage = () => {
           headers: { ...headers, "Content-Type": "application/json" },
           body: JSON.stringify({
             problemTypes: apiProblemTypes.length > 0 ? apiProblemTypes : null,
-            problemCount: 10,
+            problemCount: problemCount,
           }),
         },
       );
@@ -622,6 +624,46 @@ const GameCreationPage = () => {
               <p style={{ color: "#888", fontSize: "20px" }}>
                 (1개 ~ 4개 선택 가능)
               </p>
+
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "12px",
+                  marginTop: "12px",
+                }}
+              >
+                <span style={{ fontSize: "22px", fontWeight: "700", color: "#555" }}>
+                  문제 수
+                </span>
+                <input
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={problemCount}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    if (raw === "") {
+                      setProblemCount(1);
+                      return;
+                    }
+                    const num = Number(raw);
+                    if (Number.isNaN(num)) return;
+                    setProblemCount(Math.max(1, Math.min(100, num)));
+                  }}
+                  style={{
+                    border: "2px solid #FFC0CB",
+                    borderRadius: "12px",
+                    padding: "8px 12px",
+                    fontSize: "20px",
+                    fontWeight: "600",
+                    backgroundColor: "#FFF0F5",
+                    color: "#444",
+                    width: "120px",
+                  }}
+                />
+              </div>
 
               {/* 2x2 그리드 배치 */}
               <div
