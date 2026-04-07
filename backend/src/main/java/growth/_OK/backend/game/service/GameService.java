@@ -12,6 +12,7 @@ import growth._OK.backend.game.repository.GameLikeRepository;
 import growth._OK.backend.game.repository.GameRepository;
 import growth._OK.backend.game.repository.GameSourceRepository;
 import growth._OK.backend.game.repository.ProblemAttemptRepository;
+import growth._OK.backend.game.repository.ProblemRepository;
 import growth._OK.backend.global.exception.CapstonException;
 import growth._OK.backend.global.exception.ExceptionCode;
 import growth._OK.backend.user.domain.User;
@@ -32,6 +33,7 @@ public class GameService {
     private final GameSourceRepository gameSourceRepository;
     private final UserRepository userRepository;
     private final ProblemAttemptRepository problemAttemptRepository;
+    private final ProblemRepository problemRepository;
 
     public GameResponseDto createGame(GameCreateRequestDto request, CustomUserDetails userDetails) {
         User owner = findUser(userDetails);
@@ -158,6 +160,23 @@ public class GameService {
                 });
 
         return GameResponseDto.from(game, liked);
+    }
+
+    // 게임 삭제. 본인 게임만 삭제 가능.
+    // FK 충돌을 피하기 위해 시도 기록/좋아요/문제를 먼저 정리한 뒤 게임을 삭제.
+    @Transactional
+    public void deleteGame(Long gameId, CustomUserDetails userDetails) {
+        User user = findUser(userDetails);
+        Game game = findGame(gameId);
+
+        if (!game.getOwner().getUserId().equals(user.getUserId())) {
+            throw new CapstonException(ExceptionCode.GAME_NOT_FOUND);
+        }
+
+        problemAttemptRepository.deleteByProblem_Game(game);
+        gameLikeRepository.deleteByGame(game);
+        problemRepository.deleteByGame(game);
+        gameRepository.delete(game);
     }
 
     // --------------------------------

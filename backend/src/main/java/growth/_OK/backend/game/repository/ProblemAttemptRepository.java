@@ -17,6 +17,7 @@ public interface ProblemAttemptRepository extends JpaRepository<ProblemAttempt, 
     List<ProblemAttempt> findByUserAndProblemOrderByAttemptOrderAsc(User user, Problem problem);
     Optional<ProblemAttempt> findFirstByUserAndProblemOrderByAttemptOrderAsc(User user, Problem problem);
     List<ProblemAttempt> findByUserOrderByCreatedAtAsc(User user);
+    void deleteByProblem_Game(Game game);
 
     @Query("select pa.problem.game from ProblemAttempt pa " +
            "where pa.user = :user " +
