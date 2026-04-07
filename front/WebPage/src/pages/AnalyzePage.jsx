@@ -30,6 +30,18 @@ const normalizeCategoryFromRow = (row) => {
   return null;
 };
 
+const formatAvgSolveTime = (ms) => {
+  if (ms == null || Number.isNaN(ms)) return "—";
+  const n = Number(ms);
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}초`;
+  return `${Math.round(n)}ms`;
+};
+
+const CATEGORY_LABEL_SHORT = {
+  WORD: "영단어",
+  GRAMMAR: "영문법",
+};
+
 const safeParseJson = async (res, apiName) => {
   const contentType = res.headers.get("content-type") || "";
   const rawText = await res.text();
@@ -71,6 +83,7 @@ const AnalyzePage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [reviewProblemCount, setReviewProblemCount] = useState(10);
+  const [detail, setDetail] = useState(null);
 
   const current = CATEGORY_STYLE[activeCategory];
   const currentWrongRates = useMemo(
@@ -132,13 +145,21 @@ const AnalyzePage = () => {
   };
 
   const handleClickWrongAnswers = (scope) => {
-    navigate("/mypage", {
+    navigate("/wrong-answers", {
       state: {
         userName,
-        openSection: "wrong-answers",
-        source: "analyze",
         filterCategory: activeCategory,
         filterScope: scope,
+      },
+    });
+  };
+
+  const handleOpenWrongAnswersPage = () => {
+    navigate("/wrong-answers", {
+      state: {
+        userName,
+        filterCategory: activeCategory,
+        filterScope: "",
       },
     });
   };
@@ -364,6 +385,270 @@ const AnalyzePage = () => {
               : hasAnyWrongData
                 ? "가장 취약한 범위를 확인하고, 바로 복습 게임을 만들 수 있어요."
                 : "아직 오답 데이터가 없어요. 게임을 플레이하면 분석이 시작됩니다."}
+          </div>
+
+          {/* 개인 상세 분석 지표 (/analysis/me/detail) */}
+          <div
+            style={{
+              marginBottom: "28px",
+              padding: "22px 24px",
+              borderRadius: "20px",
+              border: "2px solid #E1BEE7",
+              background: "linear-gradient(135deg, #F3E5F5 0%, #FFFFFF 55%)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "12px",
+                marginBottom: "16px",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "26px",
+                  fontWeight: "700",
+                  color: "#6A1B9A",
+                }}
+              >
+                개인 상세 분석 지표
+              </div>
+              <button
+                type="button"
+                onClick={handleOpenWrongAnswersPage}
+                style={{
+                  borderRadius: "18px",
+                  border: "2px solid #CE93D8",
+                  background: "#FFFFFF",
+                  padding: "8px 18px",
+                  fontSize: "17px",
+                  fontWeight: "600",
+                  cursor: "pointer",
+                  color: "#7B1FA2",
+                }}
+              >
+                틀린 문제 목록 보기
+              </button>
+            </div>
+
+            {isLoading && !detail ? (
+              <div style={{ fontSize: "18px", color: "#777" }}>
+                상세 지표를 불러오는 중이에요…
+              </div>
+            ) : detail ? (
+              <>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+                    gap: "12px",
+                    marginBottom: "20px",
+                  }}
+                >
+                  {[
+                    { label: "총 시도 수", value: detail.totalAttempts },
+                    { label: "총 오답 수", value: detail.totalWrongCount },
+                    { label: "오답률", value: `${detail.wrongRate ?? 0}%` },
+                    {
+                      label: "평균 풀이 시간",
+                      value: formatAvgSolveTime(detail.avgResponseTimeMs),
+                    },
+                    { label: "힌트 사용률", value: `${detail.hintUseRate ?? 0}%` },
+                  ].map((cell) => (
+                    <div
+                      key={cell.label}
+                      style={{
+                        background: "rgba(255,255,255,0.85)",
+                        borderRadius: "14px",
+                        padding: "12px 14px",
+                        border: "1px solid #E1BEE7",
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: "14px",
+                          color: "#666",
+                          marginBottom: "6px",
+                        }}
+                      >
+                        {cell.label}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "22px",
+                          fontWeight: "700",
+                          color: "#333",
+                        }}
+                      >
+                        {cell.value}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div
+                  style={{
+                    fontSize: "20px",
+                    fontWeight: "700",
+                    marginBottom: "10px",
+                    color: "#4A148C",
+                  }}
+                >
+                  학습 범위(scope)별 인사이트
+                </div>
+                {Array.isArray(detail.scopeInsights) &&
+                detail.scopeInsights.length > 0 ? (
+                  <div style={{ overflowX: "auto" }}>
+                    <table
+                      style={{
+                        width: "100%",
+                        borderCollapse: "collapse",
+                        fontSize: "16px",
+                        background: "#FFFFFF",
+                        borderRadius: "12px",
+                        overflow: "hidden",
+                      }}
+                    >
+                      <thead>
+                        <tr style={{ background: "#EDE7F6" }}>
+                          <th
+                            style={{
+                              textAlign: "left",
+                              padding: "10px 12px",
+                              borderBottom: "1px solid #D1C4E9",
+                            }}
+                          >
+                            과목
+                          </th>
+                          <th
+                            style={{
+                              textAlign: "left",
+                              padding: "10px 12px",
+                              borderBottom: "1px solid #D1C4E9",
+                            }}
+                          >
+                            범위
+                          </th>
+                          <th
+                            style={{
+                              textAlign: "right",
+                              padding: "10px 12px",
+                              borderBottom: "1px solid #D1C4E9",
+                            }}
+                          >
+                            시도
+                          </th>
+                          <th
+                            style={{
+                              textAlign: "right",
+                              padding: "10px 12px",
+                              borderBottom: "1px solid #D1C4E9",
+                            }}
+                          >
+                            오답
+                          </th>
+                          <th
+                            style={{
+                              textAlign: "right",
+                              padding: "10px 12px",
+                              borderBottom: "1px solid #D1C4E9",
+                            }}
+                          >
+                            오답률
+                          </th>
+                          <th
+                            style={{
+                              textAlign: "right",
+                              padding: "10px 12px",
+                              borderBottom: "1px solid #D1C4E9",
+                            }}
+                          >
+                            평균 풀이
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {detail.scopeInsights.map((row, idx) => (
+                          <tr key={`${row.scope}-${row.category}-${idx}`}>
+                            <td
+                              style={{
+                                padding: "10px 12px",
+                                borderBottom: "1px solid #EEE",
+                              }}
+                            >
+                              {CATEGORY_LABEL_SHORT[row.category] ||
+                                row.category}
+                            </td>
+                            <td
+                              style={{
+                                padding: "10px 12px",
+                                borderBottom: "1px solid #EEE",
+                              }}
+                            >
+                              {row.scope}
+                            </td>
+                            <td
+                              style={{
+                                textAlign: "right",
+                                padding: "10px 12px",
+                                borderBottom: "1px solid #EEE",
+                              }}
+                            >
+                              {row.attemptCount}
+                            </td>
+                            <td
+                              style={{
+                                textAlign: "right",
+                                padding: "10px 12px",
+                                borderBottom: "1px solid #EEE",
+                              }}
+                            >
+                              {row.wrongCount}
+                            </td>
+                            <td
+                              style={{
+                                textAlign: "right",
+                                padding: "10px 12px",
+                                borderBottom: "1px solid #EEE",
+                              }}
+                            >
+                              {row.wrongRate}%
+                            </td>
+                            <td
+                              style={{
+                                textAlign: "right",
+                                padding: "10px 12px",
+                                borderBottom: "1px solid #EEE",
+                              }}
+                            >
+                              {formatAvgSolveTime(row.avgResponseTimeMs)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      padding: "16px",
+                      color: "#777",
+                      background: "#FAFAFA",
+                      borderRadius: "12px",
+                    }}
+                  >
+                    아직 범위별 인사이트 데이터가 없어요.
+                  </div>
+                )}
+              </>
+            ) : (
+              <div style={{ fontSize: "18px", color: "#777" }}>
+                상세 지표를 불러오지 못했어요. 잠시 후 다시 시도해주세요.
+              </div>
+            )}
           </div>
 
           {/* 본문 2단 레이아웃 */}
