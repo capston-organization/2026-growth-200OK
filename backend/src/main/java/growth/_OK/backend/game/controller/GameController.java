@@ -102,7 +102,7 @@ public class GameController {
         if (request.getCorrect() == null) {
             return ResponseEntity.badRequest().build();
         }
-        problemAttemptService.submitAnswer(gameId, problemId, request.getCorrect(), user);
+        problemAttemptService.submitAnswer(gameId, problemId, request, user);
         return ResponseEntity.noContent().build();
     }
 
