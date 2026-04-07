@@ -7,9 +7,6 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.util.ArrayList;
-import java.util.List;
-
 @Entity
 @Table(name = "problems")
 @Getter
@@ -40,18 +37,22 @@ public class Problem extends BaseEntity {
     @Column(nullable = false, length = 20)
     private ProblemType type;
 
+    @Column(length = 100)
+    private String scope;
+
     @Column(columnDefinition = "TEXT")
     private String explanation;
 
     @Builder
     public Problem(Game game, int sortOrder, String question, String optionsJson,
-                   String correctAnswer, ProblemType type, String explanation) {
+                   String correctAnswer, ProblemType type, String scope, String explanation) {
         this.game = game;
         this.sortOrder = sortOrder;
         this.question = question;
         this.optionsJson = optionsJson;
         this.correctAnswer = correctAnswer;
         this.type = type;
+        this.scope = scope;
         this.explanation = explanation;
     }
 
