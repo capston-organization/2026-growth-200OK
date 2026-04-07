@@ -30,13 +30,6 @@ const normalizeCategoryFromRow = (row) => {
   return null;
 };
 
-const formatAvgSolveTime = (ms) => {
-  if (ms == null || Number.isNaN(ms)) return "—";
-  const n = Number(ms);
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}초`;
-  return `${Math.round(n)}ms`;
-};
-
 const CATEGORY_LABEL_SHORT = {
   WORD: "영단어",
   GRAMMAR: "영문법",
@@ -452,11 +445,6 @@ const AnalyzePage = () => {
                     { label: "총 시도 수", value: detail.totalAttempts },
                     { label: "총 오답 수", value: detail.totalWrongCount },
                     { label: "오답률", value: `${detail.wrongRate ?? 0}%` },
-                    {
-                      label: "평균 풀이 시간",
-                      value: formatAvgSolveTime(detail.avgResponseTimeMs),
-                    },
-                    { label: "힌트 사용률", value: `${detail.hintUseRate ?? 0}%` },
                   ].map((cell) => (
                     <div
                       key={cell.label}
@@ -559,15 +547,6 @@ const AnalyzePage = () => {
                           >
                             오답률
                           </th>
-                          <th
-                            style={{
-                              textAlign: "right",
-                              padding: "10px 12px",
-                              borderBottom: "1px solid #D1C4E9",
-                            }}
-                          >
-                            평균 풀이
-                          </th>
                         </tr>
                       </thead>
                       <tbody>
@@ -616,15 +595,6 @@ const AnalyzePage = () => {
                               }}
                             >
                               {row.wrongRate}%
-                            </td>
-                            <td
-                              style={{
-                                textAlign: "right",
-                                padding: "10px 12px",
-                                borderBottom: "1px solid #EEE",
-                              }}
-                            >
-                              {formatAvgSolveTime(row.avgResponseTimeMs)}
                             </td>
                           </tr>
                         ))}

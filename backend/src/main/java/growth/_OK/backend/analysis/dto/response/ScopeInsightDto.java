@@ -13,5 +13,4 @@ public class ScopeInsightDto {
     private final int attemptCount;
     private final int wrongCount;
     private final int wrongRate;
-    private final int avgResponseTimeMs;
 }
