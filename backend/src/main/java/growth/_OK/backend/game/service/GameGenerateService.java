@@ -109,6 +109,7 @@ public class GameGenerateService {
                     .optionsJson(optionsJson)
                     .correctAnswer(raw.correctAnswer != null ? raw.correctAnswer : "")
                     .type(pt)
+                    .scope(raw.scope != null && !raw.scope.isBlank() ? raw.scope : "기타")
                     .explanation(null)
                     .build();
             saved.add(problemRepository.save(problem));
@@ -121,6 +122,7 @@ public class GameGenerateService {
                     .optionsJson("[\"①\",\"②\",\"③\",\"④\",\"⑤\"]")
                     .correctAnswer("①")
                     .type(types.isEmpty() ? ProblemType.MULTIPLE_CHOICE : types.get(i % types.size()))
+                    .scope("기타")
                     .explanation(null)
                     .build();
             saved.add(problemRepository.save(problem));
