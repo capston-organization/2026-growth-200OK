@@ -221,7 +221,7 @@ public class AnalysisService {
         List<ProblemAttempt> attempts = problemAttemptRepository.findByUserOrderByCreatedAtAsc(user);
         if (attempts.isEmpty()) {
             return """
-                    {"category":"%s","targetScope":"%s","recent14d":{"weightedWrongRate":0,"attempts":0,"wrongCount":0},"repeatedWrongConcepts":[],"avgAttemptsUntilCorrect":1.0,"accuracyByProblemType":{"MULTIPLE_CHOICE":0,"OX":0,"SHORT_ANSWER":0}}
+                    {"category":"%s","targetScope":"%s","recent14d":{"weightedWrongRate":0,"attempts":0,"wrongCount":0},"repeatedWrongConcepts":{},"avgAttemptsUntilCorrect":1.0,"accuracyByProblemType":{"MULTIPLE_CHOICE":0,"OX":0,"SHORT_ANSWER":0}}
                     """.formatted(category, targetScope);
         }
 
