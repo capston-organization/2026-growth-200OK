@@ -666,23 +666,27 @@ const GameCreationPage = () => {
               borderTop: "1px solid #eee",
             }}
           >
-            {/* [이전] 버튼 */}
-            <button
-              className="btn-primary"
-              style={{
-                width: "180px",
-                marginTop: 0,
-                fontSize: "20px",
-                fontWeight: "bold",
-              }}
-              onClick={() => {
-                if (step === 1)
-                  navigate("/signup"); // 1단계에선 회원가입 페이지로
-                else setStep(step - 1); // 나머지는 이전 단계로
-              }}
-            >
-              ← 뒤로 가기
-            </button>
+            {/* [이전] 버튼: step 1에서는 숨김 */}
+            {step > 1 ? (
+              <button
+                className="btn-primary"
+                style={{
+                  width: "180px",
+                  marginTop: 0,
+                  fontSize: "20px",
+                  fontWeight: "bold",
+                }}
+                onClick={() => {
+                  if (step === 1)
+                    navigate("/signup"); // 1단계에선 회원가입 페이지로
+                  else setStep(step - 1); // 나머지는 이전 단계로
+                }}
+              >
+                ← 뒤로 가기
+              </button>
+            ) : (
+              <div style={{ width: "180px" }} />
+            )}
 
             {/* [다음/완료] 버튼 */}
             <button
