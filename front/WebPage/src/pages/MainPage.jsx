@@ -721,8 +721,62 @@ const MainPage = () => {
                       fontWeight: "600",
                       cursor: "pointer",
                     }}
-                    onClick={() => {
-                      alert("게임 플레이 페이지로 연결 예정입니다.");
+                    onClick={async () => {
+                      const token = localStorage.getItem("accessToken");
+                      const gameId = selectedGame?.id;
+
+                      if (!token || !gameId) {
+                        alert("게임 정보를 불러올 수 없습니다. 다시 시도해주세요.");
+                        return;
+                      }
+
+                      try {
+                        const headers = { Authorization: `Bearer ${token}` };
+
+                        // 게임에 연결된 문제 목록 조회
+                        const problemsRes = await fetch(
+                          apiUrl(`/games/${gameId}/problems`),
+                          {
+                            method: "GET",
+                            headers,
+                          },
+                        );
+                        if (!problemsRes.ok) {
+                          throw new Error("문제 목록 조회 실패");
+                        }
+                        const problems = await problemsRes.json();
+
+                        // 학습 목표/내용 프리뷰 조회(또는 생성)
+                        let previewData = {
+                          description: selectedGame.description || "",
+                          learningObjectives:
+                            selectedGame.learningObjectives || "",
+                          learningContent: selectedGame.description || "",
+                        };
+                        const previewRes = await fetch(
+                          apiUrl(`/games/${gameId}/generate/preview`),
+                          {
+                            method: "POST",
+                            headers,
+                          },
+                        );
+                        if (previewRes.ok) {
+                          previewData = await previewRes.json();
+                        }
+
+                        setSelectedGame(null);
+                        navigate("/play", {
+                          state: {
+                            gameId,
+                            problems: Array.isArray(problems) ? problems : [],
+                            previewData,
+                            userName,
+                          },
+                        });
+                      } catch (error) {
+                        console.error("저장된 게임 불러오기 실패:", error);
+                        alert("저장된 게임을 불러오지 못했습니다.");
+                      }
                     }}
                   >
                     게임 플레이
