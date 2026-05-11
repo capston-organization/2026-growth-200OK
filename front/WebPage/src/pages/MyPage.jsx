@@ -720,15 +720,16 @@ const MyPage = () => {
         >
           <div
             style={{
-              background: "#FFEFFE",
-              borderRadius: "24px",
-              border: "2px solid #F8BBD0",
-              width: "70%",
-              maxWidth: "900px",
-              minHeight: "420px",
+              background: "#FFFFFF",
+              borderRadius: "28px",
+              border: "2px solid rgb(240, 110, 151)",
+              width: "95%",
+              maxWidth: "1450px",
+              minHeight: "560px",
               boxShadow: "0 10px 30px rgba(0,0,0,0.15)",
-              padding: "32px 32px 24px",
+              padding: "22px 24px 26px",
               boxSizing: "border-box",
+              fontFamily: "Nunito, sans-serif",
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -738,14 +739,16 @@ const MyPage = () => {
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
-                marginBottom: "16px",
+                marginBottom: "18px",
+                borderBottom: "2px solid rgba(240, 110, 151, 0.35)",
+                paddingBottom: "12px",
               }}
             >
               <div
                 style={{
-                  fontSize: "22px",
+                  fontSize: "clamp(28px, 2.2vw, 46px)",
                   fontWeight: "700",
-                  color: "#D36BA3",
+                  color: "rgb(240, 110, 151)",
                 }}
               >
                 Game Maker
@@ -755,9 +758,9 @@ const MyPage = () => {
                 style={{
                   border: "none",
                   background: "transparent",
-                  fontSize: "20px",
+                  fontSize: "clamp(26px, 2vw, 40px)",
                   fontWeight: "700",
-                  color: "#D36BA3",
+                  color: "rgb(240, 110, 151)",
                   cursor: "pointer",
                 }}
               >
@@ -772,9 +775,10 @@ const MyPage = () => {
               <div
                 style={{
                   flex: 1,
-                  background: "#F5E3F7",
-                  borderRadius: "16px",
-                  minHeight: "260px",
+                  background: "#FAF7FC",
+                  borderRadius: "20px",
+                  border: "1px solid rgba(240, 110, 151, 0.2)",
+                  minHeight: "355px",
                 }}
               />
               <div
@@ -791,22 +795,22 @@ const MyPage = () => {
                     value={editTitle}
                     onChange={(e) => setEditTitle(e.target.value)}
                     style={{
-                      fontSize: "22px",
+                      fontSize: "clamp(32px, 2.2vw, 46px)",
                       fontWeight: "700",
                       border: "none",
-                      borderBottom: "2px solid #EBA7C8",
+                      borderBottom: "2px solid rgba(240, 110, 151, 0.45)",
                       outline: "none",
                       width: "100%",
-                      marginBottom: "12px",
+                      marginBottom: "14px",
                       background: "transparent",
                       paddingBottom: "8px",
                     }}
                   />
                   <div
                     style={{
-                      fontSize: "18px",
+                      fontSize: "clamp(28px, 1.6vw, 36px)",
                       fontWeight: "600",
-                      marginBottom: "4px",
+                      marginBottom: "8px",
                     }}
                   >
                     info
@@ -815,16 +819,16 @@ const MyPage = () => {
                     value={editDesc}
                     onChange={(e) => setEditDesc(e.target.value)}
                     style={{
-                      fontSize: "15px",
+                      fontSize: "clamp(22px, 1.3vw, 30px)",
                       color: "#555",
-                      border: "1px solid #EBA7C8",
-                      borderRadius: "8px",
+                      border: "1px solid rgba(240, 110, 151, 0.45)",
+                      borderRadius: "10px",
                       width: "100%",
-                      height: "80px",
+                      height: "130px",
                       resize: "vertical",
                       padding: "8px",
                       boxSizing: "border-box",
-                      background: "#FFF9FB",
+                      background: "#FFFFFF",
                     }}
                   />
                 </div>
@@ -835,19 +839,20 @@ const MyPage = () => {
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
-                    marginTop: "20px",
-                    gap: "12px",
+                    marginTop: "24px",
+                    gap: "14px",
                   }}
                 >
                   <button
                     style={{
-                      borderRadius: "12px",
-                      border: "2px solid #DDD",
-                      background: "white",
-                      padding: "8px 18px",
-                      fontSize: "15px",
+                      borderRadius: "20px",
+                      border: "2px solid rgba(240, 110, 151, 0.75)",
+                      background: "#FFFFFF",
+                      padding: "11px 24px",
+                      fontSize: "clamp(20px, 1.15vw, 24px)",
                       fontWeight: "600",
                       cursor: "pointer",
+                      color: "#222",
                     }}
                     onClick={handleGameDelete}
                   >
@@ -862,13 +867,16 @@ const MyPage = () => {
                   >
                     <button
                       style={{
-                        borderRadius: "12px",
-                        border: "2px solid #DDD",
-                        background: editPublic ? "#E8F5E9" : "#FFEBEE",
-                        padding: "8px 14px",
-                        fontSize: "15px",
+                        borderRadius: "20px",
+                        border: "2px solid rgba(240, 110, 151, 0.75)",
+                        background: editPublic
+                          ? "rgba(255, 255, 255, 0.98)"
+                          : "rgba(255, 244, 248, 1)",
+                        padding: "11px 18px",
+                        fontSize: "clamp(20px, 1.15vw, 24px)",
                         fontWeight: "600",
                         cursor: "pointer",
+                        color: "#222",
                       }}
                       onClick={() => setEditPublic(!editPublic)}
                     >
@@ -876,9 +884,10 @@ const MyPage = () => {
                     </button>
                     <span
                       style={{
-                        fontSize: "18px",
-                        color: "#F8BBD0",
+                        fontSize: "clamp(20px, 1.2vw, 26px)",
+                        color: "rgb(240, 110, 151)",
                         cursor: "pointer",
+                        lineHeight: 1,
                       }}
                       onClick={() => setEditPublic(!editPublic)}
                     >
@@ -887,13 +896,14 @@ const MyPage = () => {
                   </div>
                   <button
                     style={{
-                      borderRadius: "20px",
-                      border: "2px solid #F8BBD0",
-                      background: "#FFE4F1",
-                      padding: "10px 24px",
-                      fontSize: "16px",
+                      borderRadius: "24px",
+                      border: "2px solid rgb(240, 110, 151)",
+                      background: "#FFFFFF",
+                      padding: "14px 46px",
+                      fontSize: "28px",
                       fontWeight: "600",
                       cursor: "pointer",
+                      color: "#111",
                     }}
                     onClick={handleGameUpdate}
                   >
@@ -925,15 +935,16 @@ const MyPage = () => {
         >
           <div
             style={{
-              background: "#FFEFFE",
-              borderRadius: "24px",
-              border: "2px solid #F8BBD0",
-              width: "70%",
-              maxWidth: "900px",
-              minHeight: "420px",
+              background: "#FFFFFF",
+              borderRadius: "28px",
+              border: "2px solid rgb(240, 110, 151)",
+              width: "95%",
+              maxWidth: "1450px",
+              minHeight: "560px",
               boxShadow: "0 10px 30px rgba(0,0,0,0.15)",
-              padding: "32px 32px 24px",
+              padding: "22px 24px 26px",
               boxSizing: "border-box",
+              fontFamily: "Nunito, sans-serif",
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -942,14 +953,16 @@ const MyPage = () => {
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
-                marginBottom: "16px",
+                marginBottom: "18px",
+                borderBottom: "2px solid rgba(240, 110, 151, 0.35)",
+                paddingBottom: "12px",
               }}
             >
               <div
                 style={{
-                  fontSize: "22px",
+                  fontSize: "clamp(28px, 2.2vw, 46px)",
                   fontWeight: "700",
-                  color: "#D36BA3",
+                  color: "rgb(240, 110, 151)",
                 }}
               >
                 Game Select
@@ -959,9 +972,9 @@ const MyPage = () => {
                 style={{
                   border: "none",
                   background: "transparent",
-                  fontSize: "20px",
+                  fontSize: "clamp(26px, 2vw, 40px)",
                   fontWeight: "700",
-                  color: "#D36BA3",
+                  color: "rgb(240, 110, 151)",
                   cursor: "pointer",
                 }}
               >
@@ -974,9 +987,10 @@ const MyPage = () => {
               <div
                 style={{
                   flex: 1,
-                  background: "#F5E3F7",
-                  borderRadius: "16px",
-                  minHeight: "260px",
+                  background: "#FAF7FC",
+                  borderRadius: "20px",
+                  border: "1px solid rgba(240, 110, 151, 0.2)",
+                  minHeight: "355px",
                 }}
               />
               <div
@@ -990,32 +1004,32 @@ const MyPage = () => {
                 <div>
                   <div
                     style={{
-                      fontSize: "24px",
+                      fontSize: "clamp(36px, 2.4vw, 50px)",
                       fontWeight: "700",
-                      marginBottom: "12px",
+                      marginBottom: "14px",
                     }}
                   >
                     {selectedLikedGame.title || "게임"}
                   </div>
                   <div
                     style={{
-                      height: "1px",
-                      background: "#EBA7C8",
-                      marginBottom: "16px",
+                      height: "2px",
+                      background: "rgba(240, 110, 151, 0.45)",
+                      marginBottom: "18px",
                     }}
                   />
                   <div
                     style={{
-                      fontSize: "18px",
+                      fontSize: "clamp(28px, 1.6vw, 36px)",
                       fontWeight: "600",
-                      marginBottom: "4px",
+                      marginBottom: "8px",
                     }}
                   >
                     info
                   </div>
                   <div
                     style={{
-                      fontSize: "16px",
+                      fontSize: "clamp(24px, 1.4vw, 32px)",
                       color: "#555",
                       whiteSpace: "pre-line",
                     }}
@@ -1028,18 +1042,19 @@ const MyPage = () => {
                   style={{
                     display: "flex",
                     justifyContent: "flex-end",
-                    marginTop: "24px",
+                    marginTop: "26px",
                   }}
                 >
                   <button
                     style={{
-                      borderRadius: "20px",
-                      border: "2px solid #F8BBD0",
-                      background: "#FFE4F1",
-                      padding: "10px 24px",
-                      fontSize: "16px",
+                      borderRadius: "24px",
+                      border: "2px solid rgb(240, 110, 151)",
+                      background: "#FFFFFF",
+                      padding: "14px 46px",
+                      fontSize: "28px",
                       fontWeight: "600",
                       cursor: "pointer",
+                      color: "#111",
                     }}
                     onClick={async () => {
                       const token = localStorage.getItem("accessToken");
