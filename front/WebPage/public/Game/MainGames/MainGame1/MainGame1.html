@@ -285,15 +285,15 @@
           const params = new URLSearchParams(window.location.search);
           if (params.get("test") === "1") {
             console.log(
-              "[MainGame1 테스트 모드] 샘플 문제로 2초 후 시작합니다. (?test=1)",
+              "[MainGame1 테스트 모드] 샘플 문제로 0.6초 후 시작합니다. (?test=1)",
             );
-            this.time.delayedCall(500, () => {
+            this.time.delayedCall(300, () => {
               this.gameId = null;
               this.accessToken = "";
               this.allProblems = window.__MAIN_GAME1_DEMO_PROBLEMS__;
               this.remainingProblems = [...this.allProblems];
               this.wrongAnswers = [...this.allProblems];
-              this.time.delayedCall(2000, this.startMiniGame, [], this);
+              this.time.delayedCall(300, this.startMiniGame, [], this);
             });
           }
 
