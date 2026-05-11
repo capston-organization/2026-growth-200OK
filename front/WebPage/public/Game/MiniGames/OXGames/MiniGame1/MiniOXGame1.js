@@ -203,7 +203,10 @@ class MiniOXGame1 extends Phaser.Scene {
         if (!this.bgmMusic || !this.scene.isActive()) return;
         const ctx = this.sound.context;
         if (ctx && ctx.state === "suspended") {
-          ctx.resume().then(runFadeIn).catch(() => runFadeIn());
+          ctx
+            .resume()
+            .then(runFadeIn)
+            .catch(() => runFadeIn());
         } else {
           runFadeIn();
         }
@@ -388,7 +391,7 @@ class MiniOXGame1 extends Phaser.Scene {
     let isProblem = false;
 
     // 조건 1: 시간이 4.5초 이하로 남았는데 아직 문제가 안 나왔으면 강제 출제
-    if (!this.hasSentenceSpawned && this.timeLeft <= 4500) isProblem = true;
+    if (!this.hasSentenceSpawned && this.timeLeft <= 5000) isProblem = true;
     // 조건 2: 40% 확률로 문제 출제
     else if (!this.hasSentenceSpawned && Phaser.Math.Between(0, 100) < 40)
       isProblem = true;
