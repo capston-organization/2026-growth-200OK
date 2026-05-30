@@ -1,5 +1,23 @@
 /* global Phaser */
 /**
+ * 로컬 단독 실행(MultiChoiceGame.local.html)용 a/an·관사 객관식 샘플.
+ * correctAnswer 문자열이 options 중 하나와 정확히 같아야 함(드럼 인덱스로 변환됨).
+ */
+const MULTI_CHOICE_GAME_MOCK_PROBLEMS = [
+  {
+    id: 9301,
+    type: "MULTIPLE_CHOICE",
+    question: "Choose the correct article: It was ___ useful idea.",
+    options: ["a", "an", "the", "-(empty)", "both a and an"],
+    correctAnswer: "a",
+  },
+];
+
+if (typeof window !== "undefined") {
+  window.MULTI_CHOICE_GAME_MOCK_PROBLEMS = MULTI_CHOICE_GAME_MOCK_PROBLEMS;
+}
+
+/**
  * MultiChoiceGame.js (객관식 = 로봇 리듬 게임)
  * MiniGame2 버전: MainGame1에서 재사용하기 위해 MiniGames 디렉터리로 이동.
  * 에셋 경로: ../../MiniGames/MultiChoiceGames/MiniGame2/assets/
@@ -13,16 +31,27 @@ class MultiChoiceGame extends Phaser.Scene {
     this.mainScene = data.parent;
     this.speedLevel = data.speedLevel || 1;
     this.currentProblem = data.problem || null; // MainGame1에서 넘겨준 1개의 문제
+    this.assetBase =
+      data.assetBase ?? "../../MiniGames/MultiChoiceGames/MiniGame2/";
   }
 
   preload() {
-    this.load.setPath("../../MiniGames/MultiChoiceGames/MiniGame2/assets/");
-    this.load.image("robotBase", "images/로봇리듬기본로봇.png");
-    this.load.image("robotLeft", "images/로봇리듬왼손로봇.png");
-    this.load.image("robotRight", "images/로봇리듬오른손로봇.png");
-    this.load.image("drumImg", "images/로봇리듬북.png");
-    this.load.audio("drumHit", "sounds/드럼.mp3");
-    this.load.audio("robotRhythmBg", "sounds/로봇리듬배경음악.mp3");
+    const base = this.assetBase.endsWith("/")
+      ? this.assetBase
+      : `${this.assetBase}/`;
+    this.load.setPath(`${base}assets/`);
+    const loadImg = (key, file) => {
+      if (!this.textures.exists(key)) this.load.image(key, file);
+    };
+    const loadAud = (key, file) => {
+      if (!this.cache.audio.exists(key)) this.load.audio(key, file);
+    };
+    loadImg("robotBase", "images/로봇리듬기본로봇.png");
+    loadImg("robotLeft", "images/로봇리듬왼손로봇.png");
+    loadImg("robotRight", "images/로봇리듬오른손로봇.png");
+    loadImg("drumImg", "images/로봇리듬북.png");
+    loadAud("drumHit", "sounds/드럼.mp3");
+    loadAud("robotRhythmBg", "sounds/로봇리듬배경음악.mp3");
   }
 
   create() {
@@ -409,7 +438,7 @@ class MultiChoiceGame extends Phaser.Scene {
       this,
     );
 
-    this.time.delayedCall(500, this.showQuestion, [], this);
+    this.showQuestion();
   }
 
   /** 정답/오답/시간초과 등 결과가 나오는 순간 배경음을 끄고, 지연 재생·언락으로 다시 켜지지 않게 함 */
