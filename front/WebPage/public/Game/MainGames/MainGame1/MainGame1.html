@@ -77,6 +77,34 @@
           question: "12 - 9 = ?",
           correctAnswer: "3",
         },
+        {
+          id: 113,
+          type: "MULTIPLE_CHOICE",
+          question: "Choose the correct article: It was ___ useful idea.",
+          options: ["a", "an", "the", "-(empty)", "both a and an"],
+          correctAnswer: "a",
+        },
+        {
+          id: 114,
+          type: "OX",
+          question:
+            "단어의 첫 글자가 모음인지 아닌지에 따라 a 또는 an을 써야 한다.",
+          correctAnswer: "X",
+        },
+        {
+          id: 115,
+          type: "OX",
+          question:
+            "단어의 첫 글자가 모음인지 아닌지에 따라 a 또는 an을 써야 한다.",
+          correctAnswer: "X",
+        },
+        {
+          id: 116,
+          type: "OX",
+          question:
+            "단어의 첫 글자가 모음인지 아닌지에 따라 a 또는 an을 써야 한다.",
+          correctAnswer: "X",
+        },
       ];
 
       /**
@@ -127,7 +155,185 @@
           this.allProblems = list;
           this.remainingProblems = [...list];
           this.wrongAnswers = [...list];
-          this.time.delayedCall(2000, this.startMiniGame, [], this);
+          this._scheduleStartMiniGameAfterPrewarm();
+        }
+
+        _scheduleStartMiniGameAfterPrewarm() {
+          let introReady = false;
+          let assetsReady = false;
+          const tryStart = () => {
+            if (introReady && assetsReady) this.startMiniGame();
+          };
+          this.time.delayedCall(2000, () => {
+            introReady = true;
+            tryStart();
+          });
+          this._ensureMiniGameAssetsPrewarmed(() => {
+            assetsReady = true;
+            tryStart();
+          });
+        }
+
+        _flushMiniPrewarmCallbacks() {
+          const cbs = this._miniPrewarmCallbacks || [];
+          this._miniPrewarmCallbacks = [];
+          cbs.forEach((cb) => cb());
+        }
+
+        _ensureMiniGameAssetsPrewarmed(onComplete) {
+          if (this.registry.get("mainGame1MiniPrewarmDone")) {
+            if (onComplete) onComplete();
+            return;
+          }
+          if (onComplete) {
+            if (!this._miniPrewarmCallbacks) this._miniPrewarmCallbacks = [];
+            this._miniPrewarmCallbacks.push(onComplete);
+          }
+          if (this._miniPrewarmLoading) return;
+
+          const added = this._queueMiniGamePrewarmLoads();
+          if (added === 0) {
+            this.registry.set("mainGame1MiniPrewarmDone", true);
+            this._flushMiniPrewarmCallbacks();
+            return;
+          }
+
+          this._miniPrewarmLoading = true;
+          this.load.once("complete", () => {
+            this._miniPrewarmLoading = false;
+            this.registry.set("mainGame1MiniPrewarmDone", true);
+            this._flushMiniPrewarmCallbacks();
+          });
+          if (!this.load.isLoading()) this.load.start();
+        }
+
+        _queueMiniGamePrewarmLoads() {
+          let n = 0;
+          const img = (key, url) => {
+            if (!this.textures.exists(key)) {
+              this.load.image(key, url);
+              n++;
+            }
+          };
+          const aud = (key, url) => {
+            if (!this.cache.audio.exists(key)) {
+              this.load.audio(key, url);
+              n++;
+            }
+          };
+          const MG = "../../MiniGames";
+
+          const ox1i = `${MG}/OXGames/MiniGame1/assets/images/`;
+          const ox1s = `${MG}/OXGames/MiniGame1/assets/sounds/`;
+          [
+            ["timerIcon", "Timer.png"],
+            ["timerBarFrame", "TimerBar.png"],
+            ["background1", "Background1.png"],
+            ["background2", "Background2.png"],
+            ["leftGraphic", "LeftGraphic.png"],
+            ["rightGraphic", "RightGraphicDefault.png"],
+            ["lightGraphic", "Light.png"],
+            ["blueLightGraphic", "BlueLight.png"],
+            ["redLightGraphic", "RedLight.png"],
+            ["rightGraphicSuccess", "RightGraphicSuccess.png"],
+            ["rightGraphicFailed", "RightGraphicFailed.png"],
+            ["screenSuccess", "ScreenSuccess.png"],
+            ["screenFailed", "ScreenFailed.png"],
+            ["btnO", "OButton.png"],
+            ["btnOPushed", "OButtonPushed.png"],
+            ["btnX", "XButton.png"],
+            ["btnXPushed", "XButtonPushed.png"],
+            ["panel1", "Panel1.png"],
+            ["panel2", "Panel2.png"],
+            ["panel3", "Panel3.png"],
+            ["panel4", "Panel4.png"],
+            ["panel5", "Panel5.png"],
+          ].forEach(([k, f]) => img(k, ox1i + f));
+          aud("miniOxBgm", ox1s + "Background_Music.mp3");
+          aud("oxButtonPressSfx", ox1s + "ButtonPress.mp3");
+
+          const multi1i = `${MG}/MultiChoiceGames/MiniGame1/assets/images/`;
+          const multi1s = `${MG}/MultiChoiceGames/MiniGame1/assets/sounds/`;
+          [
+            ["bg1", "Background1.png"],
+            ["bg2", "Background2.png"],
+            ["problemBar", "ProblemBar.png"],
+            ["failedImage", "FailedImage.png"],
+            ["target1", "Target1.png"],
+            ["target1Shot", "Target1Shot.png"],
+            ["target2", "Target2.png"],
+            ["target2Shot", "Target2Shot.png"],
+            ["target3", "Target3.png"],
+            ["target3Shot", "Target3Shot.png"],
+            ["target4", "Target4.png"],
+            ["target4Shot", "Target4Shot.png"],
+            ["target5", "Target5.png"],
+            ["target5Shot", "Target5Shot.png"],
+            ["successBg1", "SuccessBg1.png"],
+            ["successBg2", "SuccessBg2.png"],
+            ["successGet", "SuccessGet.png"],
+            ["successGift1", "SuccessGift1.png"],
+            ["successGift2", "SuccessGift2.png"],
+            ["successGift3", "SuccessGift3.png"],
+          ].forEach(([k, f]) => img(k, multi1i + f));
+          aud("miniMultiBgm", multi1s + "Background_Music.mp3");
+          aud("shootSfx", multi1s + "Shoot.mp3");
+          aud("targetShootSfx", multi1s + "Taget_Shoot.mp3");
+          aud("tadaSfx", multi1s + "Tada.mp3");
+
+          const short1i = `${MG}/ShortAnswerGames/MiniGame1/assets/images/`;
+          const short1s = `${MG}/ShortAnswerGames/MiniGame1/assets/sounds/`;
+          [
+            ["background", "Background1.png"],
+            ["smartScreen", "SmartScreen.png"],
+            ["questionBubble", "Question.png"],
+            ["answerBubble", "Answer.png"],
+            ["emoBubble", "Emo.png"],
+            ["inputBox", "InputBox.png"],
+            ["submitButton", "SubmitButton.png"],
+            ["loading1", "Loading1.png"],
+            ["loading2", "Loading2.png"],
+            ["loading3", "Loading3.png"],
+            ["successEmo", "SuccessEmo.png"],
+            ["failedEmo", "FailedEmo.png"],
+          ].forEach(([k, f]) => img(k, short1i + f));
+          aud("miniShortBgm", short1s + "Background_Music.mp3");
+          aud("successPopSfx", short1s + "SuccessPop.mp3");
+          aud("failedPopSfx", short1s + "FailedPop.mp3");
+
+          const multi2 = `${MG}/MultiChoiceGames/MiniGame2/assets/`;
+          img("robotBase", multi2 + "images/로봇리듬기본로봇.png");
+          img("robotLeft", multi2 + "images/로봇리듬왼손로봇.png");
+          img("robotRight", multi2 + "images/로봇리듬오른손로봇.png");
+          img("drumImg", multi2 + "images/로봇리듬북.png");
+          aud("drumHit", multi2 + "sounds/드럼.mp3");
+          aud("robotRhythmBg", multi2 + "sounds/로봇리듬배경음악.mp3");
+
+          const short2 = `${MG}/ShortAnswerGames/MiniGame2/assets/`;
+          img("alienWaiting", short2 + "images/도넛게임기다리는외계인.png");
+          img("alienHappy", short2 + "images/도넛게임웃는외계인.png");
+          img("alienAngry", short2 + "images/도넛게임화난외계인.png");
+          img("donut", short2 + "images/도넛게임도넛.png");
+          aud("donutBgMusic", short2 + "sounds/도넛게임배경음악.mp3");
+
+          const tteok = `${MG}/OXGames/MiniGame2/assets/`;
+          [
+            ["그냥떡", "images/그냥떡.png"],
+            ["망치떡", "images/망치떡.png"],
+            ["물떡", "images/물떡.png"],
+            ["망치기본토끼", "images/망치기본토끼.png"],
+            ["망치망치토끼", "images/망치망치토끼.png"],
+            ["물기본토끼", "images/물기본토끼.png"],
+            ["물물토끼", "images/물물토끼.png"],
+          ].forEach(([k, f]) => img(k, tteok + f));
+          aud("backgroundMusic", tteok + "sounds/떡게임배경소리.mp3");
+          aud("hey", tteok + "sounds/hey.mp3");
+          aud("one", tteok + "sounds/one.mp3");
+          aud("two", tteok + "sounds/two.mp3");
+          aud("three", tteok + "sounds/three.mp3");
+          aud("four", tteok + "sounds/four.mp3");
+
+          return n;
         }
 
         preload() {
@@ -272,6 +478,8 @@
             }
           });
 
+          this._ensureMiniGameAssetsPrewarmed(() => {});
+
           // --- [C] React에서 데이터 받아서 게임 루프 시작 (늦게 도착한 메시지 + load 레이스로 먼저 온 메시지) ---
           window.addEventListener("message", (event) => {
             this.applyReactStartGame(event.data);
@@ -293,7 +501,9 @@
               this.allProblems = window.__MAIN_GAME1_DEMO_PROBLEMS__;
               this.remainingProblems = [...this.allProblems];
               this.wrongAnswers = [...this.allProblems];
-              this.time.delayedCall(300, this.startMiniGame, [], this);
+              this._ensureMiniGameAssetsPrewarmed(() => {
+                this.time.delayedCall(300, this.startMiniGame, [], this);
+              });
             });
           }
 

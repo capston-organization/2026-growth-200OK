@@ -1,5 +1,21 @@
 /* global Phaser */
 /**
+ * 로컬 단독 실행(ShortAnswerGame.local.html)용 a/an 단답형 샘플.
+ */
+const SHORT_ANSWER_GAME_MOCK_PROBLEMS = [
+  {
+    id: 9501,
+    type: "SHORT_ANSWER",
+    question: "I have ___ umbrella.",
+    correctAnswer: "an",
+  },
+];
+
+if (typeof window !== "undefined") {
+  window.SHORT_ANSWER_GAME_MOCK_PROBLEMS = SHORT_ANSWER_GAME_MOCK_PROBLEMS;
+}
+
+/**
  * ShortAnswerGame.js (단답형 = 도넛게임)
  * MiniGame2 버전: MainGame1에서 재사용하기 위해 MiniGames 디렉터리로 이동.
  * 에셋 경로: ../../MiniGames/ShortAnswerGames/MiniGame2/assets/
@@ -13,6 +29,8 @@ class ShortAnswerGame extends Phaser.Scene {
     this.mainScene = data.parent;
     this.speedLevel = data.speedLevel || 1;
     this.currentProblem = data.problem || null; // MainGame1에서 넘겨준 1개의 문제
+    this.assetBase =
+      data.assetBase ?? "../../MiniGames/ShortAnswerGames/MiniGame2/";
     this.backgroundMusic = null;
     this.hiddenInputEl = null;
     this.handleHiddenInput = null;
@@ -100,12 +118,21 @@ class ShortAnswerGame extends Phaser.Scene {
   }
 
   preload() {
-    this.load.setPath("../../MiniGames/ShortAnswerGames/MiniGame2/assets/");
-    this.load.image("alienWaiting", "images/도넛게임기다리는외계인.png");
-    this.load.image("alienHappy", "images/도넛게임웃는외계인.png");
-    this.load.image("alienAngry", "images/도넛게임화난외계인.png");
-    this.load.image("donut", "images/도넛게임도넛.png");
-    this.load.audio("donutBgMusic", "sounds/도넛게임배경음악.mp3");
+    const base = this.assetBase.endsWith("/")
+      ? this.assetBase
+      : `${this.assetBase}/`;
+    this.load.setPath(`${base}assets/`);
+    const loadImg = (key, file) => {
+      if (!this.textures.exists(key)) this.load.image(key, file);
+    };
+    const loadAud = (key, file) => {
+      if (!this.cache.audio.exists(key)) this.load.audio(key, file);
+    };
+    loadImg("alienWaiting", "images/도넛게임기다리는외계인.png");
+    loadImg("alienHappy", "images/도넛게임웃는외계인.png");
+    loadImg("alienAngry", "images/도넛게임화난외계인.png");
+    loadImg("donut", "images/도넛게임도넛.png");
+    loadAud("donutBgMusic", "sounds/도넛게임배경음악.mp3");
   }
 
   create() {
@@ -197,7 +224,7 @@ class ShortAnswerGame extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    var alienY = timerY + 230;
+    var alienY = timerY + 260;
     var alienSpacing = 240;
     var alienPositions = [timerX - alienSpacing, timerX, timerX + alienSpacing];
     var alienScale = 0.5 * spriteDisplayMul * alienSpriteExtraMul;
