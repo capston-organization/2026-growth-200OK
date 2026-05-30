@@ -1,5 +1,22 @@
 /* global Phaser */
 /**
+ * 로컬 단독 실행(MiniOXGame1.local.html)용 a/an 문법 OX 샘플 문제.
+ * O = 문장이 맞음, X = 틀림 (관사 a/an 오류 등)
+ */
+const MINI_OX_GAME1_MOCK_PROBLEMS = [
+  {
+    id: 9001,
+    type: "OX",
+    question: "단어의 첫 글자가 모음인지 아닌지에 따라 a 또는 an을 써야 한다.",
+    correctAnswer: "X",
+  },
+];
+
+if (typeof window !== "undefined") {
+  window.MINI_OX_GAME1_MOCK_PROBLEMS = MINI_OX_GAME1_MOCK_PROBLEMS;
+}
+
+/**
  * MiniOXGame1.js
  * -------------------------------------------------------------------------
  * [게임 설명]
@@ -25,6 +42,8 @@ class MiniOXGame1 extends Phaser.Scene {
     this.mainScene = data.parent;
     this.speedLevel = data.speedLevel || 1;
     this.currentProblem = data.problem; // ★ MainScene에서 넘겨준 1개의 문제 저장
+    // MiniOXGame1.local.html 등 같은 폴더에서 열 때: data.assetBase = "./"
+    this.assetBase = data.assetBase ?? "../../MiniGames/OXGames/MiniGame1/";
 
     // ★ [반응형 기준점]
     // 1280x720 해상도에서 작업한 수치들이 1.0 스케일이라고 가정합니다.
@@ -37,45 +56,47 @@ class MiniOXGame1 extends Phaser.Scene {
   // [Preload] 이미지 리소스 로드
   // =================================================================
   preload() {
-    this.load.setPath("../../MiniGames/OXGames/MiniGame1/assets/images/");
+    const base = this.assetBase.endsWith("/")
+      ? this.assetBase
+      : `${this.assetBase}/`;
+    this.load.setPath(`${base}assets/images/`);
+    const loadImg = (key, file) => {
+      if (
+        key === "timerIcon" ||
+        key === "timerBarFrame" ||
+        !this.textures.exists(key)
+      ) {
+        this.load.image(key, file);
+      }
+    };
+    const loadAud = (key, file) => {
+      if (!this.cache.audio.exists(key)) this.load.audio(key, file);
+    };
 
-    // 1. 타이머 UI (게이지 바, 아이콘)
-    this.load.image("timerIcon", "Timer.png");
-    this.load.image("timerBarFrame", "TimerBar.png");
-
-    // 2. 배경 (우주 배경, 창틀 프레임)
-    this.load.image("background1", "Background1.png");
-    this.load.image("background2", "Background2.png");
-
-    // 3. 장식용 그래픽 (좌우 기계 장치, 상태 표시등)
-    this.load.image("leftGraphic", "LeftGraphic.png");
-    this.load.image("rightGraphic", "RightGraphicDefault.png");
-    this.load.image("lightGraphic", "Light.png");
-
-    // 4. 상태 변화 그래픽 (성공/실패 시 변경될 이미지들)
-    this.load.image("blueLightGraphic", "BlueLight.png"); // 정답 시 파란불
-    this.load.image("redLightGraphic", "RedLight.png"); // 오답 시 빨간불
-    this.load.image("rightGraphicSuccess", "RightGraphicSuccess.png");
-    this.load.image("rightGraphicFailed", "RightGraphicFailed.png");
-
-    // 5. 결과 팝업 (성공/실패 화면)
-    this.load.image("screenSuccess", "ScreenSuccess.png");
-    this.load.image("screenFailed", "ScreenFailed.png");
-
-    // 6. 컨트롤 버튼 (O / X 및 눌린 상태)
-    this.load.image("btnO", "OButton.png");
-    this.load.image("btnOPushed", "OButtonPushed.png");
-    this.load.image("btnX", "XButton.png");
-    this.load.image("btnXPushed", "XButtonPushed.png");
-
-    // 7. 지나가는 패널 (장식용 1~5번)
+    loadImg("timerIcon", "Timer.png");
+    loadImg("timerBarFrame", "TimerBar.png");
+    loadImg("background1", "Background1.png");
+    loadImg("background2", "Background2.png");
+    loadImg("leftGraphic", "LeftGraphic.png");
+    loadImg("rightGraphic", "RightGraphicDefault.png");
+    loadImg("lightGraphic", "Light.png");
+    loadImg("blueLightGraphic", "BlueLight.png");
+    loadImg("redLightGraphic", "RedLight.png");
+    loadImg("rightGraphicSuccess", "RightGraphicSuccess.png");
+    loadImg("rightGraphicFailed", "RightGraphicFailed.png");
+    loadImg("screenSuccess", "ScreenSuccess.png");
+    loadImg("screenFailed", "ScreenFailed.png");
+    loadImg("btnO", "OButton.png");
+    loadImg("btnOPushed", "OButtonPushed.png");
+    loadImg("btnX", "XButton.png");
+    loadImg("btnXPushed", "XButtonPushed.png");
     for (let i = 1; i <= 5; i++) {
-      this.load.image(`panel${i}`, `Panel${i}.png`);
+      loadImg(`panel${i}`, `Panel${i}.png`);
     }
 
-    this.load.setPath("../../MiniGames/OXGames/MiniGame1/assets/sounds/");
-    this.load.audio("miniOxBgm", "Background_Music.mp3");
-    this.load.audio("oxButtonPressSfx", "ButtonPress.mp3");
+    this.load.setPath(`${base}assets/sounds/`);
+    loadAud("miniOxBgm", "Background_Music.mp3");
+    loadAud("oxButtonPressSfx", "ButtonPress.mp3");
   }
 
   // =================================================================

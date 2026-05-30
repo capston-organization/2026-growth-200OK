@@ -1,5 +1,23 @@
 /* global Phaser */
 /**
+ * 로컬 단독 실행(MiniMultiGame1.local.html)용 a/an·관사 객관식 샘플.
+ * options는 5개, correctAnswer는 옵션 문자열과 정확히 일치해야 함.
+ */
+const MINI_MULTI_GAME1_MOCK_PROBLEMS = [
+  {
+    id: 9301,
+    type: "MULTIPLE_CHOICE",
+    question: "Choose the correct article: It was ___ useful idea.",
+    options: ["a", "an", "the", "-(empty)", "both a and an"],
+    correctAnswer: "a",
+  },
+];
+
+if (typeof window !== "undefined") {
+  window.MINI_MULTI_GAME1_MOCK_PROBLEMS = MINI_MULTI_GAME1_MOCK_PROBLEMS;
+}
+
+/**
  * MiniMultiGame1: 영어 단어 맞추기 (Refactored_Final_Responsive_Fixed)
  *
  * [수정 사항]
@@ -20,6 +38,8 @@ class MiniMultiGame1 extends Phaser.Scene {
     this.mainScene = data.parent;
     this.speedLevel = data.speedLevel || 1;
     this.currentProblem = data.problem; // ★ MainScene에서 넘겨준 1개의 문제 저장
+    this.assetBase =
+      data.assetBase ?? "../../MiniGames/MultiChoiceGames/MiniGame1/";
 
     // ★ [MiniOXGame1 방식] 반응형 기준점 설정
     this.baseWidth = 1280;
@@ -31,36 +51,45 @@ class MiniMultiGame1 extends Phaser.Scene {
   // [1] Preload
   // =================================================================
   preload() {
-    this.load.setPath(
-      "../../MiniGames/MultiChoiceGames/MiniGame1/assets/images/",
-    );
+    const base = this.assetBase.endsWith("/")
+      ? this.assetBase
+      : `${this.assetBase}/`;
+    this.load.setPath(`${base}assets/images/`);
+    const loadImg = (key, file) => {
+      if (
+        key === "timerIcon" ||
+        key === "timerBarFrame" ||
+        !this.textures.exists(key)
+      ) {
+        this.load.image(key, file);
+      }
+    };
+    const loadAud = (key, file) => {
+      if (!this.cache.audio.exists(key)) this.load.audio(key, file);
+    };
 
-    this.load.image("bg1", "Background1.png");
-    this.load.image("bg2", "Background2.png");
-    this.load.image("problemBar", "ProblemBar.png");
-    this.load.image("timerBarFrame", "TimerBar.png");
-    this.load.image("timerIcon", "Timer.png");
-    this.load.image("failedImage", "FailedImage.png");
-
+    loadImg("bg1", "Background1.png");
+    loadImg("bg2", "Background2.png");
+    loadImg("problemBar", "ProblemBar.png");
+    loadImg("timerBarFrame", "TimerBar.png");
+    loadImg("timerIcon", "Timer.png");
+    loadImg("failedImage", "FailedImage.png");
     for (let i = 1; i <= 5; i++) {
-      this.load.image(`target${i}`, `Target${i}.png`);
-      this.load.image(`target${i}Shot`, `Target${i}Shot.png`);
+      loadImg(`target${i}`, `Target${i}.png`);
+      loadImg(`target${i}Shot`, `Target${i}Shot.png`);
     }
-
-    this.load.image("successBg1", "SuccessBg1.png");
-    this.load.image("successBg2", "SuccessBg2.png");
-    this.load.image("successGet", "SuccessGet.png");
+    loadImg("successBg1", "SuccessBg1.png");
+    loadImg("successBg2", "SuccessBg2.png");
+    loadImg("successGet", "SuccessGet.png");
     for (let i = 1; i <= 3; i++) {
-      this.load.image(`successGift${i}`, `SuccessGift${i}.png`);
+      loadImg(`successGift${i}`, `SuccessGift${i}.png`);
     }
 
-    this.load.setPath(
-      "../../MiniGames/MultiChoiceGames/MiniGame1/assets/sounds/",
-    );
-    this.load.audio("miniMultiBgm", "Background_Music.mp3");
-    this.load.audio("shootSfx", "Shoot.mp3");
-    this.load.audio("targetShootSfx", "Taget_Shoot.mp3");
-    this.load.audio("tadaSfx", "Tada.mp3");
+    this.load.setPath(`${base}assets/sounds/`);
+    loadAud("miniMultiBgm", "Background_Music.mp3");
+    loadAud("shootSfx", "Shoot.mp3");
+    loadAud("targetShootSfx", "Taget_Shoot.mp3");
+    loadAud("tadaSfx", "Tada.mp3");
   }
 
   // =================================================================
@@ -207,7 +236,10 @@ class MiniMultiGame1 extends Phaser.Scene {
         if (!this.bgmMusic || !this.scene.isActive()) return;
         const ctx = this.sound.context;
         if (ctx && ctx.state === "suspended") {
-          ctx.resume().then(runFadeIn).catch(() => runFadeIn());
+          ctx
+            .resume()
+            .then(runFadeIn)
+            .catch(() => runFadeIn());
         } else {
           runFadeIn();
         }

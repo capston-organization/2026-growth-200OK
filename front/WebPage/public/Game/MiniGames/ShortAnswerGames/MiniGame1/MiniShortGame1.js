@@ -1,5 +1,22 @@
 /* global Phaser */
 /**
+ * 로컬 단독 실행(MiniShortGame1.local.html)용 a/an 단답형 샘플.
+ * 정답은 소문자로 비교됨(MiniShortGame1 내부 trim + toLowerCase).
+ */
+const MINI_SHORT_GAME1_MOCK_PROBLEMS = [
+  {
+    id: 9501,
+    type: "SHORT_ANSWER",
+    question: "I have ___ umbrella.",
+    correctAnswer: "an",
+  },
+];
+
+if (typeof window !== "undefined") {
+  window.MINI_SHORT_GAME1_MOCK_PROBLEMS = MINI_SHORT_GAME1_MOCK_PROBLEMS;
+}
+
+/**
  * [MiniShortGame1 클래스]
  * -------------------------------------------------------------------------
  * - 컨셉: 스마트폰 채팅 앱 스타일의 영어 단답형 퀴즈 게임
@@ -22,6 +39,8 @@ class MiniShortGame1 extends Phaser.Scene {
     this.mainScene = data.parent;
     this.speedLevel = data.speedLevel || 1; // 기본 속도 레벨 1
     this.currentProblem = data.problem; // ★ 추가: MainScene에서 넘겨준 1개의 문제 저장
+    this.assetBase =
+      data.assetBase ?? "../../MiniGames/ShortAnswerGames/MiniGame1/";
 
     // ★ [반응형 기준점] 1280x720 해상도 기준
     this.baseWidth = 1280;
@@ -34,34 +53,42 @@ class MiniShortGame1 extends Phaser.Scene {
 
   // [에셋 로드] 게임에 필요한 이미지 리소스 불러오기
   preload() {
-    this.load.setPath(
-      "../../MiniGames/ShortAnswerGames/MiniGame1/assets/images/",
-    );
+    const base = this.assetBase.endsWith("/")
+      ? this.assetBase
+      : `${this.assetBase}/`;
+    this.load.setPath(`${base}assets/images/`);
+    const loadImg = (key, file) => {
+      if (
+        key === "timerIcon" ||
+        key === "timerBarFrame" ||
+        !this.textures.exists(key)
+      ) {
+        this.load.image(key, file);
+      }
+    };
+    const loadAud = (key, file) => {
+      if (!this.cache.audio.exists(key)) this.load.audio(key, file);
+    };
 
-    // 기본 UI 이미지
-    this.load.image("background", "Background1.png");
-    this.load.image("smartScreen", "SmartScreen.png");
-    this.load.image("questionBubble", "Question.png");
-    this.load.image("answerBubble", "Answer.png");
-    this.load.image("emoBubble", "Emo.png");
-    this.load.image("inputBox", "InputBox.png");
-    this.load.image("submitButton", "SubmitButton.png");
-    this.load.image("timerIcon", "Timer.png");
-    this.load.image("timerBarFrame", "TimerBar.png");
+    loadImg("background", "Background1.png");
+    loadImg("smartScreen", "SmartScreen.png");
+    loadImg("questionBubble", "Question.png");
+    loadImg("answerBubble", "Answer.png");
+    loadImg("emoBubble", "Emo.png");
+    loadImg("inputBox", "InputBox.png");
+    loadImg("submitButton", "SubmitButton.png");
+    loadImg("timerIcon", "Timer.png");
+    loadImg("timerBarFrame", "TimerBar.png");
+    loadImg("loading1", "Loading1.png");
+    loadImg("loading2", "Loading2.png");
+    loadImg("loading3", "Loading3.png");
+    loadImg("successEmo", "SuccessEmo.png");
+    loadImg("failedEmo", "FailedEmo.png");
 
-    // ★ [추가] 애니메이션 및 결과 이모지 리소스
-    this.load.image("loading1", "Loading1.png");
-    this.load.image("loading2", "Loading2.png");
-    this.load.image("loading3", "Loading3.png");
-    this.load.image("successEmo", "SuccessEmo.png");
-    this.load.image("failedEmo", "FailedEmo.png");
-
-    this.load.setPath(
-      "../../MiniGames/ShortAnswerGames/MiniGame1/assets/sounds/",
-    );
-    this.load.audio("miniShortBgm", "Background_Music.mp3");
-    this.load.audio("successPopSfx", "SuccessPop.mp3");
-    this.load.audio("failedPopSfx", "FailedPop.mp3");
+    this.load.setPath(`${base}assets/sounds/`);
+    loadAud("miniShortBgm", "Background_Music.mp3");
+    loadAud("successPopSfx", "SuccessPop.mp3");
+    loadAud("failedPopSfx", "FailedPop.mp3");
   }
 
   // [게임 생성] 화면 구성 및 로직 초기화
@@ -184,7 +211,10 @@ class MiniShortGame1 extends Phaser.Scene {
         if (!this.bgmMusic || !this.scene.isActive()) return;
         const ctx = this.sound.context;
         if (ctx && ctx.state === "suspended") {
-          ctx.resume().then(runFadeIn).catch(() => runFadeIn());
+          ctx
+            .resume()
+            .then(runFadeIn)
+            .catch(() => runFadeIn());
         } else {
           runFadeIn();
         }
