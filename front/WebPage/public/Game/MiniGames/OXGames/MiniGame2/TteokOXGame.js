@@ -17,19 +17,25 @@ class TteokOXGame extends Phaser.Scene {
 
   preload() {
     this.load.setPath("../../MiniGames/OXGames/MiniGame2/assets/");
-    this.load.image("그냥떡", "images/그냥떡.png");
-    this.load.image("망치떡", "images/망치떡.png");
-    this.load.image("물떡", "images/물떡.png");
-    this.load.image("망치기본토끼", "images/망치기본토끼.png");
-    this.load.image("망치망치토끼", "images/망치망치토끼.png");
-    this.load.image("물기본토끼", "images/물기본토끼.png");
-    this.load.image("물물토끼", "images/물물토끼.png");
-    this.load.audio("backgroundMusic", "sounds/떡게임배경소리.mp3");
-    this.load.audio("hey", "sounds/hey.mp3");
-    this.load.audio("one", "sounds/one.mp3");
-    this.load.audio("two", "sounds/two.mp3");
-    this.load.audio("three", "sounds/three.mp3");
-    this.load.audio("four", "sounds/four.mp3");
+    const loadImg = (key, file) => {
+      if (!this.textures.exists(key)) this.load.image(key, file);
+    };
+    const loadAud = (key, file) => {
+      if (!this.cache.audio.exists(key)) this.load.audio(key, file);
+    };
+    loadImg("그냥떡", "images/그냥떡.png");
+    loadImg("망치떡", "images/망치떡.png");
+    loadImg("물떡", "images/물떡.png");
+    loadImg("망치기본토끼", "images/망치기본토끼.png");
+    loadImg("망치망치토끼", "images/망치망치토끼.png");
+    loadImg("물기본토끼", "images/물기본토끼.png");
+    loadImg("물물토끼", "images/물물토끼.png");
+    loadAud("backgroundMusic", "sounds/떡게임배경소리.mp3");
+    loadAud("hey", "sounds/hey.mp3");
+    loadAud("one", "sounds/one.mp3");
+    loadAud("two", "sounds/two.mp3");
+    loadAud("three", "sounds/three.mp3");
+    loadAud("four", "sounds/four.mp3");
   }
 
   create() {
@@ -305,7 +311,7 @@ class TteokOXGame extends Phaser.Scene {
     this.input.once("pointerdown", enableAudio);
     this.input.keyboard.once("keydown", enableAudio);
 
-    this.time.delayedCall(500, this.showQuestion, [], this);
+    this.time.delayedCall(300, this.showQuestion, [], this);
   }
 
   createSounds() {

@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <title>TteokOXGame — 로컬 테스트</title>
+    <!--
+      cd WebPage && npm run dev
+      → http://localhost:5173/Game/MiniGames/OXGames/MiniGame2/TteokOXGame.local.html
+
+      리듬 구간(카운트 후)에 왼쪽 토끼(망치)=O, 오른쪽(물)=X. 같은 선택으로 4비트 입력.
+
+      ?q=0  문제 인덱스 고정 · ?speed=1~5 · ?loop=0 한 판만
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background: #fff8e7;
+        font-family: system-ui, sans-serif;
+      }
+      #hud {
+        position: fixed;
+        top: 8px;
+        left: 12px;
+        z-index: 9999;
+        color: #3d2a1f;
+        font-size: 13px;
+        line-height: 1.45;
+        pointer-events: none;
+        text-shadow: 0 1px 2px #fff;
+        max-width: 92vw;
+      }
+      #hud strong {
+        color: #8b4a6b;
+      }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+    <script src="TteokOXGame.js"></script>
+  </head>
+  <body>
+    <div id="hud" aria-live="polite">
+      <div><strong>TteokOXGame</strong> 로컬 테스트</div>
+      <div id="hud-status">로딩 중…</div>
+    </div>
+
+    <script>
+      (function () {
+        const hudStatus = document.getElementById("hud-status");
+        const params = new URLSearchParams(window.location.search);
+        const problems = window.TTEOK_OX_GAME_MOCK_PROBLEMS || [];
+        const loop = params.get("loop") !== "0";
+        const speedLevel = Math.min(
+          5,
+          Math.max(1, parseInt(params.get("speed") || "1", 10) || 1),
+        );
+        const SCENE_KEY = "TteokOXGame";
+
+        function pickProblem() {
+          const q = params.get("q");
+          if (q !== null && q !== "") {
+            const idx =
+              ((parseInt(q, 10) || 0) % problems.length + problems.length) %
+              problems.length;
+            return problems[idx];
+          }
+          return Phaser.Utils.Array.GetRandom(problems);
+        }
+
+        class TteokOXStandaloneBoot extends Phaser.Scene {
+          constructor() {
+            super({ key: "TteokOXStandaloneBoot" });
+          }
+          create() {
+            this.launchRound();
+          }
+          handleMiniGameResult(isSuccess, problem) {
+            const label = isSuccess ? "SUCCESS" : "FAILED";
+            hudStatus.textContent =
+              label +
+              " — id " +
+              (problem && problem.id) +
+              ": " +
+              (problem && problem.question);
+            console.log("[TteokOXGame local]", label, problem);
+            if (!loop) return;
+            this.time.delayedCall(2500, () => {
+              if (this.scene.isActive(SCENE_KEY)) this.scene.stop(SCENE_KEY);
+              this.launchRound();
+            });
+          }
+          launchRound() {
+            const problem = pickProblem();
+            hudStatus.textContent =
+              "문제 #" +
+              problem.id +
+              " (speed " +
+              speedLevel +
+              ") — 왼쪽=O, 오른쪽=X · 리듬 구간에 4비트";
+            if (this.scene.isActive(SCENE_KEY)) this.scene.stop(SCENE_KEY);
+            this.scene.launch(SCENE_KEY, {
+              parent: this,
+              problem,
+              speedLevel,
+              assetBase: "./",
+            });
+          }
+        }
+
+        const game = new Phaser.Game({
+          type: Phaser.AUTO,
+          width: window.innerWidth,
+          height: window.innerHeight,
+          backgroundColor: "#FFF8E7",
+          resolution: window.devicePixelRatio,
+          scale: {
+            mode: Phaser.Scale.RESIZE,
+            autoCenter: Phaser.Scale.CENTER_BOTH,
+          },
+          scene: [TteokOXStandaloneBoot, TteokOXGame],
+        });
+      })();
+    </script>
+  </body>
+</html>

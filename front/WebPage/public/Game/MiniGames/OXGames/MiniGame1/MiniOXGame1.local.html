@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <title>MiniOXGame1 — 로컬 테스트</title>
+    <!--
+      로컬 실행 (HTTP 필수, file:// 은 오디오·로드 제한 있음):
+        cd WebPage && npm run dev
+        → http://localhost:5173/Game/MiniGames/OXGames/MiniGame1/MiniOXGame1.local.html
+
+      쿼리:
+        ?q=0     첫 번째 mock 문제 (0~7)
+        ?speed=3 스피드 단계 1~5
+        ?loop=0  한 판만 (기본: 2.5초 후 다음 문제)
+    -->
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background: #0a0a12;
+        font-family: system-ui, sans-serif;
+      }
+      #hud {
+        position: fixed;
+        top: 8px;
+        left: 12px;
+        z-index: 9999;
+        color: #e8e8f0;
+        font-size: 13px;
+        line-height: 1.45;
+        pointer-events: none;
+        text-shadow: 0 1px 4px #000;
+        max-width: 90vw;
+      }
+      #hud strong {
+        color: #9cf;
+      }
+      @font-face {
+        font-family: "Nunito";
+        src: url("../../../common/Fonts/Nunito/static/Nunito-SemiBold.ttf");
+      }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+    <script src="MiniOXGame1.js"></script>
+  </head>
+  <body>
+    <div id="hud" aria-live="polite">
+      <div><strong>MiniOXGame1</strong> 로컬 테스트</div>
+      <div id="hud-status">로딩 중…</div>
+    </div>
+
+    <script>
+      (function () {
+        const hudStatus = document.getElementById("hud-status");
+        const params = new URLSearchParams(window.location.search);
+        const problems =
+          window.MINI_OX_GAME1_MOCK_PROBLEMS || [];
+        const loop = params.get("loop") !== "0";
+        const speedLevel = Math.min(
+          5,
+          Math.max(1, parseInt(params.get("speed") || "1", 10) || 1),
+        );
+
+        function pickProblem() {
+          const q = params.get("q");
+          if (q !== null && q !== "") {
+            const idx =
+              ((parseInt(q, 10) || 0) % problems.length + problems.length) %
+              problems.length;
+            return problems[idx];
+          }
+          return Phaser.Utils.Array.GetRandom(problems);
+        }
+
+        class MiniOXStandaloneBoot extends Phaser.Scene {
+          constructor() {
+            super({ key: "MiniOXStandaloneBoot" });
+          }
+
+          create() {
+            this.launchRound();
+          }
+
+          handleMiniGameResult(isSuccess, problem) {
+            const label = isSuccess ? "SUCCESS" : "FAILED";
+            hudStatus.textContent = `${label} — id ${problem.id}: ${problem.question}`;
+            console.log("[MiniOXGame1 local]", label, problem);
+
+            if (!loop) return;
+
+            this.time.delayedCall(2500, () => {
+              if (this.scene.isActive("MiniOXGame1")) {
+                this.scene.stop("MiniOXGame1");
+              }
+              this.launchRound();
+            });
+          }
+
+          launchRound() {
+            const problem = pickProblem();
+            hudStatus.textContent = `문제 #${problem.id} (speed ${speedLevel}) — O=맞음, X=틀림`;
+
+            if (this.scene.isActive("MiniOXGame1")) {
+              this.scene.stop("MiniOXGame1");
+            }
+
+            this.scene.launch("MiniOXGame1", {
+              parent: this,
+              problem,
+              speedLevel,
+              assetBase: "./",
+            });
+          }
+        }
+
+        const config = {
+          type: Phaser.AUTO,
+          width: window.innerWidth,
+          height: window.innerHeight,
+          backgroundColor: "#0a0a12",
+          resolution: window.devicePixelRatio,
+          scale: {
+            mode: Phaser.Scale.RESIZE,
+            autoCenter: Phaser.Scale.CENTER_BOTH,
+          },
+          scene: [MiniOXStandaloneBoot, MiniOXGame1],
+        };
+
+        // eslint-disable-next-line no-unused-vars
+        const game = new Phaser.Game(config);
+      })();
+    </script>
+  </body>
+</html>
