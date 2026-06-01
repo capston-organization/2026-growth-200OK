@@ -3,6 +3,14 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { apiUrl } from "../config/api";
 import LearningVillageLogoImage from "../assets/images/Learning_Village_Logo_ImageOnly.png";
 import LearningVillageLogoText from "../assets/images/Learning_Village_Logo_TextOnly.png";
+import GameImage from "../assets/images/GameImage.png";
+import GameIcon1 from "../assets/images/GameIcon1.png";
+import GameIcon2 from "../assets/images/GameIcon2.png";
+import GameIcon3 from "../assets/images/GameIcon3.png";
+import GameIcon4 from "../assets/images/GameIcon4.png";
+import GameIcon5 from "../assets/images/GameIcon5.png";
+import GameIcon6 from "../assets/images/GameIcon6.png";
+import GameIcon7 from "../assets/images/GameIcon7.png";
 
 const MyPage = () => {
   const navigate = useNavigate();
@@ -34,6 +42,26 @@ const MyPage = () => {
   const [selectedLikedGame, setSelectedLikedGame] = useState(null);
 
   const currentYear = new Date().getFullYear();
+
+  const gameCardIcons = [
+    GameIcon1,
+    GameIcon2,
+    GameIcon3,
+    GameIcon4,
+    GameIcon5,
+    GameIcon6,
+    GameIcon7,
+  ];
+
+  const pickCardIcon = (seedValue) => {
+    const seed = String(seedValue ?? "default");
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) {
+      hash = (hash * 31 + seed.charCodeAt(i)) | 0;
+    }
+    const idx = Math.abs(hash) % gameCardIcons.length;
+    return gameCardIcons[idx];
+  };
 
   // ── 변경 감지 ──
   const profileDirty = useMemo(
@@ -617,8 +645,22 @@ const MyPage = () => {
                         borderRadius: "12px",
                         height: "180px",
                         marginBottom: "10px",
+                        overflow: "hidden",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
                       }}
-                    />
+                    >
+                      <img
+                        src={pickCardIcon(game.id ?? game.title ?? "mypage-my")}
+                        alt={`${game.title || `게임 ${game.id}`} 아이콘`}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                        }}
+                      />
+                    </div>
                     <div style={{ fontSize: "20px", fontWeight: "600" }}>
                       {game.title || `게임 ${game.id}`}
                     </div>
@@ -688,8 +730,24 @@ const MyPage = () => {
                         borderRadius: "12px",
                         height: "180px",
                         marginBottom: "10px",
+                        overflow: "hidden",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
                       }}
-                    />
+                    >
+                      <img
+                        src={pickCardIcon(
+                          game.id ?? game.title ?? "mypage-liked",
+                        )}
+                        alt={`${game.title || `게임 ${game.id}`} 아이콘`}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                        }}
+                      />
+                    </div>
                     <div style={{ fontSize: "20px", fontWeight: "600" }}>
                       {game.title || `게임 ${game.id}`}
                     </div>
@@ -779,8 +837,24 @@ const MyPage = () => {
                   borderRadius: "20px",
                   border: "1px solid rgba(240, 110, 151, 0.2)",
                   minHeight: "355px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  overflow: "hidden",
                 }}
-              />
+              >
+                <img
+                  src={GameImage}
+                  alt="게임 미리보기"
+                  style={{
+                    width: "100%",
+                    maxWidth: "700px",
+                    height: "auto",
+                    objectFit: "cover",
+                    borderRadius: "16px",
+                  }}
+                />
+              </div>
               <div
                 style={{
                   flex: 1,
@@ -991,8 +1065,24 @@ const MyPage = () => {
                   borderRadius: "20px",
                   border: "1px solid rgba(240, 110, 151, 0.2)",
                   minHeight: "355px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  overflow: "hidden",
                 }}
-              />
+              >
+                <img
+                  src={GameImage}
+                  alt="게임 미리보기"
+                  style={{
+                    width: "100%",
+                    maxWidth: "700px",
+                    height: "auto",
+                    objectFit: "cover",
+                    borderRadius: "16px",
+                  }}
+                />
+              </div>
               <div
                 style={{
                   flex: 1,
@@ -1061,7 +1151,9 @@ const MyPage = () => {
                       const gameId = selectedLikedGame?.id;
 
                       if (!token || !gameId) {
-                        alert("게임 정보를 불러올 수 없습니다. 다시 시도해주세요.");
+                        alert(
+                          "게임 정보를 불러올 수 없습니다. 다시 시도해주세요.",
+                        );
                         return;
                       }
 
