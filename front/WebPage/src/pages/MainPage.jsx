@@ -3,6 +3,14 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { apiUrl } from "../config/api";
 import LearningVillageLogoImage from "../assets/images/Learning_Village_Logo_ImageOnly.png";
 import LearningVillageLogoText from "../assets/images/Learning_Village_Logo_TextOnly.png";
+import GameImage from "../assets/images/GameImage.png";
+import GameIcon1 from "../assets/images/GameIcon1.png";
+import GameIcon2 from "../assets/images/GameIcon2.png";
+import GameIcon3 from "../assets/images/GameIcon3.png";
+import GameIcon4 from "../assets/images/GameIcon4.png";
+import GameIcon5 from "../assets/images/GameIcon5.png";
+import GameIcon6 from "../assets/images/GameIcon6.png";
+import GameIcon7 from "../assets/images/GameIcon7.png";
 
 const MainPage = () => {
   const navigate = useNavigate();
@@ -28,6 +36,26 @@ const MainPage = () => {
   const [greetingMessage, setGreetingMessage] =
     useState("집중 모드 ON! 오늘도 파이팅!");
   const [isGreetingLoading, setIsGreetingLoading] = useState(false);
+
+  const gameCardIcons = [
+    GameIcon1,
+    GameIcon2,
+    GameIcon3,
+    GameIcon4,
+    GameIcon5,
+    GameIcon6,
+    GameIcon7,
+  ];
+
+  const pickCardIcon = (seedValue) => {
+    const seed = String(seedValue ?? "default");
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) {
+      hash = (hash * 31 + seed.charCodeAt(i)) | 0;
+    }
+    const idx = Math.abs(hash) % gameCardIcons.length;
+    return gameCardIcons[idx];
+  };
 
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
@@ -563,8 +591,22 @@ const MainPage = () => {
                         borderRadius: "12px",
                         height: "250px",
                         marginBottom: "10px",
+                        overflow: "hidden",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
                       }}
-                    />
+                    >
+                      <img
+                        src={pickCardIcon(game.id ?? game.title ?? "main-card")}
+                        alt={`${game.title || `게임 ${game.id}`} 아이콘`}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                        }}
+                      />
+                    </div>
                     <div style={{ fontSize: "20px", fontWeight: "600" }}>
                       {game.title || `게임 ${game.id}`}
                     </div>
@@ -652,7 +694,7 @@ const MainPage = () => {
                 alignItems: "stretch",
               }}
             >
-              {/* 왼쪽: 게임 이미지 자리 (플레이스홀더) */}
+              {/* 왼쪽: 게임 대표 이미지 */}
               <div
                 style={{
                   flex: 1,
@@ -660,8 +702,24 @@ const MainPage = () => {
                   borderRadius: "20px",
                   border: "1px solid rgba(240, 110, 151, 0.2)",
                   minHeight: "355px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  overflow: "hidden",
                 }}
-              />
+              >
+                <img
+                  src={GameImage}
+                  alt="게임 미리보기"
+                  style={{
+                    width: "100%",
+                    maxWidth: "700px",
+                    height: "auto",
+                    objectFit: "cover",
+                    borderRadius: "16px",
+                  }}
+                />
+              </div>
 
               {/* 오른쪽: 게임 정보 */}
               <div
@@ -732,7 +790,9 @@ const MainPage = () => {
                       const gameId = selectedGame?.id;
 
                       if (!token || !gameId) {
-                        alert("게임 정보를 불러올 수 없습니다. 다시 시도해주세요.");
+                        alert(
+                          "게임 정보를 불러올 수 없습니다. 다시 시도해주세요.",
+                        );
                         return;
                       }
 
