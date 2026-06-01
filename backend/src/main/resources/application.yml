@@ -45,3 +45,7 @@ gemini:
 app:
   # 클래스룸 과제 설명에 포함되는 게임 플레이 URL의 origin (경로는 /games/{id} 로 붙습니다)
   frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
+nlp:
+  server-url: ${NLP_SERVER_URL:http://localhost:8000}
+  timeout-seconds: 60
+  enabled: ${NLP_ENABLED:true}
