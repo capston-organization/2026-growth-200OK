@@ -2,6 +2,7 @@ package growth._OK.backend.auth.service;
 
 import growth._OK.backend.auth.dto.request.GoogleCodeRequest;
 import growth._OK.backend.auth.dto.response.GoogleUserInfoResponse;
+import growth._OK.backend.auth.dto.response.LoginResponseDto;
 import growth._OK.backend.auth.dto.response.TokenResponse;
 import growth._OK.backend.auth.jwt.CustomUserDetails;
 import growth._OK.backend.auth.jwt.JwtTokenProvider;
@@ -28,7 +29,7 @@ public class AuthService {
     private final GoogleClient googleClient;
 
     @Transactional
-    public void googleLogin(GoogleCodeRequest request, HttpServletResponse response) {
+    public LoginResponseDto googleLogin(GoogleCodeRequest request, HttpServletResponse response) {
 
         String decodedCode = java.net.URLDecoder.decode(request.getCode(), java.nio.charset.StandardCharsets.UTF_8);
 
@@ -43,6 +44,7 @@ public class AuthService {
 
         response.addCookie(tokenService.createRefreshCookie(tokens.getRefresh_token()));
         response.setHeader("Authorization", "Bearer " + tokens.getAccess_token());
+        return LoginResponseDto.from(user);
     }
 
     @Transactional
