@@ -95,7 +95,15 @@ public class GameGenerateService {
                 : game.getAllowedProblemTypes().isEmpty() ? List.of(ProblemType.MULTIPLE_CHOICE) : game.getAllowedProblemTypes();
 
         String sourceText = game.getSource().getExtractedText();
-        List<GeminiService.RawGeneratedProblem> rawList = geminiService.generateProblemsFromSource(sourceText, count, types);
+        List<GeminiService.RawGeneratedProblem> rawList = geminiService.generateProblemsFromSource(
+                sourceText,
+                count,
+                types,
+                game.getLearningObjectives()
+        );
+        if (rawList.size() > count) {
+            rawList = new ArrayList<>(rawList.subList(0, count));
+        }
 
         List<Problem> saved = new ArrayList<>();
         for (int i = 0; i < rawList.size(); i++) {
@@ -109,6 +117,7 @@ public class GameGenerateService {
                     .optionsJson(optionsJson)
                     .correctAnswer(raw.correctAnswer != null ? raw.correctAnswer : "")
                     .type(pt)
+                    .scope(raw.scope != null && !raw.scope.isBlank() ? raw.scope : "기타")
                     .explanation(null)
                     .build();
             saved.add(problemRepository.save(problem));
@@ -121,6 +130,7 @@ public class GameGenerateService {
                     .optionsJson("[\"①\",\"②\",\"③\",\"④\",\"⑤\"]")
                     .correctAnswer("①")
                     .type(types.isEmpty() ? ProblemType.MULTIPLE_CHOICE : types.get(i % types.size()))
+                    .scope("기타")
                     .explanation(null)
                     .build();
             saved.add(problemRepository.save(problem));

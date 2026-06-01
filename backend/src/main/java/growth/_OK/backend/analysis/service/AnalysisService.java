@@ -1,0 +1,440 @@
+package growth._OK.backend.analysis.service;
+
+import growth._OK.backend.analysis.dto.request.CreateReviewGameRequestDto;
+import growth._OK.backend.analysis.dto.response.AnalysisDetailResponseDto;
+import growth._OK.backend.analysis.dto.response.AnalysisOverviewResponseDto;
+import growth._OK.backend.analysis.dto.response.CategoryScopeWrongRateDto;
+import growth._OK.backend.analysis.dto.response.CreateReviewGameResponseDto;
+import growth._OK.backend.analysis.dto.response.ScopeWrongRateDto;
+import growth._OK.backend.analysis.dto.response.ScopeInsightDto;
+import growth._OK.backend.analysis.dto.response.WrongAnswerItemDto;
+import growth._OK.backend.analysis.dto.response.WrongAnswerListResponseDto;
+import growth._OK.backend.auth.jwt.CustomUserDetails;
+import growth._OK.backend.game.domain.GameType;
+import growth._OK.backend.game.domain.Problem;
+import growth._OK.backend.game.domain.ProblemAttempt;
+import growth._OK.backend.game.domain.ProblemType;
+import growth._OK.backend.game.dto.ResponseDto.GameResponseDto;
+import growth._OK.backend.game.dto.requestDto.GameCreateRequestDto;
+import growth._OK.backend.game.repository.ProblemAttemptRepository;
+import growth._OK.backend.game.service.GameService;
+import growth._OK.backend.global.exception.CapstonException;
+import growth._OK.backend.global.exception.ExceptionCode;
+import growth._OK.backend.user.domain.User;
+import growth._OK.backend.user.repository.UserRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class AnalysisService {
+
+    private final UserRepository userRepository;
+    private final ProblemAttemptRepository problemAttemptRepository;
+    private final AnalysisGeminiService analysisGeminiService;
+    private final GameService gameService;
+    private final ObjectMapper objectMapper;
+
+    @Transactional(readOnly = true)
+    public AnalysisOverviewResponseDto getOverview(CustomUserDetails userDetails) {
+        User user = findUser(userDetails);
+        BaseAnalysisData base = buildBaseData(user);
+        List<ProblemAttempt> attempts = problemAttemptRepository.findByUserOrderByCreatedAtAsc(user);
+
+        Map<String, Integer> totalByCategory = new LinkedHashMap<>();
+        totalByCategory.put("WORD", 0);
+        totalByCategory.put("GRAMMAR", 0);
+
+        Map<String, Map<String, Integer>> wrongScopeCountByCategory = new LinkedHashMap<>();
+        wrongScopeCountByCategory.put("WORD", new LinkedHashMap<>());
+        wrongScopeCountByCategory.put("GRAMMAR", new LinkedHashMap<>());
+
+        for (ProblemAttempt attempt : attempts) {
+            String category = toCategory(attempt.getProblem().getGame().getType());
+            totalByCategory.put(category, totalByCategory.getOrDefault(category, 0) + 1);
+
+            if (attempt.isCorrect()) continue;
+
+            String scope = normalizeScope(attempt.getProblem());
+            Map<String, Integer> scopeMap = wrongScopeCountByCategory.get(category);
+            scopeMap.put(scope, scopeMap.getOrDefault(scope, 0) + 1);
+        }
+
+        List<CategoryScopeWrongRateDto> categoryDtos = new ArrayList<>();
+        for (String category : List.of("WORD", "GRAMMAR")) {
+            int total = totalByCategory.getOrDefault(category, 0);
+            Map<String, Integer> counts = wrongScopeCountByCategory.getOrDefault(category, Map.of());
+
+            List<ScopeWrongRateDto> scopes = counts.entrySet().stream()
+                    .sorted((a, b) -> Integer.compare(b.getValue(), a.getValue()))
+                    .map(entry -> {
+                        int rate = total == 0 ? 0 : (int) Math.round((entry.getValue() * 100.0) / total);
+                        return ScopeWrongRateDto.builder()
+                                .scope(entry.getKey())
+                                .wrongRate(rate)
+                                .build();
+                    })
+                    .collect(Collectors.toList());
+
+            categoryDtos.add(CategoryScopeWrongRateDto.builder()
+                    .category(category)
+                    .scopes(scopes)
+                    .build());
+        }
+
+        return AnalysisOverviewResponseDto.builder()
+                .weakTop3(base.weakTop3())
+                .scopeWrongRates(categoryDtos)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public AnalysisDetailResponseDto getDetail(CustomUserDetails userDetails) {
+        User user = findUser(userDetails);
+        List<ProblemAttempt> attempts = problemAttemptRepository.findByUserOrderByCreatedAtAsc(user);
+
+        int totalAttempts = attempts.size();
+        int totalWrongCount = (int) attempts.stream().filter(a -> !a.isCorrect()).count();
+        int wrongRate = totalAttempts == 0 ? 0 : (int) Math.round(totalWrongCount * 100.0 / totalAttempts);
+
+        Map<String, List<ProblemAttempt>> grouped = attempts.stream()
+                .collect(Collectors.groupingBy(a ->
+                                toCategory(a.getProblem().getGame().getType()) + "||" + normalizeScope(a.getProblem()),
+                        LinkedHashMap::new,
+                        Collectors.toList()));
+
+        List<ScopeInsightDto> scopeInsights = grouped.entrySet().stream()
+                .map(entry -> {
+                    String[] key = entry.getKey().split("\\|\\|", 2);
+                    String category = key[0];
+                    String scope = key.length > 1 ? key[1] : "기타";
+                    List<ProblemAttempt> rows = entry.getValue();
+                    int attemptsCount = rows.size();
+                    int wrongCount = (int) rows.stream().filter(a -> !a.isCorrect()).count();
+                    int rate = attemptsCount == 0 ? 0 : (int) Math.round(wrongCount * 100.0 / attemptsCount);
+                    return ScopeInsightDto.builder()
+                            .category(category)
+                            .scope(scope)
+                            .attemptCount(attemptsCount)
+                            .wrongCount(wrongCount)
+                            .wrongRate(rate)
+                            .build();
+                })
+                .sorted((a, b) -> Integer.compare(b.getWrongRate(), a.getWrongRate()))
+                .limit(10)
+                .collect(Collectors.toList());
+
+        return AnalysisDetailResponseDto.builder()
+                .totalAttempts(totalAttempts)
+                .totalWrongCount(totalWrongCount)
+                .wrongRate(wrongRate)
+                .scopeInsights(scopeInsights)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public WrongAnswerListResponseDto getWrongAnswers(
+            CustomUserDetails userDetails,
+            String category,
+            String scope,
+            LocalDate fromDate,
+            LocalDate toDate
+    ) {
+        User user = findUser(userDetails);
+        BaseAnalysisData base = buildBaseData(user);
+        String normalizedCategory = normalizeCategory(category);
+
+        List<WrongAnswerItemDto> items = base.wrongs().stream()
+                .filter(w -> normalizedCategory == null || normalizedCategory.equals(w.category()))
+                .filter(w -> scope == null || scope.isBlank() || Objects.equals(base.scopeByProblem().get(w.problemId()), scope))
+                .filter(w -> fromDate == null || w.wrongDate() == null || !w.wrongDate().isBefore(fromDate))
+                .filter(w -> toDate == null || w.wrongDate() == null || !w.wrongDate().isAfter(toDate))
+                .sorted(Comparator.comparing(WrongSeed::wrongDate, Comparator.nullsLast(Comparator.naturalOrder())).reversed())
+                .map(w -> WrongAnswerItemDto.builder()
+                        .gameId(w.gameId())
+                        .problemId(w.problemId())
+                        .category(w.category())
+                        .scope(base.scopeByProblem().getOrDefault(w.problemId(), "기타"))
+                        .question(w.question())
+                        .answer(w.answer())
+                        .wrongDate(w.wrongDate())
+                        .build())
+                .collect(Collectors.toList());
+
+        return WrongAnswerListResponseDto.builder()
+                .items(items)
+                .build();
+    }
+
+    @Transactional
+    public CreateReviewGameResponseDto createReviewGame(CustomUserDetails userDetails, CreateReviewGameRequestDto request) {
+        User user = findUser(userDetails);
+        String category = normalizeCategory(request != null ? request.getCategory() : null);
+        if (category == null) {
+            category = "WORD";
+        }
+        String scope = (request != null && request.getScope() != null && !request.getScope().isBlank())
+                ? request.getScope().trim()
+                : "핵심 개념";
+        int problemCount = (request != null && request.getProblemCount() != null && request.getProblemCount() > 0)
+                ? request.getProblemCount()
+                : 10;
+
+        String title = "[복습] " + scope;
+        String reviewProfileJson = buildReviewProfileJson(user, category, scope);
+        String description = analysisGeminiService.generateReviewDescription(category, scope);
+
+        GameCreateRequestDto createRequest = GameCreateRequestDto.builder()
+                .type("GRAMMAR".equals(category) ? GameType.GRAMMAR : GameType.VOCAB)
+                .title(title)
+                .description(description)
+                .learningObjectives("""
+                        %s 중심 오답 복습
+                        reviewProfile:
+                        %s
+                        """.formatted(scope, reviewProfileJson).trim())
+                .isPublic(false)
+                .problemCount(problemCount)
+                .build();
+
+        GameResponseDto game = gameService.createGame(createRequest, userDetails);
+        return CreateReviewGameResponseDto.builder()
+                .gameId(game.getId())
+                .status("PREPARING")
+                .nextPage("/play?status=preparing")
+                .build();
+    }
+
+    private String buildReviewProfileJson(User user, String category, String targetScope) {
+        List<ProblemAttempt> attempts = problemAttemptRepository.findByUserOrderByCreatedAtAsc(user);
+        if (attempts.isEmpty()) {
+            return """
+                    {"category":"%s","targetScope":"%s","recent14d":{"weightedWrongRate":0,"attempts":0,"wrongCount":0},"repeatedWrongConcepts":{},"avgAttemptsUntilCorrect":1.0,"accuracyByProblemType":{"MULTIPLE_CHOICE":0,"OX":0,"SHORT_ANSWER":0}}
+                    """.formatted(category, targetScope);
+        }
+
+        LocalDate today = LocalDate.now();
+        List<ProblemAttempt> recent14d = attempts.stream()
+                .filter(a -> a.getCreatedAt() != null)
+                .filter(a -> !a.getCreatedAt().toLocalDate().isBefore(today.minusDays(13)))
+                .toList();
+
+        double weightedAttempts = 0.0;
+        double weightedWrong = 0.0;
+        for (ProblemAttempt attempt : recent14d) {
+            LocalDate d = attempt.getCreatedAt().toLocalDate();
+            long daysAgo = Math.max(0, today.toEpochDay() - d.toEpochDay());
+            double weight = 1.0 + ((14.0 - Math.min(daysAgo, 13)) / 14.0); // 최근일수록 최대 2.0 가중
+            weightedAttempts += weight;
+            if (!attempt.isCorrect()) {
+                weightedWrong += weight;
+            }
+        }
+        int weightedWrongRate = weightedAttempts == 0 ? 0 : (int) Math.round((weightedWrong * 100.0) / weightedAttempts);
+
+        Map<String, Long> repeatedWrongConcepts = attempts.stream()
+                .filter(a -> !a.isCorrect())
+                .filter(a -> category.equals(toCategory(a.getProblem().getGame().getType())))
+                .collect(Collectors.groupingBy(a -> normalizeScope(a.getProblem()), Collectors.counting()))
+                .entrySet().stream()
+                .filter(e -> e.getValue() >= 2)
+                .sorted((a, b) -> Long.compare(b.getValue(), a.getValue()))
+                .limit(5)
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        Map.Entry::getValue,
+                        (a, b) -> a,
+                        LinkedHashMap::new
+                ));
+
+        Map<Long, List<ProblemAttempt>> byProblem = attempts.stream()
+                .collect(Collectors.groupingBy(a -> a.getProblem().getId(), LinkedHashMap::new, Collectors.toList()));
+
+        double avgAttemptsUntilCorrect = byProblem.values().stream()
+                .mapToInt(rows -> {
+                    rows.sort(Comparator.comparing(ProblemAttempt::getAttemptOrder));
+                    for (int i = 0; i < rows.size(); i++) {
+                        if (rows.get(i).isCorrect()) {
+                            return i + 1;
+                        }
+                    }
+                    return rows.size();
+                })
+                .average()
+                .orElse(1.0);
+
+        Set<ProblemType> objectiveTypes = Set.of(ProblemType.MULTIPLE_CHOICE, ProblemType.OX);
+        long objectiveTotal = attempts.stream()
+                .filter(a -> objectiveTypes.contains(a.getProblem().getType()))
+                .count();
+        long objectiveCorrect = attempts.stream()
+                .filter(a -> objectiveTypes.contains(a.getProblem().getType()))
+                .filter(ProblemAttempt::isCorrect)
+                .count();
+        long subjectiveTotal = attempts.stream()
+                .filter(a -> a.getProblem().getType() == ProblemType.SHORT_ANSWER)
+                .count();
+        long subjectiveCorrect = attempts.stream()
+                .filter(a -> a.getProblem().getType() == ProblemType.SHORT_ANSWER)
+                .filter(ProblemAttempt::isCorrect)
+                .count();
+
+        Map<String, Object> profile = new LinkedHashMap<>();
+        profile.put("category", category);
+        profile.put("targetScope", targetScope);
+
+        Map<String, Object> recent14dNode = new LinkedHashMap<>();
+        recent14dNode.put("weightedWrongRate", weightedWrongRate);
+        recent14dNode.put("attempts", recent14d.size());
+        recent14dNode.put("wrongCount", recent14d.stream().filter(a -> !a.isCorrect()).count());
+        profile.put("recent14d", recent14dNode);
+        profile.put("repeatedWrongConcepts", repeatedWrongConcepts);
+        profile.put("avgAttemptsUntilCorrect", Math.round(avgAttemptsUntilCorrect * 100.0) / 100.0);
+
+        Map<String, Integer> accuracyByProblemType = new LinkedHashMap<>();
+        accuracyByProblemType.put("MULTIPLE_CHOICE", ratioPercent(
+                attempts.stream().filter(a -> a.getProblem().getType() == ProblemType.MULTIPLE_CHOICE).filter(ProblemAttempt::isCorrect).count(),
+                attempts.stream().filter(a -> a.getProblem().getType() == ProblemType.MULTIPLE_CHOICE).count()
+        ));
+        accuracyByProblemType.put("OX", ratioPercent(
+                attempts.stream().filter(a -> a.getProblem().getType() == ProblemType.OX).filter(ProblemAttempt::isCorrect).count(),
+                attempts.stream().filter(a -> a.getProblem().getType() == ProblemType.OX).count()
+        ));
+        accuracyByProblemType.put("SHORT_ANSWER", ratioPercent(subjectiveCorrect, subjectiveTotal));
+        accuracyByProblemType.put("OBJECTIVE", ratioPercent(objectiveCorrect, objectiveTotal));
+        accuracyByProblemType.put("SUBJECTIVE", ratioPercent(subjectiveCorrect, subjectiveTotal));
+        profile.put("accuracyByProblemType", accuracyByProblemType);
+
+        try {
+            return objectMapper.writeValueAsString(profile);
+        } catch (Exception e) {
+            return "{\"category\":\"%s\",\"targetScope\":\"%s\"}".formatted(category, targetScope);
+        }
+    }
+
+    private static int ratioPercent(long correct, long total) {
+        if (total <= 0) return 0;
+        return (int) Math.round(correct * 100.0 / total);
+    }
+
+    private BaseAnalysisData buildBaseData(User user) {
+        List<ProblemAttempt> attempts = problemAttemptRepository.findByUserOrderByCreatedAtAsc(user);
+        Map<Long, ProblemAttempt> firstAttempts = new LinkedHashMap<>();
+        for (ProblemAttempt attempt : attempts) {
+            Long problemId = attempt.getProblem().getId();
+            firstAttempts.putIfAbsent(problemId, attempt);
+        }
+
+        List<WrongSeed> wrongs = new ArrayList<>();
+        for (ProblemAttempt first : firstAttempts.values()) {
+            if (first.isCorrect()) continue;
+            Problem problem = first.getProblem();
+            wrongs.add(new WrongSeed(
+                    problem.getGame().getId(),
+                    problem.getId(),
+                    toCategory(problem.getGame().getType()),
+                    problem.getQuestion(),
+                    resolveUserAnswer(first, problem),
+                    first.getCreatedAt() != null ? first.getCreatedAt().toLocalDate() : null,
+                    problem
+            ));
+        }
+
+        AnalysisGeminiService.AnalysisAiResult aiResult = analysisGeminiService.analyzeWrongProblems(wrongs);
+        Map<Long, String> scopeByProblem = new LinkedHashMap<>();
+        for (WrongSeed wrong : wrongs) {
+            AnalysisGeminiService.ScopeCategory sc = aiResult.perProblem().get(wrong.problemId());
+            String scope = (sc != null && sc.scope() != null && !sc.scope().isBlank())
+                    ? sc.scope()
+                    : normalizeScope(wrong.problem());
+            scopeByProblem.put(wrong.problemId(), scope);
+        }
+
+        List<String> weakTop3 = new ArrayList<>(aiResult.weakTop3());
+        if (weakTop3.isEmpty()) {
+            weakTop3 = scopeByProblem.values().stream()
+                    .collect(Collectors.groupingBy(v -> v, LinkedHashMap::new, Collectors.counting()))
+                    .entrySet().stream()
+                    .sorted((a, b) -> Long.compare(b.getValue(), a.getValue()))
+                    .limit(3)
+                    .map(Map.Entry::getKey)
+                    .collect(Collectors.toList());
+        }
+        while (weakTop3.size() < 3) {
+            weakTop3.add("기초 개념");
+        }
+
+        return new BaseAnalysisData(firstAttempts, wrongs, scopeByProblem, weakTop3);
+    }
+
+    private static String fallbackScope(String question) {
+        if (question == null || question.isBlank()) return "기타";
+        if (question.contains("which") || question.contains("who") || question.contains("that")) return "관계대명사";
+        if (question.contains("it")) return "가주어 it";
+        if (question.contains("조건")) return "조건문";
+        if (question.contains("동의어")) return "동의어";
+        return "기타";
+    }
+
+    private static String normalizeScope(Problem problem) {
+        if (problem.getScope() != null && !problem.getScope().isBlank()) {
+            return problem.getScope();
+        }
+        return fallbackScope(problem.getQuestion());
+    }
+
+    private static String resolveUserAnswer(ProblemAttempt attempt, Problem problem) {
+        if (attempt.getSubmittedText() != null && !attempt.getSubmittedText().isBlank()) {
+            return attempt.getSubmittedText();
+        }
+        if (attempt.getChosenAnswer() != null && !attempt.getChosenAnswer().isBlank()) {
+            return attempt.getChosenAnswer();
+        }
+        return problem.getCorrectAnswer();
+    }
+
+    private static String toCategory(GameType gameType) {
+        return gameType == GameType.GRAMMAR ? "GRAMMAR" : "WORD";
+    }
+
+    private static String normalizeCategory(String category) {
+        if (category == null || category.isBlank()) return null;
+        if ("GRAMMAR".equalsIgnoreCase(category)) return "GRAMMAR";
+        if ("WORD".equalsIgnoreCase(category)) return "WORD";
+        return null;
+    }
+
+    private User findUser(CustomUserDetails userDetails) {
+        return userRepository.findById(userDetails.getUser().getUserId())
+                .orElseThrow(() -> new CapstonException(ExceptionCode.USER_NOT_FOUND));
+    }
+
+    public record WrongSeed(
+            Long gameId,
+            Long problemId,
+            String category,
+            String question,
+            String answer,
+            LocalDate wrongDate,
+            Problem problem
+    ) {}
+
+    private record BaseAnalysisData(
+            Map<Long, ProblemAttempt> firstAttempts,
+            List<WrongSeed> wrongs,
+            Map<Long, String> scopeByProblem,
+            List<String> weakTop3
+    ) {}
+}
