@@ -1,0 +1,172 @@
+# Grammar RAG Engine — 실행 가이드
+
+## 필요한 것
+
+- Python 3.10+
+- PostgreSQL (로컬 또는 SpringBoot와 동일한 DB)
+- Gemini API 키
+
+---
+
+## 1. 환경 세팅
+
+```bash
+# 가상환경 생성 및 활성화
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+
+# 의존성 설치 (torch 포함이라 5~10분 걸림)
+pip install -r requirements.txt
+
+# Stanza 영어 모델 다운로드 (최초 1회, 약 400MB)
+python -c "import stanza; stanza.download('en')"
+```
+
+---
+
+## 2. 환경변수 설정
+
+```bash
+cp .env.example .env
+```
+
+`.env` 파일을 열어서 아래 값 입력:
+
+```env
+# SpringBoot와 동일한 DB를 바라보면 됨
+DATABASE_URL=postgresql://postgres:비밀번호@localhost:5432/capston
+
+# Gemini API 키 (SpringBoot에서 쓰는 것과 동일하게)
+GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_MODEL=gemini-2.5-flash
+```
+
+---
+
+## 3. 서버 실행
+
+```bash
+# 개발 모드 (코드 변경 시 자동 재시작)
+uvicorn app.main:app --reload --port 8000
+
+# 서버가 뜨면 아래 주소에서 API 문서 확인
+# http://localhost:8000/docs
+```
+
+---
+
+## 4. 동작 확인 (단계별)
+
+### Step 1 — 서버 기본 동작 확인 (DB 없어도 됨)
+
+```bash
+curl http://localhost:8000/health
+# {"status":"ok"}
+
+curl http://localhost:8000/
+# {"message":"Grammar RAG Engine is running", ...}
+```
+
+### Step 2 — Stanza 파싱 확인 (DB 없어도 됨)
+
+```bash
+curl -X POST http://localhost:8000/parse \
+  -H "Content-Type: application/json" \
+  -d '{"text": "She has been studying English for two years."}'
+# tokens 리스트 + grammar_tags 반환
+```
+
+### Step 3 — 문제 생성 확인 (DB 없어도 됨, Gemini API 키 필요)
+
+```bash
+curl -X POST http://localhost:8000/api/generate/problems \
+  -H "Content-Type: application/json" \
+  -d '{
+    "source_text": "She has been studying English for two years. He went to school yesterday.",
+    "problem_count": 3,
+    "problem_types": ["MULTIPLE_CHOICE", "OX"]
+  }'
+```
+
+> corpus가 비어 있어도 source_text가 있으면 그걸로 문제 생성함
+
+### Step 4 — Corpus 빌드 (DB 필요, 시간 오래 걸림)
+
+```bash
+# 소량으로 먼저 테스트 (동기, 즉시 결과 반환)
+curl -X POST http://localhost:8000/api/corpus/build/sync \
+  -H "Content-Type: application/json" \
+  -d '{"dataset_name":"open_subtitles","max_sentences":100}'
+
+# 실제 빌드 (비동기, 백그라운드 실행)
+curl -X POST http://localhost:8000/api/corpus/build \
+  -H "Content-Type: application/json" \
+  -d '{"dataset_name":"open_subtitles","max_sentences":5000}'
+
+# 빌드 상태 확인
+curl http://localhost:8000/api/corpus/status
+```
+
+---
+
+## 5. DB 없이 빠르게 테스트하는 방법
+
+DB 설정 전에 문제 생성만 먼저 보고 싶다면,
+`source_text`를 직접 넣어서 `/api/generate/problems` 호출하면 됨.
+corpus retrieval을 건너뛰고 source_text → Gemini 직접 호출로 동작함.
+
+---
+
+## 6. SpringBoot와 동시에 로컬 실행
+
+```bash
+# 터미널 1: SpringBoot
+./gradlew bootRun
+
+# 터미널 2: FastAPI
+source .venv/bin/activate
+uvicorn app.main:app --reload --port 8000
+
+# SpringBoot에서 FastAPI 연결 확인
+curl http://localhost:8080/nlp/status
+# {"nlpEnabled":true,"nlpHealthy":true,"mode":"RAG (NLP Server)"}
+```
+
+---
+
+## 포트 정리
+
+| 서비스     | 포트 | 비고 |
+| ---------- | ---- | ---- |
+| SpringBoot | 8080 | 기존 |
+| FastAPI    | 8000 | 신규 |
+| PostgreSQL | 5432 | 공유 |
+
+---
+
+## 자주 나오는 오류
+
+**`stanza.download` 안 했을 때**
+
+```
+FileNotFoundError: [Errno 2] No such file or directory: '...en_ewt...'
+```
+
+→ `python -c "import stanza; stanza.download('en')"` 실행
+
+**DB 연결 실패**
+
+```
+psycopg2.OperationalError: could not connect to server
+```
+
+→ `.env`의 `DATABASE_URL` 확인. corpus/retrieval 기능만 안 되고 나머지는 동작함
+
+**포트 충돌**
+
+```
+ERROR: [Errno 48] Address already in use
+```
+
+→ `uvicorn app.main:app --reload --port 8001` 로 포트 변경 후
+SpringBoot 환경변수 `NLP_SERVER_URL=http://localhost:8001`
