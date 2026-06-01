@@ -1,3 +1,13 @@
+# Database
+psycopg2-binary==2.9.9
+
+# HuggingFace
+datasets==3.6.0
+huggingface-hub==0.30.2
+
+# HTTP
+requests==2.33.1
+
 annotated-doc==0.0.4
 annotated-types==0.7.0
 anyio==4.13.0
