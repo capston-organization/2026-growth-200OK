@@ -88,6 +88,15 @@ def count_by_tag() -> dict:
     finally:
         conn.close()
 
+def count_corpus() -> int:
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM grammar_corpus")
+            return cur.fetchone()[0]
+    finally:
+        conn.close()
+
 
 # ── Text cleaning ─────────────────────────────────────────────────────────────
 
