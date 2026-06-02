@@ -52,20 +52,9 @@ _WRONG_CHOICES = {
     },
 }
 
-# 시제 변환 맵
-_TENSE_FORMS = {
-    "goes": {"past": "went", "progressive": "going", "perfect": "gone", "present": "go"},
-    "go":   {"past": "went", "progressive": "going", "perfect": "gone", "present": "goes"},
-    "is":   {"past": "was",  "progressive": "being", "perfect": "been", "present": "are"},
-    "are":  {"past": "were", "progressive": "being", "perfect": "been", "present": "is"},
-    "has":  {"past": "had",  "progressive": "having","perfect": "had",  "present": "have"},
-    "have": {"past": "had",  "progressive": "having","perfect": "had",  "present": "has"},
-    "does": {"past": "did",  "progressive": "doing", "perfect": "done", "present": "do"},
-    "do":   {"past": "did",  "progressive": "doing", "perfect": "done", "present": "does"},
-    "runs": {"past": "ran",  "progressive": "running","perfect": "run", "present": "run"},
-    "run":  {"past": "ran",  "progressive": "running","perfect": "run", "present": "runs"},
-    "was":  {"past": "were", "progressive": "being", "perfect": "been", "present": "is"},
-    "were": {"past": "was",  "progressive": "being", "perfect": "been", "present": "are"},
+# 3인칭 단수 현재형 예외 (규칙 적용 시 오류 방지)
+_THIRD_PERSON_SINGULAR = {
+    "go": "goes", "do": "does", "have": "has", "be": "is",
 }
 
 
@@ -83,7 +72,7 @@ def build_problem_material(
         "target_grammar": str,
         "target_word": str,       # 빈칸이 될 단어
         "answer": str,            # 정답
-        "wrong_choices": List[str], # 오답 3개
+        "wrong_choices": List[str], # 오답 4개 (SpringBoot 5지선다 맞춤)
         "problem_type": str,      # multiple_choice / ox / short_answer
     }
     실패 시 None 반환
@@ -101,7 +90,6 @@ def build_problem_material(
     if not target_tag:
         return None
 
-    # 태그에 맞는 타깃 토큰 추출
     target_token = _find_target_token(target_tag, tokens)
     if not target_token:
         return None
@@ -112,18 +100,15 @@ def build_problem_material(
     if not wrong_choices:
         return None
 
-    # OX 문제는 article, basic_word_order에 적용
-    if target_tag in ("basic_word_order",):
-        problem_type = "ox"
-    else:
-        problem_type = "multiple_choice"
+    # OX 문제는 basic_word_order에 적용
+    problem_type = "ox" if target_tag == "basic_word_order" else "multiple_choice"
 
     return {
         "sentence": sentence,
         "target_grammar": target_tag,
         "target_word": answer,
         "answer": answer,
-        "wrong_choices": wrong_choices[:3],
+        "wrong_choices": wrong_choices[:4],   # 4개 → SpringBoot 5지선다(정답1+오답4)
         "problem_type": problem_type,
     }
 
@@ -161,66 +146,116 @@ def _find_target_token(tag: str, tokens: List[dict]) -> Optional[dict]:
 
 
 def _generate_wrong_choices(tag: str, answer: str, tokens: List[dict]) -> List[str]:
-    """태그 기반 오답 후보 생성"""
+    """태그 기반 오답 후보 생성 — 4개 반환 (SpringBoot 5지선다 맞춤)"""
     answer_lower = answer.lower()
     wrongs = []
 
     if tag in ("tense_present", "tense_past", "subject_verb_agreement"):
-        forms = _TENSE_FORMS.get(answer_lower, {})
-        wrongs = list(set(forms.values()) - {answer_lower})
-        if not wrongs:
-            # fallback: 일반적인 동사 변형 오답
-            wrongs = _verb_fallback(answer_lower)
+        lemma = next(
+            (t["lemma"] for t in tokens if t["text"].lower() == answer_lower),
+            answer_lower,
+        )
+        return _conjugate_verb(lemma, answer_lower)
 
     elif tag == "auxiliary_verb":
         pool = [w for w in _WRONG_CHOICES["auxiliary_verb"]["pool"] if w.lower() != answer_lower]
-        wrongs = random.sample(pool, min(3, len(pool)))
+        wrongs = random.sample(pool, min(4, len(pool)))
 
     elif tag == "preposition":
         pool = [w for w in _WRONG_CHOICES["preposition"]["pool"] if w.lower() != answer_lower]
-        wrongs = random.sample(pool, min(3, len(pool)))
+        wrongs = random.sample(pool, min(4, len(pool)))
 
     elif tag == "article":
         pool = [w for w in _WRONG_CHOICES["article"]["pool"] if w.lower() != answer_lower]
-        wrongs = pool[:3]
+        wrongs = pool[:4]
 
     elif tag == "comparative":
         pool = [w for w in _WRONG_CHOICES["comparative"]["pool"] if w.lower() != answer_lower]
-        wrongs = random.sample(pool, min(3, len(pool)))
+        wrongs = random.sample(pool, min(4, len(pool)))
 
     elif tag == "to_infinitive":
-        # to부정사 → 동명사(-ing) vs 원형 혼동
-        # 다음 토큰이 동사인지 확인
-        wrongs = ["for", "of", "in"]
+        wrongs = ["for", "of", "in", "at"]
 
     elif tag == "passive_voice":
         pool = [w for w in _WRONG_CHOICES["passive_voice"]["pool"] if w.lower() != answer_lower]
-        wrongs = random.sample(pool, min(3, len(pool)))
+        wrongs = random.sample(pool, min(4, len(pool)))
 
     elif tag == "basic_word_order":
-        # OX 문제용 — 어순이 맞는지 틀린지만 판단
         wrongs = []  # OX는 오답 없음
 
-    return [w for w in wrongs if w and w.lower() != answer_lower][:3]
+    return [w for w in wrongs if w and w.lower() != answer_lower][:4]
 
 
-def _verb_fallback(verb: str) -> List[str]:
-    """TENSE_FORMS에 없는 동사의 fallback 오답"""
-    results = []
-    # -s 붙이거나 제거
-    if verb.endswith("s") and len(verb) > 2:
-        results.append(verb[:-1])
-    else:
-        results.append(verb + "s")
-    # -ing
-    if verb.endswith("e"):
-        results.append(verb[:-1] + "ing")
-    else:
-        results.append(verb + "ing")
-    # -ed
-    if verb.endswith("e"):
-        results.append(verb + "d")
-    else:
-        results.append(verb + "ed")
-    return results
+def _conjugate_verb(lemma: str, exclude: str) -> List[str]:
+    """lemma(동사 원형)로 변형 생성 후 정답 제외 — 4개 반환"""
+    forms = set()
 
+    # 3인칭 단수 현재형 (예외 처리 우선)
+    if lemma in _THIRD_PERSON_SINGULAR:
+        forms.add(_THIRD_PERSON_SINGULAR[lemma])
+    elif lemma.endswith(("s", "x", "z", "ch", "sh")):
+        forms.add(lemma + "es")
+    elif lemma.endswith("y") and len(lemma) > 1 and lemma[-2] not in "aeiou":
+        forms.add(lemma[:-1] + "ies")
+    else:
+        forms.add(lemma + "s")
+
+    # 원형
+    forms.add(lemma)
+
+    # 불규칙 동사 테이블
+    irregular = {
+        "go":    ("went",    "gone"),
+        "be":    ("was",     "been"),
+        "have":  ("had",     "had"),
+        "do":    ("did",     "done"),
+        "make":  ("made",    "made"),
+        "take":  ("took",    "taken"),
+        "come":  ("came",    "come"),
+        "see":   ("saw",     "seen"),
+        "get":   ("got",     "gotten"),
+        "give":  ("gave",    "given"),
+        "know":  ("knew",    "known"),
+        "think": ("thought", "thought"),
+        "say":   ("said",    "said"),
+        "run":   ("ran",     "run"),
+        "eat":   ("ate",     "eaten"),
+        "write": ("wrote",   "written"),
+        "speak": ("spoke",   "spoken"),
+        "bring": ("brought", "brought"),
+        "buy":   ("bought",  "bought"),
+        "teach": ("taught",  "taught"),
+        "find":  ("found",   "found"),
+        "leave": ("left",    "left"),
+        "feel":  ("felt",    "felt"),
+        "keep":  ("kept",    "kept"),
+        "meet":  ("met",     "met"),
+        "send":  ("sent",    "sent"),
+        "tell":  ("told",    "told"),
+        "hear":  ("heard",   "heard"),
+        "stand": ("stood",   "stood"),
+        "lose":  ("lost",    "lost"),
+        "put":   ("put",     "put"),
+    }
+
+    if lemma in irregular:
+        past, pp = irregular[lemma]
+        forms.add(past)
+        forms.add(pp)
+    else:
+        # 규칙 동사 과거형
+        if lemma.endswith("e"):
+            forms.add(lemma + "d")
+        elif lemma.endswith("y") and len(lemma) > 1 and lemma[-2] not in "aeiou":
+            forms.add(lemma[:-1] + "ied")
+        else:
+            forms.add(lemma + "ed")
+
+    # 진행형 -ing
+    if lemma.endswith("e") and not lemma.endswith("ee"):
+        forms.add(lemma[:-1] + "ing")
+    else:
+        forms.add(lemma + "ing")
+
+    wrongs = [f for f in forms if f != exclude]
+    return wrongs[:4]
