@@ -46,12 +46,18 @@ async def generate(req: ProblemGenerationRequest):
     retrieve_count = min(req.problem_count * 3, 30)
 
     if grammar_tags:
-        retrieved = retrieve_by_tags(
-            grammar_tags=grammar_tags,
-            limit=retrieve_count,
-        )
+        try:
+            retrieved = retrieve_by_tags(
+                grammar_tags=grammar_tags,
+                limit=retrieve_count,
+            )
+        except Exception:
+            retrieved = []
     else:
-        retrieved = retrieve_random(limit=retrieve_count)
+        try:
+            retrieved = retrieve_random(limit=retrieve_count)
+        except Exception:
+            retrieved = []
 
     retrieved_sentences = [r["sentence"] for r in retrieved]
 
