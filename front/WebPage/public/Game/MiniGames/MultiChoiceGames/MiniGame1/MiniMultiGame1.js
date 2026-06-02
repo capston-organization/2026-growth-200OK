@@ -7,6 +7,20 @@ const MINI_MULTI_GAME1_MOCK_PROBLEMS = [
   {
     id: 9301,
     type: "MULTIPLE_CHOICE",
+    question:
+      "Choose the correct article: I want to go there, but she doesn't want to ___ there. testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest",
+    options: [
+      "go",
+      "testtesttesttestgoing",
+      "testtesttesttestgoes",
+      "testtesttesttestgone",
+      "testtesttetetestwent",
+    ],
+    correctAnswer: "go",
+  },
+  {
+    id: 9302,
+    type: "MULTIPLE_CHOICE",
     question: "Choose the correct article: It was ___ useful idea.",
     options: ["a", "an", "the", "-(empty)", "both a and an"],
     correctAnswer: "a",
@@ -133,6 +147,7 @@ class MiniMultiGame1 extends Phaser.Scene {
         color: "#000000",
         fontFamily: "Nunito",
         align: "center",
+        wordWrap: { width: 800, useAdvancedWrap: true },
       })
       .setStroke("#ffffff", 5)
       .setOrigin(0.5);
@@ -327,6 +342,96 @@ class MiniMultiGame1 extends Phaser.Scene {
     else this.timerText.setColor("#ffffff");
   }
 
+  _getQuestionBarLayout() {
+    const { width, height } = this.scale;
+    const problemBarY = height * 0.075;
+    const problemBarHeight = 150 * this.globalScale;
+    const centerX = width / 2;
+    const centerY = problemBarY * 1.15;
+    const boxW = width * 0.8;
+    // ProblemBar.png 안쪽(테두리·상단 장식 제외) — bar 높이 대비 비율로 고정
+    const boxH = problemBarHeight * 0.66;
+    return { problemBarY, problemBarHeight, centerX, centerY, boxW, boxH };
+  }
+
+  _getQuestionTextBox() {
+    const { boxW, boxH } = this._getQuestionBarLayout();
+    return {
+      maxWidth: boxW,
+      maxHeight: boxH,
+      baseFontSize: 40 * this.globalScale,
+    };
+  }
+
+  _getTargetWordTextBox() {
+    return {
+      maxWidth: 210 * this.globalScale,
+      maxHeight: 56 * this.globalScale,
+      baseFontSize: 34 * this.globalScale,
+    };
+  }
+
+  _fitTextToBox(
+    textObj,
+    content,
+    {
+      maxWidth,
+      maxHeight,
+      baseFontSize,
+      strokePad = 0,
+      minFontSize = 8,
+      absoluteMinFontSize = 6,
+    },
+  ) {
+    const text = String(content ?? "");
+    const fitHeight = Math.max(8, maxHeight - strokePad);
+    const floor = Math.min(minFontSize, absoluteMinFontSize);
+
+    textObj.setWordWrapWidth(maxWidth, true);
+
+    const measureHeight = () => {
+      const stroke = Number(textObj.style?.strokeThickness) || 0;
+      return textObj.height + stroke * 2;
+    };
+
+    let fontSize = Math.ceil(baseFontSize);
+    while (fontSize >= floor) {
+      textObj.setFontSize(`${fontSize}px`);
+      textObj.setText(text);
+      if (measureHeight() <= fitHeight) return;
+      fontSize -= 1;
+    }
+
+    textObj.setFontSize(`${floor}px`);
+    textObj.setText(text);
+  }
+
+  _fitQuestionText(content) {
+    if (!this.questionText) return;
+    if (this.questionTextMaskGfx) {
+      this.questionText.clearMask();
+      this.questionTextMaskGfx.destroy();
+      this.questionTextMaskGfx = null;
+    }
+    const { centerX, centerY } = this._getQuestionBarLayout();
+    this._fitTextToBox(this.questionText, content, {
+      ...this._getQuestionTextBox(),
+      strokePad: 12,
+      minFontSize: 8,
+      absoluteMinFontSize: 6,
+    });
+    this.questionText.setPosition(centerX, centerY).setOrigin(0.5, 0.5);
+  }
+
+  _fitTargetWord(textObj, content) {
+    this._fitTextToBox(textObj, content, {
+      ...this._getTargetWordTextBox(),
+      strokePad: 8,
+      minFontSize: 10,
+      absoluteMinFontSize: 10,
+    });
+  }
+
   // =================================================================
   // [4] Create Targets
   // =================================================================
@@ -345,6 +450,7 @@ class MiniMultiGame1 extends Phaser.Scene {
           color: "#ffffff",
           fontFamily: "Nunito",
           align: "center",
+          wordWrap: { width: 210, useAdvancedWrap: true },
         })
         .setStroke("#000000", 6)
         .setOrigin(0.5);
@@ -374,7 +480,7 @@ class MiniMultiGame1 extends Phaser.Scene {
     const p = this.currentProblem; // 전달받은 문제 사용
 
     // API 명세서에 따르면 문제는 p.question 에 들어있음
-    this.questionText.setText(p.question);
+    this._fitQuestionText(p.question);
 
     // 옵션 섞기 (API의 p.options 사용)
     const options = Phaser.Utils.Array.Shuffle([...p.options]).slice(0, 5);
@@ -388,7 +494,7 @@ class MiniMultiGame1 extends Phaser.Scene {
     this.targets.forEach((t, i) => {
       // 옵션이 5개가 안될 수도 있으니 예외 처리
       const optionText = options[i] || "";
-      t.word.setText(optionText);
+      this._fitTargetWord(t.word, optionText);
       t.clicked = false;
       t.image.setTexture(`target${t.id}`);
       t.image.clearTint();
@@ -565,14 +671,15 @@ class MiniMultiGame1 extends Phaser.Scene {
     }
 
     // 5. 상단 문제 바
-    const problemBarY = height * 0.075;
+    const { problemBarY, problemBarHeight, centerX } =
+      this._getQuestionBarLayout();
     this.problemBarBg
-      .setPosition(width / 2, problemBarY)
-      .setDisplaySize(width * 0.9, 100 * this.globalScale); // 높이만 스케일
+      .setPosition(centerX, problemBarY)
+      .setDisplaySize(width * 0.9, problemBarHeight);
 
-    this.questionText
-      .setPosition(width / 2, problemBarY + 5 * this.globalScale)
-      .setFontSize(`${40 * this.globalScale}px`);
+    if (this.currentProblem?.question) {
+      this._fitQuestionText(this.currentProblem.question);
+    }
 
     // 6. 하단 타이머 UI
     // 6. 타이머 UI 조정
@@ -635,8 +742,8 @@ class MiniMultiGame1 extends Phaser.Scene {
           );
 
           // [폰트 조정]
-          t.word.setFontSize(`${34 * this.globalScale}px`);
           t.word.y = 130 * this.globalScale; // 텍스트 Y 위치도 보정
+          this._fitTargetWord(t.word, t.word.text);
         }
       });
     }
