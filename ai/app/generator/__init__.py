@@ -83,7 +83,7 @@ def wrap_problem_with_llm(material: dict) -> Optional[dict]:
     sentence_with_blank = sentence.replace(answer, "___", 1)
 
     # 선택지 섞기 (정답 포함, 서버에서)
-    all_choices = [answer] + wrong_choices[:3]
+    all_choices = [answer] + wrong_choices[:4]
     import random; random.shuffle(all_choices)
 
     # LLM에게는 지시문 + 해설만 요청
