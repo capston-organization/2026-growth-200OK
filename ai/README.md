@@ -24,6 +24,8 @@ Stanza 파서의 정확도를 UD English EWT 테스트셋으로 직접 실측하
 ### 2. Grammar Rule Precision (UD English EWT)
 
 grammar_tagger의 10개 rule 함수를 UD EWT gold annotation과 비교하여 Precision·Recall·F1을 측정하였다.
+<img width="884" height="928" alt="image" src="https://github.com/user-attachments/assets/38bdf1d9-d8c8-40b7-b75a-f6859af5aaec" />
+
 
 - 데이터셋: UD English EWT (`en_ewt-ud-test.conllu`)
 - 평가 문장 수: 500개 (30토큰 이하)
