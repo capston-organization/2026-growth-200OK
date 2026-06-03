@@ -62,13 +62,24 @@ def _truncate(text: str, max_len: int) -> str:
 
 
 def _remove_markdown(text: str) -> str:
-    """마크다운 기호 제거 (**, *, ##, __ 등)"""
-    text = re.sub(r"\*{1,3}(.*?)\*{1,3}", r"\1", text)   # **bold**, *italic*
-    text = re.sub(r"_{1,2}(.*?)_{1,2}", r"\1", text)      # __bold__, _italic_
-    text = re.sub(r"#+\s*", "", text)                      # ## 헤더
-    text = re.sub(r"\[(.*?)\]\(.*?\)", r"\1", text)        # [링크](url)
+    """마크다운 기호 완전 제거"""
+    # **bold**, ***bold***, *italic*
+    text = re.sub(r"\*{1,3}(.*?)\*{1,3}", r"\1", text, flags=re.DOTALL)
+    # __bold__, _italic_
+    text = re.sub(r"_{1,2}(.*?)_{1,2}", r"\1", text, flags=re.DOTALL)
+    # ## 헤더
+    text = re.sub(r"^#{1,6}\s*", "", text, flags=re.MULTILINE)
+    # [링크](url)
+    text = re.sub(r"\[(.*?)\]\(.*?\)", r"\1", text)
+    # 남은 * 기호 완전 제거
+    text = text.replace("*", "")
     text = text.strip()
     return text
+
+
+def _make_blank_sentence(sentence: str, answer: str) -> str:
+    """대소문자 무시하고 정답을 ___ 로 교체"""
+    return re.sub(re.escape(answer), "___", sentence, count=1, flags=re.IGNORECASE)
 
 
 # ── 핵심: LLM은 포장만 ────────────────────────────────────────────────────────
@@ -76,9 +87,6 @@ def _remove_markdown(text: str) -> str:
 def wrap_problem_with_llm(material: dict) -> Optional[dict]:
     """
     rule-based가 만든 재료 → LLM이 빈칸 포함 문제 지시문 + 해설만 생성
-
-    반환:
-        question (빈칸 문장 포함), options, answer, explanation, type, scope
     """
     sentence       = material["sentence"]
     answer         = material["answer"]
@@ -86,14 +94,13 @@ def wrap_problem_with_llm(material: dict) -> Optional[dict]:
     target_grammar = material["target_grammar"]
     problem_type   = material["problem_type"]
 
-    # 빈칸 문장 생성 (서버에서 직접)
-    sentence_with_blank = sentence.replace(answer, "___", 1)
+    # 빈칸 문장 생성 (대소문자 무시)
+    sentence_with_blank = _make_blank_sentence(sentence, answer)
 
-    # 선택지 섞기 (서버에서)
+    # 선택지 섞기
     all_choices = [answer] + wrong_choices[:4]
     import random; random.shuffle(all_choices)
 
-    # LLM에게는 question(빈칸 문장 포함)과 해설만 요청
     prompt = f"""영어 문법 문제의 지시문과 해설을 작성해 주세요.
 
 [문법 포인트] {_tag_to_scope(target_grammar)}
@@ -102,11 +109,11 @@ def wrap_problem_with_llm(material: dict) -> Optional[dict]:
 [오답들] {', '.join(wrong_choices)}
 
 [요구사항]
-- question: 반드시 빈칸 문장을 포함한 문제 지시문. 형식: "{sentence_with_blank} 빈칸에 알맞은 말을 고르시오."
-  예시: "She ___ to school every day. 빈칸에 알맞은 말을 고르시오."
+- question: 반드시 빈칸 문장을 포함한 문제 지시문.
+  형식: "{sentence_with_blank} 빈칸에 알맞은 말을 고르시오."
   한국어+영어 혼용 가능. 60자 이내.
-- explanation: 왜 '{answer}'이 정답인지 초중등 눈높이 한국어로 2~3문장. 
-  마크다운 기호(**,*,##,__) 절대 사용 금지. 일반 텍스트만.
+- explanation: 왜 '{answer}'이 정답인지 초중등 눈높이 한국어로 2~3문장.
+  마크다운 기호(**,*,##,__,【】) 절대 사용 금지. 일반 텍스트만.
 
 JSON만 출력. 코드블록 금지. 다른 설명 금지.
 {{"question":"...","explanation":"..."}}"""
@@ -118,7 +125,6 @@ JSON만 출력. 코드블록 금지. 다른 설명 금지.
         explanation = _remove_markdown(_truncate(parsed.get("explanation", ""), 300))
     except Exception as e:
         logger.warning("LLM wrap failed: %s", e)
-        # fallback: 빈칸 문장을 question에 직접 포함
         question    = f"{sentence_with_blank} 빈칸에 알맞은 말을 고르시오."
         explanation = f"정답은 '{answer}'입니다."
 
@@ -202,7 +208,7 @@ def _llm_fallback(
 
 [규칙]
 - question: 반드시 빈칸 문장 포함. 예: "She ___ to school. 빈칸에 알맞은 말을 고르시오." 80자 이내
-- explanation: 마크다운(**,*,##) 절대 사용 금지. 일반 텍스트만.
+- explanation: 마크다운(**,*,##,__) 절대 사용 금지. 일반 텍스트만.
 - JSON 배열만 출력. 설명 금지.
 {tag_hint}{personal}
 
@@ -249,7 +255,7 @@ def generate_analysis_feedback(weak_tags: List[dict]) -> str:
 {tag_lines}
 
 위 결과를 바탕으로 초중등 학생에게 맞는 학습 피드백을 3~5문장 한국어로 작성해 주세요.
-격려 메시지 포함. 마크다운(**,*,##) 절대 사용 금지. 일반 텍스트만."""
+격려 메시지 포함. 마크다운(**,*,##,__) 절대 사용 금지. 일반 텍스트만."""
     try:
         return _remove_markdown(_call_gemini(prompt).strip())
     except Exception as e:
