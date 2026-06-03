@@ -15,12 +15,6 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
-/**
- * FastAPI NLP 서버 클라이언트
- * POST /api/generate/problems → GeminiService.RawGeneratedProblem 리스트로 변환
- *
- * nlp.enabled=false 이거나 서버 응답 실패 시 null 반환 → GameGenerateService에서 Gemini fallback
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -30,8 +24,6 @@ public class NlpClient {
     private final WebClient.Builder webClientBuilder;
     private final ObjectMapper objectMapper;
 
-    // ── FastAPI 요청 body ──────────────────────────────────────────────────────
-
     public record NlpGenerateRequest(
             @JsonProperty("source_text")    String sourceText,
             @JsonProperty("grammar_tags")   List<String> grammarTags,
@@ -40,34 +32,22 @@ public class NlpClient {
             @JsonProperty("personalization_context") String personalizationContext
     ) {}
 
-    // ── FastAPI 응답 body ─────────────────────────────────────────────────────
-
     public record NlpProblem(
             String question,
             List<String> options,
-            @JsonProperty("correct_answer") String correctAnswer,
+            @JsonProperty("correct_answer")      String correctAnswer,
+            @JsonProperty("sentence_with_blank") String sentenceWithBlank,
+            String explanation,   // ← FastAPI의 해설 필드 추가
             String type,
             String scope
     ) {}
 
     public record NlpGenerateResponse(
             List<NlpProblem> problems,
-            @JsonProperty("source_sentences") List<String> sourceSentences,
+            @JsonProperty("source_sentences")  List<String> sourceSentences,
             @JsonProperty("grammar_tags_used") List<String> grammarTagsUsed
     ) {}
 
-    // ── 핵심 메서드 ────────────────────────────────────────────────────────────
-
-    /**
-     * FastAPI 서버에 문제 생성 요청.
-     *
-     * @param sourceText             사용자 업로드 텍스트 (null 가능 — corpus에서 자동 검색)
-     * @param grammarTags            취약점 기반 grammar tag 목록 (null 가능)
-     * @param problemCount           생성할 문제 수
-     * @param problemTypes           문제 유형 목록
-     * @param personalizationContext AnalysisService에서 만든 사용자 취약점 JSON 문자열
-     * @return 파싱된 문제 목록. 실패 시 null 반환 → 호출부에서 Gemini fallback 처리
-     */
     public List<GeminiService.RawGeneratedProblem> generateProblems(
             String sourceText,
             List<String> grammarTags,
@@ -122,10 +102,6 @@ public class NlpClient {
         }
     }
 
-    /**
-     * FastAPI 응답 → GeminiService.RawGeneratedProblem 변환
-     * 기존 GameGenerateService 로직을 그대로 재사용할 수 있게 맞춤
-     */
     private GeminiService.RawGeneratedProblem toRaw(NlpProblem p) {
         GeminiService.RawGeneratedProblem raw = new GeminiService.RawGeneratedProblem();
         raw.question      = p.question();
@@ -133,14 +109,10 @@ public class NlpClient {
         raw.correctAnswer = p.correctAnswer();
         raw.type          = p.type();
         raw.scope         = p.scope();
+        raw.explanation   = p.explanation();   // ← FastAPI 해설 매핑
         return raw;
     }
 
-    // ── 헬스체크 ───────────────────────────────────────────────────────────────
-
-    /**
-     * NLP 서버 상태 확인 (로컬 테스트용)
-     */
     public boolean isHealthy() {
         if (!nlpProperties.isEnabled()) return false;
         try {

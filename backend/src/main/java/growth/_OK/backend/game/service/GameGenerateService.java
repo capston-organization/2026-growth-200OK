@@ -4,6 +4,7 @@ import growth._OK.backend.auth.jwt.CustomUserDetails;
 import growth._OK.backend.game.client.NlpClient;
 import growth._OK.backend.game.domain.Game;
 import growth._OK.backend.game.domain.GameSource;
+import growth._OK.backend.game.domain.GameType;
 import growth._OK.backend.game.domain.Problem;
 import growth._OK.backend.game.domain.ProblemType;
 import growth._OK.backend.game.dto.ResponseDto.GamePreviewResponseDto;
@@ -34,7 +35,7 @@ public class GameGenerateService {
     private final ProblemRepository problemRepository;
     private final UserRepository userRepository;
     private final GeminiService geminiService;
-    private final NlpClient nlpClient;          // ← 추가
+    private final NlpClient nlpClient;
     private final ObjectMapper objectMapper;
 
     @Transactional
@@ -101,10 +102,18 @@ public class GameGenerateService {
 
         String sourceText = game.getSource().getExtractedText();
 
-        // ── RAG Pipeline: NLP 서버 우선 호출 → 실패 시 Gemini fallback ─────────
-        List<GeminiService.RawGeneratedProblem> rawList = generateProblemsWithFallback(
-                sourceText, count, types, game.getLearningObjectives()
-        );
+        // ── 영문법 vs 영단어 분기 ──────────────────────────────────────────────
+        List<GeminiService.RawGeneratedProblem> rawList;
+
+        if (GameType.GRAMMAR.equals(game.getType())) {
+            // 영문법 → FastAPI RAG 파이프라인 (NLP 서버 우선, 실패 시 Gemini fallback)
+            log.info("[GameGenerateService] 영문법 게임 - FastAPI RAG 파이프라인 호출");
+            rawList = generateProblemsWithFallback(sourceText, count, types, game.getLearningObjectives());
+        } else {
+            // 영단어 → GeminiService 직접 호출 (영단어 전용 프롬프트)
+            log.info("[GameGenerateService] 영단어 게임 - Gemini 직접 호출");
+            rawList = geminiService.generateProblemsFromSource(sourceText, count, types, game.getLearningObjectives());
+        }
 
         if (rawList.size() > count) {
             rawList = new ArrayList<>(rawList.subList(0, count));
@@ -124,7 +133,7 @@ public class GameGenerateService {
                     .correctAnswer(raw.correctAnswer != null ? raw.correctAnswer : "")
                     .type(pt)
                     .scope(raw.scope != null && !raw.scope.isBlank() ? raw.scope : "기타")
-                    .explanation(null)
+                    .explanation(raw.explanation)
                     .build();
             saved.add(problemRepository.save(problem));
         }
@@ -157,21 +166,20 @@ public class GameGenerateService {
     }
 
     /**
-     * RAG Pipeline 실행:
+     * 영문법 RAG Pipeline:
      * 1. NLP 서버(FastAPI) 호출 시도
-     * 2. 실패(서버 다운 / nlp.enabled=false) 시 → 기존 Gemini 직접 호출
+     * 2. 실패 시 → Gemini fallback
      */
     private List<GeminiService.RawGeneratedProblem> generateProblemsWithFallback(
             String sourceText, int count, List<ProblemType> types, String learningObjectives) {
 
-        // 1. NLP 서버 시도
         try {
             List<GeminiService.RawGeneratedProblem> nlpResult = nlpClient.generateProblems(
                     sourceText,
-                    null,               // grammar_tags: corpus 자동 검색
+                    null,
                     count,
                     types,
-                    learningObjectives  // personalization_context로 전달
+                    learningObjectives
             );
             if (nlpResult != null && !nlpResult.isEmpty()) {
                 log.info("[GameGenerateService] NLP 서버로 문제 {}개 생성 완료", nlpResult.size());
@@ -181,12 +189,11 @@ public class GameGenerateService {
             log.warn("[GameGenerateService] NLP 서버 호출 실패, Gemini fallback: {}", e.getMessage());
         }
 
-        // 2. Gemini fallback (기존 로직 그대로)
-        log.info("[GameGenerateService] Gemini 직접 호출로 문제 생성");
+        log.info("[GameGenerateService] Gemini fallback으로 문제 생성");
         return geminiService.generateProblemsFromSource(sourceText, count, types, learningObjectives);
     }
 
-    // ── 유틸 (기존과 동일) ───────────────────────────────────────────────────
+    // ── 유틸 ─────────────────────────────────────────────────────────────────
 
     private static ProblemType parseProblemType(String type) {
         if (type == null) return ProblemType.MULTIPLE_CHOICE;
