@@ -176,15 +176,13 @@ const GameCreationPage = () => {
       );
       const previewData = await previewRes.json();
 
-      // [4번 API] 문제 유형 설정 (서술형 제외)
+      // [4번 API] 문제 유형 설정
       const typeMapping = {
         단답식: "SHORT_ANSWER",
         OX: "OX",
         객관식: "MULTIPLE_CHOICE",
       };
-      const apiProblemTypes = selectedQuestions
-        .filter((q) => q !== "서술형")
-        .map((q) => typeMapping[q]);
+      const apiProblemTypes = selectedQuestions.map((q) => typeMapping[q]);
 
       const problemRes = await fetch(
         apiUrl(`/games/${gameId}/generate/problems`),
@@ -662,7 +660,7 @@ const GameCreationPage = () => {
                 />
               </div>
 
-              {/* 2x2 그리드 배치 */}
+              {/* 2x2 레이아웃: 상단 2개, 하단 객관식 1개(가운데) — 서술형 미개발로 제외 */}
               <div
                 style={{
                   display: "grid",
@@ -673,15 +671,14 @@ const GameCreationPage = () => {
                   justifyItems: "center",
                 }}
               >
-                {["단답식", "OX", "객관식", "서술형"].map((type) => (
+                {["단답식", "OX"].map((type) => (
                   <div
                     key={type}
-                    // 이미 선택된 목록에 포함되어 있으면 테두리 표시
                     style={{
                       ...cardStyle(selectedQuestions.includes(type)),
                       margin: 0,
                     }}
-                    onClick={() => toggleQuestion(type)} // 클릭 시 토글
+                    onClick={() => toggleQuestion(type)}
                   >
                     <div style={{ fontSize: "80px", marginBottom: "10px" }}>
                       ❓
@@ -689,6 +686,26 @@ const GameCreationPage = () => {
                     <h4 style={{ fontSize: "28px", margin: 20 }}>{type}</h4>
                   </div>
                 ))}
+                <div
+                  style={{
+                    gridColumn: "1 / -1",
+                    display: "flex",
+                    justifyContent: "center",
+                  }}
+                >
+                  <div
+                    style={{
+                      ...cardStyle(selectedQuestions.includes("객관식")),
+                      margin: 0,
+                    }}
+                    onClick={() => toggleQuestion("객관식")}
+                  >
+                    <div style={{ fontSize: "80px", marginBottom: "10px" }}>
+                      ❓
+                    </div>
+                    <h4 style={{ fontSize: "28px", margin: 20 }}>객관식</h4>
+                  </div>
+                </div>
               </div>
             </div>
           )}
