@@ -1,7 +1,7 @@
 """
 Rule-based Problem Builder
 Stanza 태그 기반으로 정답/오답 후보를 서버가 직접 결정.
-LLM은 이 결과를 받아서 문제 지시문과 해설만 생성.
+LLM은 이 결과를 받아서 해설만 생성.
 """
 import random
 from typing import List, Optional
@@ -10,51 +10,44 @@ from typing import List, Optional
 # ── 태그별 오답 풀 (rule-based) ───────────────────────────────────────────────
 
 _WRONG_CHOICES = {
-    "tense_present": {
-        "description": "현재시제",
-        "transforms": ["past", "progressive", "perfect"],
-    },
-    "tense_past": {
-        "description": "과거시제",
-        "transforms": ["present", "progressive", "perfect"],
-    },
-    "subject_verb_agreement": {
-        "description": "수일치",
-        "transforms": ["number_flip"],
-    },
     "auxiliary_verb": {
-        "description": "조동사",
         "pool": ["can", "could", "will", "would", "should", "must", "may", "might"],
     },
     "preposition": {
-        "description": "전치사",
         "pool": ["in", "on", "at", "by", "for", "with", "to", "from", "of", "about"],
     },
     "article": {
-        "description": "관사",
-        "pool": ["a", "an", "the", ""],  # 빈 문자열 = 관사 없음
+        "pool": ["a", "an", "the", ""],
     },
     "comparative": {
-        "description": "비교급",
         "pool": ["more", "most", "less", "least", "very", "much"],
     },
     "to_infinitive": {
-        "description": "to부정사",
-        "transforms": ["gerund_swap"],
+        "pool": ["for", "of", "in", "at"],
     },
     "passive_voice": {
-        "description": "수동태",
         "pool": ["is", "are", "was", "were", "be", "been", "being"],
-    },
-    "basic_word_order": {
-        "description": "문장구조",
-        "transforms": ["word_order"],
     },
 }
 
-# 3인칭 단수 현재형 예외 (규칙 적용 시 오류 방지)
+# 3인칭 단수 현재형 예외
 _THIRD_PERSON_SINGULAR = {
     "go": "goes", "do": "does", "have": "has", "be": "is",
+}
+
+# 태그별 문제 유형 가중치
+# (multiple_choice, short_answer, ox) 비율
+_TYPE_WEIGHTS = {
+    "subject_verb_agreement": ["multiple_choice", "multiple_choice", "short_answer"],
+    "tense_present":          ["multiple_choice", "multiple_choice", "short_answer"],
+    "tense_past":             ["multiple_choice", "multiple_choice", "short_answer"],
+    "auxiliary_verb":         ["multiple_choice", "short_answer", "ox"],
+    "preposition":            ["multiple_choice", "short_answer", "ox"],
+    "article":                ["multiple_choice", "short_answer", "ox"],
+    "comparative":            ["multiple_choice", "short_answer", "ox"],
+    "to_infinitive":          ["multiple_choice", "short_answer", "ox"],
+    "passive_voice":          ["multiple_choice", "multiple_choice", "ox"],
+    "basic_word_order":       ["ox", "ox", "multiple_choice"],
 }
 
 
@@ -65,22 +58,10 @@ def build_problem_material(
 ) -> Optional[dict]:
     """
     문장 + grammar_tags + Stanza tokens → rule-based 문제 재료 생성
-
-    반환:
-    {
-        "sentence": str,
-        "target_grammar": str,
-        "target_word": str,       # 빈칸이 될 단어
-        "answer": str,            # 정답
-        "wrong_choices": List[str], # 오답 4개 (SpringBoot 5지선다 맞춤)
-        "problem_type": str,      # multiple_choice / ox / short_answer
-    }
-    실패 시 None 반환
     """
     if not grammar_tags or not tokens:
         return None
 
-    # V1 태그 중 탐지된 첫 번째 태그로 문제 생성
     v1_tags = [
         "subject_verb_agreement", "tense_present", "tense_past",
         "auxiliary_verb", "preposition", "article",
@@ -95,32 +76,40 @@ def build_problem_material(
         return None
 
     answer = target_token["text"]
-    wrong_choices = _generate_wrong_choices(target_tag, answer, tokens)
 
-    if not wrong_choices:
-        return None
+    # 문제 유형 결정 (태그별 가중치 기반 랜덤)
+    weights = _TYPE_WEIGHTS.get(target_tag, ["multiple_choice", "short_answer", "ox"])
+    problem_type = random.choice(weights)
 
-    # OX 문제는 basic_word_order에 적용
-    problem_type = "ox" if target_tag == "basic_word_order" else "multiple_choice"
+    # OX 문제는 오답 불필요
+    if problem_type == "ox":
+        wrong_choices = []
+    else:
+        wrong_choices = _generate_wrong_choices(target_tag, answer, tokens)
+        if not wrong_choices:
+            # 오답 생성 실패 시 multiple_choice → short_answer로 downgrade
+            if problem_type == "multiple_choice":
+                problem_type = "short_answer"
+            wrong_choices = []
 
     return {
-        "sentence": sentence,
+        "sentence":       sentence,
         "target_grammar": target_tag,
-        "target_word": answer,
-        "answer": answer,
-        "wrong_choices": wrong_choices[:4],   # 4개 → SpringBoot 5지선다(정답1+오답4)
-        "problem_type": problem_type,
+        "target_word":    answer,
+        "answer":         answer,
+        "wrong_choices":  wrong_choices[:4],
+        "problem_type":   problem_type,
     }
 
 
 def _find_target_token(tag: str, tokens: List[dict]) -> Optional[dict]:
     """태그에 맞는 토큰 추출"""
     for token in tokens:
-        feats = token.get("feats") or ""
-        upos = token.get("upos", "")
+        feats  = token.get("feats") or ""
+        upos   = token.get("upos", "")
         deprel = token.get("deprel", "")
-        lemma = token.get("lemma", "")
-        text = token.get("text", "")
+        lemma  = token.get("lemma", "")
+        text   = token.get("text", "")
 
         if tag == "tense_present" and upos == "VERB" and "Tense=Pres" in feats:
             return token
@@ -146,7 +135,7 @@ def _find_target_token(tag: str, tokens: List[dict]) -> Optional[dict]:
 
 
 def _generate_wrong_choices(tag: str, answer: str, tokens: List[dict]) -> List[str]:
-    """태그 기반 오답 후보 생성 — 4개 반환 (SpringBoot 5지선다 맞춤)"""
+    """태그 기반 오답 후보 생성 — 4개 반환"""
     answer_lower = answer.lower()
     wrongs = []
 
@@ -157,31 +146,10 @@ def _generate_wrong_choices(tag: str, answer: str, tokens: List[dict]) -> List[s
         )
         return _conjugate_verb(lemma, answer_lower)
 
-    elif tag == "auxiliary_verb":
-        pool = [w for w in _WRONG_CHOICES["auxiliary_verb"]["pool"] if w.lower() != answer_lower]
+    elif tag in ("auxiliary_verb", "preposition", "article", "comparative",
+                 "to_infinitive", "passive_voice"):
+        pool = [w for w in _WRONG_CHOICES[tag]["pool"] if w.lower() != answer_lower]
         wrongs = random.sample(pool, min(4, len(pool)))
-
-    elif tag == "preposition":
-        pool = [w for w in _WRONG_CHOICES["preposition"]["pool"] if w.lower() != answer_lower]
-        wrongs = random.sample(pool, min(4, len(pool)))
-
-    elif tag == "article":
-        pool = [w for w in _WRONG_CHOICES["article"]["pool"] if w.lower() != answer_lower]
-        wrongs = pool[:4]
-
-    elif tag == "comparative":
-        pool = [w for w in _WRONG_CHOICES["comparative"]["pool"] if w.lower() != answer_lower]
-        wrongs = random.sample(pool, min(4, len(pool)))
-
-    elif tag == "to_infinitive":
-        wrongs = ["for", "of", "in", "at"]
-
-    elif tag == "passive_voice":
-        pool = [w for w in _WRONG_CHOICES["passive_voice"]["pool"] if w.lower() != answer_lower]
-        wrongs = random.sample(pool, min(4, len(pool)))
-
-    elif tag == "basic_word_order":
-        wrongs = []  # OX는 오답 없음
 
     return [w for w in wrongs if w and w.lower() != answer_lower][:4]
 
@@ -190,7 +158,6 @@ def _conjugate_verb(lemma: str, exclude: str) -> List[str]:
     """lemma(동사 원형)로 변형 생성 후 정답 제외 — 4개 반환"""
     forms = set()
 
-    # 3인칭 단수 현재형 (예외 처리 우선)
     if lemma in _THIRD_PERSON_SINGULAR:
         forms.add(_THIRD_PERSON_SINGULAR[lemma])
     elif lemma.endswith(("s", "x", "z", "ch", "sh")):
@@ -200,10 +167,8 @@ def _conjugate_verb(lemma: str, exclude: str) -> List[str]:
     else:
         forms.add(lemma + "s")
 
-    # 원형
     forms.add(lemma)
 
-    # 불규칙 동사 테이블
     irregular = {
         "go":    ("went",    "gone"),
         "be":    ("was",     "been"),
@@ -243,7 +208,6 @@ def _conjugate_verb(lemma: str, exclude: str) -> List[str]:
         forms.add(past)
         forms.add(pp)
     else:
-        # 규칙 동사 과거형
         if lemma.endswith("e"):
             forms.add(lemma + "d")
         elif lemma.endswith("y") and len(lemma) > 1 and lemma[-2] not in "aeiou":
@@ -251,7 +215,6 @@ def _conjugate_verb(lemma: str, exclude: str) -> List[str]:
         else:
             forms.add(lemma + "ed")
 
-    # 진행형 -ing
     if lemma.endswith("e") and not lemma.endswith("ee"):
         forms.add(lemma[:-1] + "ing")
     else:
