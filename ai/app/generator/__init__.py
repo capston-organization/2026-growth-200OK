@@ -6,6 +6,7 @@ LLM은 해설만 생성 (question은 서버에서 직접 조합)
 import json
 import logging
 import re
+import random
 from typing import List, Optional
 
 import requests
@@ -63,7 +64,6 @@ def _remove_markdown(text: str) -> str:
     """마크다운 기호 제거 — ___ 빈칸 표시는 보존"""
     BLANK_PLACEHOLDER = "\x00BLANK\x00"
     text = text.replace("___", BLANK_PLACEHOLDER)
-
     text = re.sub(r"\*{1,3}(.*?)\*{1,3}", r"\1", text, flags=re.DOTALL)
     text = re.sub(r"(?<!\x00)_{2}(.+?)_{2}(?!\x00)", r"\1", text, flags=re.DOTALL)
     text = re.sub(r"(?<!\x00)_([^_]+?)_(?!\x00)", r"\1", text, flags=re.DOTALL)
@@ -88,19 +88,14 @@ def wrap_problem_with_llm(material: dict) -> Optional[dict]:
     target_grammar = material["target_grammar"]
     problem_type   = material["problem_type"]
 
-    import random
-
     # ── 문제 유형별 처리 ─────────────────────────────────────────────────────
 
     if problem_type == "ox":
-        # OX: 문장이 문법적으로 맞는지 틀린지
-        # 50% 확률로 맞는 문장 / 틀린 문장 제시
         is_correct = random.choice([True, False])
         if is_correct:
             question = f"다음 문장의 {_tag_to_scope(target_grammar)}이 올바른가요? {sentence}"
             correct_answer = "O"
         else:
-            # 정답 단어를 오답으로 교체해서 틀린 문장 제시
             if wrong_choices:
                 wrong_word = random.choice(wrong_choices)
                 wrong_sentence = re.sub(
@@ -111,19 +106,16 @@ def wrap_problem_with_llm(material: dict) -> Optional[dict]:
                 question = f"다음 문장의 {_tag_to_scope(target_grammar)}이 올바른가요? {sentence}"
                 is_correct = True
             correct_answer = "X"
-
         all_choices = []
         sentence_with_blank = sentence
 
     elif problem_type == "short_answer":
-        # SHORT_ANSWER: 빈칸 채우기 (선택지 없음)
         sentence_with_blank = _make_blank_sentence(sentence, answer)
         question = f"{sentence_with_blank} 빈칸에 알맞은 말을 직접 쓰시오."
         correct_answer = answer
         all_choices = []
 
     else:
-        # MULTIPLE_CHOICE: 5지선다 빈칸
         sentence_with_blank = _make_blank_sentence(sentence, answer)
         question = f"{sentence_with_blank} 빈칸에 알맞은 말을 고르시오."
         correct_answer = answer
@@ -153,7 +145,6 @@ JSON만 출력. 코드블록 금지.
         logger.warning("LLM wrap failed: %s", e)
         explanation = f"정답은 '{correct_answer}'입니다. {_tag_to_scope(target_grammar)} 문법 포인트입니다."
 
-    # problem_type 변환
     type_map = {
         "multiple_choice": "MULTIPLE_CHOICE",
         "short_answer":    "SHORT_ANSWER",
@@ -184,6 +175,17 @@ def generate_problems(
     from app.nlp.grammar_tagger import extract_grammar_tags
     from app.nlp.problem_builder import build_problem_material
 
+    # 사용자 선택 유형 정규화
+    type_map = {
+        "multiple_choice": "multiple_choice",
+        "MULTIPLE_CHOICE": "multiple_choice",
+        "ox":              "ox",
+        "OX":              "ox",
+        "short_answer":    "short_answer",
+        "SHORT_ANSWER":    "short_answer",
+    }
+    normalized_types = [type_map.get(t, "multiple_choice") for t in problem_types] if problem_types else []
+
     results = []
 
     for sentence in source_sentences:
@@ -199,6 +201,10 @@ def generate_problems(
             material = build_problem_material(sentence, tags, tokens)
             if material is None:
                 continue
+
+            # 사용자가 선택한 problem_types 반영
+            if normalized_types:
+                material["problem_type"] = random.choice(normalized_types)
 
             wrapped = wrap_problem_with_llm(material)
             if wrapped:
@@ -239,7 +245,7 @@ def _llm_fallback(
 - SHORT_ANSWER: 빈칸에 직접 쓰는 문제. 선택지 없음([]).
 
 [규칙]
-- 유형을 골고루 섞어 주세요 (MULTIPLE_CHOICE, OX, SHORT_ANSWER 각각 포함).
+- 사용자가 선택한 유형({type_str})만 사용하세요.
 - question: 80자 이내. MULTIPLE_CHOICE/SHORT_ANSWER는 반드시 ___ 빈칸 포함.
 - explanation: 마크다운 절대 금지. 일반 텍스트만.
 - JSON 배열만 출력. 설명 금지.
