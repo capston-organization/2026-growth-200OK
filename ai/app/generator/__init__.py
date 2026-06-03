@@ -1,7 +1,7 @@
 """
 LLM Generator
 rule-based problem_builder가 만든 재료를 받아서
-LLM은 문제 지시문·빈칸 문장·해설만 생성 (정답/오답은 절대 창작 안 함)
+LLM은 해설만 생성 (question은 서버에서 직접 조합)
 """
 import json
 import logging
@@ -17,8 +17,6 @@ logger = logging.getLogger(__name__)
 MAX_SOURCE_CHARS = 8000
 GEMINI_TIMEOUT = 60
 
-
-# ── Gemini 호출 ───────────────────────────────────────────────────────────────
 
 def _call_gemini(prompt: str) -> str:
     if not GEMINI_API_KEY:
@@ -62,19 +60,18 @@ def _truncate(text: str, max_len: int) -> str:
 
 
 def _remove_markdown(text: str) -> str:
-    """마크다운 기호 완전 제거"""
-    # **bold**, ***bold***, *italic*
+    """마크다운 기호 제거 — ___ 빈칸 표시는 보존"""
+    BLANK_PLACEHOLDER = "\x00BLANK\x00"
+    text = text.replace("___", BLANK_PLACEHOLDER)
+
     text = re.sub(r"\*{1,3}(.*?)\*{1,3}", r"\1", text, flags=re.DOTALL)
-    # __bold__, _italic_
-    text = re.sub(r"_{1,2}(.*?)_{1,2}", r"\1", text, flags=re.DOTALL)
-    # ## 헤더
+    text = re.sub(r"(?<!\x00)_{2}(.+?)_{2}(?!\x00)", r"\1", text, flags=re.DOTALL)
+    text = re.sub(r"(?<!\x00)_([^_]+?)_(?!\x00)", r"\1", text, flags=re.DOTALL)
     text = re.sub(r"^#{1,6}\s*", "", text, flags=re.MULTILINE)
-    # [링크](url)
     text = re.sub(r"\[(.*?)\]\(.*?\)", r"\1", text)
-    # 남은 * 기호 완전 제거
     text = text.replace("*", "")
-    text = text.strip()
-    return text
+    text = text.replace(BLANK_PLACEHOLDER, "___")
+    return text.strip()
 
 
 def _make_blank_sentence(sentence: str, answer: str) -> str:
@@ -82,59 +79,94 @@ def _make_blank_sentence(sentence: str, answer: str) -> str:
     return re.sub(re.escape(answer), "___", sentence, count=1, flags=re.IGNORECASE)
 
 
-# ── 핵심: LLM은 포장만 ────────────────────────────────────────────────────────
+# ── 핵심: question은 서버에서 직접 조합, LLM은 해설만 ─────────────────────────
 
 def wrap_problem_with_llm(material: dict) -> Optional[dict]:
-    """
-    rule-based가 만든 재료 → LLM이 빈칸 포함 문제 지시문 + 해설만 생성
-    """
     sentence       = material["sentence"]
     answer         = material["answer"]
     wrong_choices  = material["wrong_choices"]
     target_grammar = material["target_grammar"]
     problem_type   = material["problem_type"]
 
-    # 빈칸 문장 생성 (대소문자 무시)
-    sentence_with_blank = _make_blank_sentence(sentence, answer)
+    import random
 
-    # 선택지 섞기
-    all_choices = [answer] + wrong_choices[:4]
-    import random; random.shuffle(all_choices)
+    # ── 문제 유형별 처리 ─────────────────────────────────────────────────────
 
-    prompt = f"""영어 문법 문제의 지시문과 해설을 작성해 주세요.
+    if problem_type == "ox":
+        # OX: 문장이 문법적으로 맞는지 틀린지
+        # 50% 확률로 맞는 문장 / 틀린 문장 제시
+        is_correct = random.choice([True, False])
+        if is_correct:
+            question = f"다음 문장의 {_tag_to_scope(target_grammar)}이 올바른가요? {sentence}"
+            correct_answer = "O"
+        else:
+            # 정답 단어를 오답으로 교체해서 틀린 문장 제시
+            if wrong_choices:
+                wrong_word = random.choice(wrong_choices)
+                wrong_sentence = re.sub(
+                    re.escape(answer), wrong_word, sentence, count=1, flags=re.IGNORECASE
+                )
+                question = f"다음 문장의 {_tag_to_scope(target_grammar)}이 올바른가요? {wrong_sentence}"
+            else:
+                question = f"다음 문장의 {_tag_to_scope(target_grammar)}이 올바른가요? {sentence}"
+                is_correct = True
+            correct_answer = "X"
+
+        all_choices = []
+        sentence_with_blank = sentence
+
+    elif problem_type == "short_answer":
+        # SHORT_ANSWER: 빈칸 채우기 (선택지 없음)
+        sentence_with_blank = _make_blank_sentence(sentence, answer)
+        question = f"{sentence_with_blank} 빈칸에 알맞은 말을 직접 쓰시오."
+        correct_answer = answer
+        all_choices = []
+
+    else:
+        # MULTIPLE_CHOICE: 5지선다 빈칸
+        sentence_with_blank = _make_blank_sentence(sentence, answer)
+        question = f"{sentence_with_blank} 빈칸에 알맞은 말을 고르시오."
+        correct_answer = answer
+        all_choices = [answer] + wrong_choices[:4]
+        random.shuffle(all_choices)
+
+    # ── LLM: 해설만 생성 ─────────────────────────────────────────────────────
+    prompt = f"""영어 문법 문제의 해설을 작성해 주세요.
 
 [문법 포인트] {_tag_to_scope(target_grammar)}
-[빈칸 문장] {sentence_with_blank}
-[정답] {answer}
-[오답들] {', '.join(wrong_choices)}
+[원래 문장] {sentence}
+[정답] {correct_answer}
 
 [요구사항]
-- question: 반드시 빈칸 문장을 포함한 문제 지시문.
-  형식: "{sentence_with_blank} 빈칸에 알맞은 말을 고르시오."
-  한국어+영어 혼용 가능. 60자 이내.
-- explanation: 왜 '{answer}'이 정답인지 초중등 눈높이 한국어로 2~3문장.
-  마크다운 기호(**,*,##,__,【】) 절대 사용 금지. 일반 텍스트만.
+- explanation: 초중등 눈높이 한국어 2~3문장.
+- 문장에서 '{answer}' 부분이 왜 {_tag_to_scope(target_grammar)} 문법과 관련있는지 설명.
+- 마크다운(**,*,##,__) 절대 사용 금지. 일반 텍스트만.
 
-JSON만 출력. 코드블록 금지. 다른 설명 금지.
-{{"question":"...","explanation":"..."}}"""
+JSON만 출력. 코드블록 금지.
+{{"explanation":"..."}}"""
 
     try:
         raw = _call_gemini(prompt)
         parsed = json.loads(_extract_json(raw))
-        question    = _remove_markdown(_truncate(parsed.get("question", sentence_with_blank + " 빈칸에 알맞은 말을 고르시오."), 80))
         explanation = _remove_markdown(_truncate(parsed.get("explanation", ""), 300))
     except Exception as e:
         logger.warning("LLM wrap failed: %s", e)
-        question    = f"{sentence_with_blank} 빈칸에 알맞은 말을 고르시오."
-        explanation = f"정답은 '{answer}'입니다."
+        explanation = f"정답은 '{correct_answer}'입니다. {_tag_to_scope(target_grammar)} 문법 포인트입니다."
+
+    # problem_type 변환
+    type_map = {
+        "multiple_choice": "MULTIPLE_CHOICE",
+        "short_answer":    "SHORT_ANSWER",
+        "ox":              "OX",
+    }
 
     return {
         "question":            question,
-        "sentence_with_blank": sentence_with_blank,
+        "sentence_with_blank": sentence_with_blank if problem_type != "ox" else None,
         "options":             all_choices,
-        "correct_answer":      answer,
+        "correct_answer":      correct_answer,
         "explanation":         explanation,
-        "type":                "MULTIPLE_CHOICE" if problem_type == "multiple_choice" else "OX",
+        "type":                type_map.get(problem_type, "MULTIPLE_CHOICE"),
         "scope":               _tag_to_scope(target_grammar),
     }
 
@@ -195,20 +227,21 @@ def _llm_fallback(
 ) -> List[dict]:
     source_block = "\n".join(f"- {s}" for s in source_sentences)
     source_block = _truncate(source_block, MAX_SOURCE_CHARS)
-    type_str     = ", ".join(problem_types) if problem_types else "MULTIPLE_CHOICE"
+    type_str     = ", ".join(problem_types) if problem_types else "MULTIPLE_CHOICE, OX, SHORT_ANSWER"
     tag_hint     = f"\n[Grammar focus]\n{', '.join(grammar_tags)}" if grammar_tags else ""
     personal     = f"\n[개인화 컨텍스트]\n{personalization_context}" if personalization_context else ""
 
     prompt = f"""아래 영어 문장들을 학습 자료로 정확히 {count}개의 퀴즈 문제를 만들어 주세요.
 
 유형: {type_str}
-- MULTIPLE_CHOICE: 선택지 정확히 5개, 기호 없이 내용만
-- OX: 정답은 "O" 또는 "X"
-- SHORT_ANSWER: 단답형, 정답 50자 이내
+- MULTIPLE_CHOICE: 선택지 정확히 5개. 빈칸은 ___(밑줄 3개)로 표시.
+- OX: 정답은 "O" 또는 "X"만. 문법 맞는지 판단.
+- SHORT_ANSWER: 빈칸에 직접 쓰는 문제. 선택지 없음([]).
 
 [규칙]
-- question: 반드시 빈칸 문장 포함. 예: "She ___ to school. 빈칸에 알맞은 말을 고르시오." 80자 이내
-- explanation: 마크다운(**,*,##,__) 절대 사용 금지. 일반 텍스트만.
+- 유형을 골고루 섞어 주세요 (MULTIPLE_CHOICE, OX, SHORT_ANSWER 각각 포함).
+- question: 80자 이내. MULTIPLE_CHOICE/SHORT_ANSWER는 반드시 ___ 빈칸 포함.
+- explanation: 마크다운 절대 금지. 일반 텍스트만.
 - JSON 배열만 출력. 설명 금지.
 {tag_hint}{personal}
 
