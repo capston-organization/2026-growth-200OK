@@ -111,24 +111,9 @@ async def generate(req: ProblemGenerationRequest):
 
     retrieved_sentences = [r["sentence"] for r in retrieved]
 
-    # source_text가 있으면 문장 단위로 분리 후 corpus와 교차 배치
-    if req.source_text:
-        user_sents = [
-            s.strip()
-            for s in re.split(r"(?<=[.!?])\s+", req.source_text)
-            if len(s.strip()) > 5
-        ]
-        # 사용자 문장과 corpus 문장을 교차 배치 → 다양성 극대화
-        interleaved = []
-        max_len = max(len(user_sents), len(retrieved_sentences))
-        for i in range(max_len):
-            if i < len(user_sents):
-                interleaved.append(user_sents[i])
-            if i < len(retrieved_sentences):
-                interleaved.append(retrieved_sentences[i])
-        source_sentences = interleaved[:req.problem_count * 3]
-    else:
-        source_sentences = retrieved_sentences
+    # source_text는 grammar_tags 추출에만 사용 (저작권 리스크 0)
+    # 문제 문장은 HuggingFace Corpus에서만 가져옴
+    source_sentences = retrieved_sentences
 
     if not source_sentences:
         raise HTTPException(
