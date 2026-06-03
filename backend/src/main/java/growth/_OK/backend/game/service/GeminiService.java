@@ -162,6 +162,7 @@ public class GeminiService {
         public String correctAnswer;
         public String type;
         public String scope;
+        public String explanation;
     }
 
     private List<RawGeneratedProblem> parseProblemsResponse(String raw) {
