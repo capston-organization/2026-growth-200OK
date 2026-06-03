@@ -22,7 +22,7 @@ const MINI_MULTI_GAME1_MOCK_PROBLEMS = [
     id: 9302,
     type: "MULTIPLE_CHOICE",
     question: "Choose the correct article: It was ___ useful idea.",
-    options: ["a", "an", "the", "-(empty)", "both a and an"],
+    options: ["a"],
     correctAnswer: "a",
   },
 ];
@@ -30,6 +30,11 @@ const MINI_MULTI_GAME1_MOCK_PROBLEMS = [
 if (typeof window !== "undefined") {
   window.MINI_MULTI_GAME1_MOCK_PROBLEMS = MINI_MULTI_GAME1_MOCK_PROBLEMS;
 }
+
+/** 과녁 슬롯 수 (항상 5개 표시) */
+const MINI_MULTI_TARGET_SLOT_COUNT = 5;
+/** 선택지가 부족할 때 채우는 더미 보기 */
+const MINI_MULTI_PLACEHOLDER_OPTION = "(없음)";
 
 /**
  * MiniMultiGame1: 영어 단어 맞추기 (Refactored_Final_Responsive_Fixed)
@@ -472,42 +477,55 @@ class MiniMultiGame1 extends Phaser.Scene {
     }
   }
 
+  /**
+   * API options를 과녁 5칸에 맞게 정규화: 빈 값 제거 → 5개 미만이면 (없음)으로 채움 → 섞기
+   */
+  _buildShuffledOptionsForTargets(problem) {
+    const correct = String(problem.correctAnswer ?? "").trim();
+    const raw = Array.isArray(problem.options) ? problem.options : [];
+    const real = raw
+      .map((o) => String(o ?? "").trim())
+      .filter((o) => o !== "" && o !== MINI_MULTI_PLACEHOLDER_OPTION);
+
+    const pool = [...real];
+    if (correct && !pool.includes(correct)) {
+      pool.unshift(correct);
+    }
+
+    while (pool.length < MINI_MULTI_TARGET_SLOT_COUNT) {
+      pool.push(MINI_MULTI_PLACEHOLDER_OPTION);
+    }
+
+    return Phaser.Utils.Array.Shuffle(pool).slice(
+      0,
+      MINI_MULTI_TARGET_SLOT_COUNT,
+    );
+  }
+
   // =================================================================
   // [5] Set Problem
   // =================================================================
   setProblem() {
-    // ★ 하드코딩된 problems 배열 삭제
-    const p = this.currentProblem; // 전달받은 문제 사용
+    const p = this.currentProblem;
+    const correct = String(p.correctAnswer ?? "").trim();
 
-    // API 명세서에 따르면 문제는 p.question 에 들어있음
     this._fitQuestionText(p.question);
 
-    // 옵션 섞기 (API의 p.options 사용)
-    const options = Phaser.Utils.Array.Shuffle([...p.options]).slice(0, 5);
+    const options = this._buildShuffledOptionsForTargets(p);
     this.correctCount = 0;
-
-    // API 명세서에 따르면 단일 정답인 correctAnswer가 있음.
-    // 만약 정답이 여러 개라면 백엔드 명세가 배열이어야 하지만,
-    // 보여준 예시는 "correctAnswer": "삼" 이므로 문자열 처리 기준으로 작성할게.
     this.totalCorrect = 1;
 
     this.targets.forEach((t, i) => {
-      // 옵션이 5개가 안될 수도 있으니 예외 처리
       const optionText = options[i] || "";
+      const isPlaceholder = optionText === MINI_MULTI_PLACEHOLDER_OPTION;
+
       this._fitTargetWord(t.word, optionText);
       t.clicked = false;
       t.image.setTexture(`target${t.id}`);
       t.image.clearTint();
-
-      // 타겟 숨기기/보이기 처리 (옵션 개수가 적을 때를 대비)
       t.container.setVisible(optionText !== "");
 
-      // 정답 체크 로직 수정
-      if (optionText === p.correctAnswer) {
-        t.isAnswer = true;
-      } else {
-        t.isAnswer = false;
-      }
+      t.isAnswer = !isPlaceholder && correct !== "" && optionText === correct;
     });
   }
 
