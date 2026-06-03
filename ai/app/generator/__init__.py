@@ -18,6 +18,15 @@ logger = logging.getLogger(__name__)
 MAX_SOURCE_CHARS = 8000
 GEMINI_TIMEOUT = 60
 
+# 오답 부족 시 fallback 선택지 풀
+_FALLBACK_CHOICES = {
+    "verb":        ["go", "goes", "went", "going", "gone", "to go", "have gone", "had gone"],
+    "auxiliary":   ["can", "could", "will", "would", "should", "must", "may", "might"],
+    "preposition": ["in", "on", "at", "by", "for", "with", "to", "from"],
+    "article":     ["a", "an", "the", "some"],
+    "default":     ["is", "are", "was", "were", "be"],
+}
+
 
 def _call_gemini(prompt: str) -> str:
     if not GEMINI_API_KEY:
@@ -79,6 +88,44 @@ def _make_blank_sentence(sentence: str, answer: str) -> str:
     return re.sub(re.escape(answer), "___", sentence, count=1, flags=re.IGNORECASE)
 
 
+def _ensure_five_choices(answer: str, wrong_choices: List[str], target_grammar: str) -> List[str]:
+    """
+    오답이 4개 미만일 때 fallback 풀에서 보충해서 반드시 5개(정답1+오답4) 반환
+    """
+    wrongs = list(wrong_choices[:4])
+
+    # fallback 풀 선택
+    if target_grammar in ("tense_present", "tense_past", "subject_verb_agreement"):
+        fallback = _FALLBACK_CHOICES["verb"]
+    elif target_grammar == "auxiliary_verb":
+        fallback = _FALLBACK_CHOICES["auxiliary"]
+    elif target_grammar == "preposition":
+        fallback = _FALLBACK_CHOICES["preposition"]
+    elif target_grammar == "article":
+        fallback = _FALLBACK_CHOICES["article"]
+    else:
+        fallback = _FALLBACK_CHOICES["default"]
+
+    # 정답·기존 오답과 겹치지 않는 fallback으로 보충
+    for w in fallback:
+        if len(wrongs) >= 4:
+            break
+        if w.lower() != answer.lower() and w not in wrongs:
+            wrongs.append(w)
+
+    # 그래도 부족하면 숫자로 채우기 (최후 수단)
+    idx = 1
+    while len(wrongs) < 4:
+        placeholder = f"option{idx}"
+        if placeholder not in wrongs:
+            wrongs.append(placeholder)
+        idx += 1
+
+    all_choices = [answer] + wrongs[:4]
+    random.shuffle(all_choices)
+    return all_choices
+
+
 # ── 핵심: question은 서버에서 직접 조합, LLM은 해설만 ─────────────────────────
 
 def wrap_problem_with_llm(material: dict) -> Optional[dict]:
@@ -116,11 +163,11 @@ def wrap_problem_with_llm(material: dict) -> Optional[dict]:
         all_choices = []
 
     else:
+        # MULTIPLE_CHOICE — 반드시 5개 보장
         sentence_with_blank = _make_blank_sentence(sentence, answer)
         question = f"{sentence_with_blank} 빈칸에 알맞은 말을 고르시오."
         correct_answer = answer
-        all_choices = [answer] + wrong_choices[:4]
-        random.shuffle(all_choices)
+        all_choices = _ensure_five_choices(answer, wrong_choices, target_grammar)
 
     # ── LLM: 해설만 생성 ─────────────────────────────────────────────────────
     prompt = f"""영어 문법 문제의 해설을 작성해 주세요.
@@ -240,12 +287,13 @@ def _llm_fallback(
     prompt = f"""아래 영어 문장들을 학습 자료로 정확히 {count}개의 퀴즈 문제를 만들어 주세요.
 
 유형: {type_str}
-- MULTIPLE_CHOICE: 선택지 정확히 5개. 빈칸은 ___(밑줄 3개)로 표시.
+- MULTIPLE_CHOICE: 선택지 반드시 정확히 5개. 기호 없이 내용만. 빈칸은 ___(밑줄 3개)로 표시.
 - OX: 정답은 "O" 또는 "X"만. 문법 맞는지 판단.
 - SHORT_ANSWER: 빈칸에 직접 쓰는 문제. 선택지 없음([]).
 
 [규칙]
 - 사용자가 선택한 유형({type_str})만 사용하세요.
+- MULTIPLE_CHOICE는 반드시 선택지 5개. 4개나 6개 절대 금지.
 - question: 80자 이내. MULTIPLE_CHOICE/SHORT_ANSWER는 반드시 ___ 빈칸 포함.
 - explanation: 마크다운 절대 금지. 일반 텍스트만.
 - JSON 배열만 출력. 설명 금지.
@@ -263,8 +311,13 @@ def _llm_fallback(
             p_type  = str(item.get("type", "MULTIPLE_CHOICE")).upper()
             options = item.get("options", [])
             options = [str(o).strip() for o in options if str(o).strip()] if isinstance(options, list) else []
-            if p_type == "MULTIPLE_CHOICE": options = options[:5]
-            elif p_type in ("OX", "SHORT_ANSWER"): options = []
+            if p_type == "MULTIPLE_CHOICE":
+                # 5개 미만이면 fallback으로 보충
+                while len(options) < 5:
+                    options.append(f"option{len(options)+1}")
+                options = options[:5]
+            elif p_type in ("OX", "SHORT_ANSWER"):
+                options = []
             results.append({
                 "question":            _remove_markdown(_truncate(str(item.get("question", "")), 80)),
                 "sentence_with_blank": None,
