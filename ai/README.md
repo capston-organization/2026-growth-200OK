@@ -111,7 +111,7 @@ uvicorn app.main:app --reload --port 8000
 
 ## 4. 동작 확인 (단계별)
 
-### Step 1 — 서버 기본 동작 확인 (DB 없어도 됨)
+### Step 1 — 서버 기본 동작 확인 (DB 필요 X)
 
 ```bash
 curl http://localhost:8000/health
@@ -121,7 +121,7 @@ curl http://localhost:8000/
 # {"message":"Grammar RAG Engine is running", ...}
 ```
 
-### Step 2 — Stanza 파싱 확인 (DB 없어도 됨)
+### Step 2 — Stanza 파싱 확인 (DB 필요 X)
 
 ```bash
 curl -X POST http://localhost:8000/parse \
@@ -130,7 +130,7 @@ curl -X POST http://localhost:8000/parse \
 # tokens 리스트 + grammar_tags 반환
 ```
 
-### Step 3 — 문제 생성 확인 (DB 없어도 됨, Gemini API 키 필요)
+### Step 3 — 문제 생성 확인 (DB 필요 X, Gemini API 키 필요)
 
 ```bash
 curl -X POST http://localhost:8000/api/generate/problems \
@@ -142,7 +142,7 @@ curl -X POST http://localhost:8000/api/generate/problems \
   }'
 ```
 
-> corpus가 비어 있어도 source_text가 있으면 그걸로 문제 생성함
+> corpus가 비어 있어도 source_text가 있으면 해당 입력으로 문제 생성
 
 ### Step 4 — Corpus 빌드 (DB 필요, 시간 오래 걸림)
 
@@ -166,8 +166,8 @@ curl http://localhost:8000/api/corpus/status
 ## 5. DB 없이 빠르게 테스트하는 방법
 
 DB 설정 전에 문제 생성만 먼저 보고 싶다면,
-`source_text`를 직접 넣어서 `/api/generate/problems` 호출하면 됨.
-corpus retrieval을 건너뛰고 source_text → Gemini 직접 호출로 동작함.
+`source_text`를 직접 넣어서 `/api/generate/problems` 호출
+corpus retrieval을 건너뛰고 source_text → Gemini 직접 호출로 동작
 
 ---
 
