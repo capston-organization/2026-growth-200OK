@@ -71,7 +71,7 @@ grammar_tagger의 10개 rule 함수를 UD EWT gold annotation과 비교하여 Pr
 python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 
-# 의존성 설치 (torch 포함이라 5~10분 걸림)
+# 의존성 설치 (torch 포함이라 5~10분 소요)
 pip install -r requirements.txt
 
 # Stanza 영어 모델 다운로드 (최초 1회, 약 400MB)
@@ -89,10 +89,10 @@ cp .env.example .env
 `.env` 파일을 열어서 아래 값 입력:
 
 ```env
-# SpringBoot와 동일한 DB를 바라보면 됨
+# SpringBoot와 동일한 DB
 DATABASE_URL=postgresql://postgres:비밀번호@localhost:5432/capston
 
-# Gemini API 키 (SpringBoot에서 쓰는 것과 동일하게)
+# Gemini API 키 (SpringBoot에서 쓰는 것과 동일)
 GEMINI_API_KEY=your_gemini_api_key_here
 GEMINI_MODEL=gemini-2.5-flash
 ```
@@ -167,7 +167,7 @@ curl http://localhost:8000/api/corpus/status
 
 ## 5. DB 없이 빠르게 테스트하는 방법
 
-DB 설정 전에 문제 생성만 먼저 보고 싶다면,
+DB 설정 전에 문제 생성만 먼저 보기 위해선,
 `source_text`를 직접 넣어서 `/api/generate/problems` 호출
 corpus retrieval을 건너뛰고 source_text → Gemini 직접 호출로 동작
 
