@@ -66,7 +66,9 @@ jobs:
           script: |
             LIBS=/home/${{ secrets.EC2_USERNAME }}/app/backend/build/libs
             mkdir -p "$LIBS"
-            sudo systemctl stop springboot || true
-            sleep 3
-            sudo systemctl start springboot
+            cd "$LIBS"
+            for pid in $(pidof java 2>/dev/null); do kill "$pid" 2>/dev/null || true; done
+            echo "$(date -Is) deploy" >> "$LIBS/app.log"
+            nohup java -jar backend-0.0.1-SNAPSHOT.jar >> "$LIBS/app.log" 2>&1 </dev/null &
+            sleep 2
             exit 0
