@@ -240,20 +240,25 @@ npm run dev
 
 ### 1. 자동화 테스트 (Backend)
 
-JUnit 5 + Spring Boot Test + Mockito 기반 테스트 코드가 `backend/src/test/`에 있습니다.
+JUnit 5 + Spring Boot Test + Mockito 기반 테스트가 `backend/src/test/`에 포함되어 있습니다.  
+테스트 실행 시 **PostgreSQL·Redis·외부 API 없이** H2 인메모리 DB와 Mock Redis(`TestRedisConfig`)를 사용합니다.
 
 ```bash
 cd backend
 ./gradlew test          # Windows: gradlew.bat test
 ```
 
-| 테스트 파일 | 내용 | 현재 상태 |
-|-------------|------|-----------|
-| `BackendApplicationTests.java` | 컨텍스트 로드 | 주석 처리됨 |
-| `GameServiceTest.java` | GameService 단위 테스트 | 주석 처리됨 |
-| `GameControllerIntegrationTest.java` | GameController 통합 테스트 | 주석 처리됨 |
+**테스트 설정:** `src/test/resources/application-test.yml` (`test` 프로파일)
 
-> 현재 테스트 클래스가 **전부 주석 처리**되어 있어 `./gradlew test`는 테스트 없이 통과합니다. 테스트를 활성화하려면 `application-test.yml` 및 `TestRedisConfig` 주석을 해제하고 Redis autoconfigure exclude 설정을 적용해야 합니다.
+| 테스트 클래스 | 유형 | 검증 내용 |
+|---------------|------|-----------|
+| `BackendApplicationTests` | Spring Boot 통합 | 애플리케이션 컨텍스트 로드 |
+| `GameServiceTest` | 단위 (Mockito) | 게임 생성, 목록 조회, 좋아요 토글, 예외 처리 |
+| `GameControllerIntegrationTest` | API (MockMvc + H2) | `POST /games`, `GET /games`, `POST /games/{id}/like`, `GET /games/likes/me` |
+
+**실행 결과 (로컬 검증):** `./gradlew test` → **10 tests, BUILD SUCCESSFUL**
+
+테스트 리포트: `backend/build/reports/tests/test/index.html`
 
 ### 2. 자동화 테스트 (Frontend)
 
@@ -392,7 +397,7 @@ I have already finished my homework.
 | [JJWT](https://github.com/jwtk/jjwt) | 0.11.5 | Apache 2.0 | JWT 생성·검증 |
 | [Lombok](https://projectlombok.org/) | (Boot BOM) | MIT | 보일러플레이트 코드 감소 |
 | [Apache PDFBox](https://pdfbox.apache.org/) | 3.0.3 | Apache 2.0 | PDF 텍스트 추출 |
-| [H2 Database](https://www.h2database.com/) | (test) | MPL 2.0 / EPL 1.0 | 테스트용 인메모리 DB (설정 주석 상태) |
+| [H2 Database](https://www.h2database.com/) | (test) | MPL 2.0 / EPL 1.0 | 테스트용 인메모리 DB (`application-test.yml`) |
 | [JUnit 5](https://junit.org/junit5/) | (Boot BOM) | EPL 2.0 | 단위·통합 테스트 |
 
 ### Frontend (JavaScript / npm)
@@ -459,6 +464,6 @@ I have already finished my homework.
 ### 알려진 제한
 
 1. NLP FastAPI 서버는 **본 저장소에 미포함** (Gemini fallback으로 동작)
-2. Backend 자동화 테스트는 **현재 주석 처리** 상태
+2. Frontend 자동화 테스트 **미구성** (Backend JUnit 10건은 `./gradlew test`로 실행 가능)
 3. 학습 PDF/TXT 샘플 파일·DB seed SQL **미포함**
 4. 자동 설치 스크립트 없음 — [How to Install](#how-to-install) 절차 참고
