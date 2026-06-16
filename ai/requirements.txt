@@ -6,7 +6,9 @@ python-dotenv==1.2.2
 
 # NLP
 stanza==1.11.1
-torch==2.11.0
+# CPU 전용 torch (EC2 GPU 없음 → GPU 버전 설치 시 디스크 2GB+ 초과)
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.11.0+cpu
 
 # Database (2.9.10+ 부터 Python 3.13 지원)
 psycopg2-binary>=2.9.10
