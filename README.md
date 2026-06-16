@@ -1,88 +1,125 @@
 # Learning Village (200OK)
 
-AI 기반 영어 학습 게임 플랫폼입니다. 사용자가 PDF·텍스트 학습 자료를 업로드하면 **Gemini API**(및 선택적 NLP RAG 서버)로 문제를 생성하고, **Phaser** 미니게임(O/X, 5지선다, 단답형)으로 학습합니다. Google OAuth 로그인, 학습 분석, Google Classroom 연동, 코인·스트릭 등 게이미피케이션 기능을 제공합니다.
+---
+
+## 프로젝트 설명 (Project Description)
+
+**Learning Village**는 AI 기반 영어 학습 게임 플랫폼입니다.
+
+사용자가 PDF·텍스트 학습 자료를 업로드하면 **Google Gemini API**(및 선택적 NLP RAG 서버)가 O/X, 5지선다, 단답형 문제를 생성하고, **Phaser** 미니게임으로 학습합니다. Google OAuth 로그인, 학습 분석·오답 노트, Google Classroom 연동, 코인·스트릭·캐릭터 육성 등 게이미피케이션 기능을 제공합니다.
+
+| 항목 | 내용 |
+|------|------|
+| **대상 사용자** | 영어 학습자(학생), 교사(Google Classroom 연동) |
+| **핵심 기능** | AI 문제 생성, Phaser 게임 플레이, 학습 분석, 복습 게임 |
+| **저장소** | `git clone` 후 Gradle Wrapper·npm으로 빌드·실행 가능 |
 
 ---
 
-## 목차
+## Source Code 설명
 
-1. [저장소 구조](#저장소-구조)
-2. [기술 스택](#기술-스택)
-3. [사전 요구사항](#사전-요구사항)
-4. [빠른 시작 (로컬 개발)](#빠른-시작-로컬-개발)
-5. [환경 변수](#환경-변수)
-6. [빌드 및 실행](#빌드-및-실행)
-7. [샘플 데이터 및 테스트 방법](#샘플-데이터-및-테스트-방법)
-8. [주요 기능 및 API 개요](#주요-기능-및-api-개요)
-9. [배포](#배포)
-10. [트러블슈팅](#트러블슈팅)
-11. [제한 사항 및 알려진 이슈](#제한-사항-및-알려진-이슈)
-
----
-
-## 저장소 구조
+### 저장소 구조
 
 ```
 2026-growth-200OK/
-├── backend/                    # Spring Boot REST API (Java 17)
-│   ├── src/main/java/          # 도메인·서비스·컨트롤러
-│   ├── src/main/resources/
-│   │   └── application.yml     # DB·OAuth·Gemini·NLP 설정
-│   ├── gradlew / gradlew.bat   # Gradle Wrapper (재현 가능한 빌드)
-│   └── build.gradle
-├── front/WebPage/              # React + Vite 프론트엔드
-│   ├── src/                    # 페이지·API 설정
-│   ├── public/Game/            # Phaser 미니게임 HTML/JS + 에셋(이미지·사운드)
-│   ├── .env.example            # 프론트 환경 변수 예시
-│   └── package.json
-├── docs/
-│   └── GrounRule.MD            # 팀 협업 규칙
-├── .github/workflows/
-│   └── deploy.yml              # develop 브랜치 → EC2 배포
-└── README.md
+├── backend/                 # Spring Boot REST API (Java 17)
+├── front/WebPage/           # React + Vite 프론트엔드 + Phaser 게임
+├── docs/GrounRule.MD        # 팀 협업 규칙
+└── .github/workflows/       # CI/CD (develop → EC2)
 ```
+
+### Backend (`backend/`)
+
+Spring Boot 3.3.4 기반 REST API. 패키지는 도메인별로 분리되어 있습니다.
+
+| 패키지 | 역할 |
+|--------|------|
+| `auth/` | Google OAuth 2.0, JWT 발급·갱신, Redis 기반 Refresh Token·블랙리스트 |
+| `user/` | 사용자 프로필, 온보딩, 코인, 스트릭, 캐릭터(간식·놀기·공부) |
+| `game/` | 게임 CRUD, PDF/TXT 소스 업로드, Gemini·NLP 문제 생성, 답안 제출, 좋아요 |
+| `analysis/` | 학습 개요·상세 분석, 오답 목록, 오답 기반 복습 게임 생성 |
+| `classroom/` | Google Classroom OAuth 연동, 수업 공유 |
+| `global/` | Security, CORS, 전역 예외 처리, 설정(`application.yml`) |
+
+**주요 진입점**
+
+- `BackendApplication.java` — Spring Boot 메인 클래스
+- `application.yml` — DB·OAuth·Gemini·NLP 설정 (시크릿은 환경 변수로 주입)
+
+**문제 생성 흐름**
+
+1. 사용자가 게임 생성 후 PDF/TXT 업로드 또는 텍스트 입력 → `GameSourceService`가 텍스트 추출
+2. `POST /games/{id}/generate/preview` → Gemini로 학습 목표·내용 미리보기
+3. `POST /games/{id}/generate/problems` → 게임 유형에 따라 문제 생성
+   - `GRAMMAR`: NLP FastAPI RAG 서버 우선 → 실패 시 Gemini fallback
+   - `VOCAB`: Gemini 직접 호출
+4. 생성된 문제는 PostgreSQL `problems` 테이블에 저장
+
+### Frontend (`front/WebPage/`)
+
+React 19 + Vite 7 SPA. Phaser 3 미니게임은 `public/Game/`에 HTML/JS로 분리되어 iframe으로 로드됩니다.
 
 | 경로 | 설명 |
 |------|------|
-| `backend/` | 게임 CRUD, 문제 생성, 인증, 분석, Classroom API |
-| `front/WebPage/src/pages/` | 로그인, 게임 생성, 플레이, 분석, 마이페이지 등 React 페이지 |
-| `front/WebPage/public/Game/` | O/X·객관식·단답형 Phaser 게임 및 `assets/images`, `assets/sounds` |
-| `front/WebPage/src/assets/images/` | UI 로고·아이콘 이미지 |
+| `src/pages/` | Login, Onboarding, Main, GameCreation, GamePlay, Analyze, MyPage 등 |
+| `src/config/api.js` | API 베이스 URL (`VITE_API_BASE_URL`) |
+| `public/Game/MainGames/` | 메인 게임 셸 (문제 유형별 미니게임 라우팅) |
+| `public/Game/MiniGames/` | O/X, 객관식, 단답형 Phaser 미니게임 6종 + 에셋 |
+| `src/assets/images/` | UI 로고·아이콘 |
+
+**프론트 라우트**
+
+| 경로 | 페이지 |
+|------|--------|
+| `/` | Google 로그인 |
+| `/auth/callback` | OAuth 콜백 |
+| `/onboarding`, `/signup` | 온보딩 |
+| `/main` | 메인 (스트릭, 최근 게임) |
+| `/create-game` | 게임 생성 마법사 |
+| `/play` | Phaser 게임 플레이 |
+| `/analyze`, `/wrong-answers` | 학습 분석 |
+| `/mypage` | 마이페이지 |
 
 ---
 
-## 기술 스택
+## How to Build
 
-| 구분 | 기술 |
-|------|------|
-| **Frontend** | React 19, Vite 7, React Router 7, Phaser 3 |
-| **Backend** | Spring Boot 3.3.4, Spring Security, Spring Data JPA, WebFlux |
-| **Database** | PostgreSQL (`ddl-auto: update` — 스키마 자동 생성) |
-| **Cache / Session** | Redis (Refresh Token 저장·블랙리스트) |
-| **인증** | Google OAuth 2.0, JWT (Access + Refresh Cookie) |
-| **AI** | Google Gemini API (`gemini-2.5-flash`) |
-| **NLP (선택)** | 외부 FastAPI RAG 서버 (`http://localhost:8000`) — 미연결 시 Gemini fallback |
-| **기타** | Apache PDFBox (PDF 텍스트 추출), Google Classroom API |
+별도 Gradle·Maven 설치 없이 **Gradle Wrapper**(`gradlew`)와 **npm**으로 빌드합니다.
+
+### Backend
+
+```bash
+cd backend
+
+# 전체 빌드 (테스트 포함)
+./gradlew build          # Windows: gradlew.bat build
+
+# 테스트 제외 빌드 (CI 배포와 동일)
+./gradlew build -x test
+
+# 실행 JAR 생성
+./gradlew bootJar
+# 결과: build/libs/backend-0.0.1-SNAPSHOT.jar
+```
+
+**요구 사항:** JDK 17
+
+### Frontend
+
+```bash
+cd front/WebPage
+
+npm install
+npm run build      # 결과: dist/
+npm run preview    # 빌드 결과 로컬 미리보기
+npm run lint       # ESLint
+```
+
+**요구 사항:** Node.js 18 이상 권장
 
 ---
 
-## 사전 요구사항
-
-로컬에서 전체 기능을 실행하려면 아래가 필요합니다.
-
-| 항목 | 버전·비고 |
-|------|-----------|
-| **JDK** | 17 |
-| **Node.js** | 18 이상 권장 (Vite 7) |
-| **PostgreSQL** | 14+ 권장, DB 이름 `capston` |
-| **Redis** | 기본 `localhost:6379` (Spring Boot 기본값) |
-| **Google Cloud Console** | OAuth 2.0 Client ID / Secret, 승인된 리디렉션 URI 등록 |
-| **Gemini API Key** | [Google AI Studio](https://aistudio.google.com/) |
-| **NLP 서버 (선택)** | 영문법(GRAMMAR) 게임 RAG 파이프라인용 FastAPI — **본 저장소에 미포함** |
-
----
-
-## 빠른 시작 (로컬 개발)
+## How to Install
 
 ### 1. 저장소 클론
 
@@ -91,7 +128,9 @@ git clone https://github.com/capston-organization/2026-growth-200OK.git
 cd 2026-growth-200OK
 ```
 
-### 2. PostgreSQL 준비
+### 2. 인프라 설치 (PostgreSQL, Redis)
+
+**PostgreSQL**
 
 ```sql
 CREATE DATABASE capston;
@@ -99,18 +138,30 @@ CREATE USER your_db_user WITH PASSWORD 'your_db_password';
 GRANT ALL PRIVILEGES ON DATABASE capston TO your_db_user;
 ```
 
-### 3. Redis 실행
+**Redis** (Refresh Token 저장용)
 
 ```bash
-# Docker 사용 예시
 docker run -d --name redis -p 6379:6379 redis:7-alpine
 ```
 
-### 4. 백엔드 환경 변수 설정 후 실행
+### 3. 외부 서비스 준비
 
-`backend/` 디렉터리에서 OS 환경 변수 또는 IDE Run Configuration에 아래 값을 설정합니다.
+| 서비스 | 용도 | 발급 |
+|--------|------|------|
+| Google OAuth | 로그인 | [Google Cloud Console](https://console.cloud.google.com/) |
+| Gemini API | 문제·해설 생성 | [Google AI Studio](https://aistudio.google.com/) |
+| NLP 서버 (선택) | 영문법 RAG | 별도 FastAPI 서버 — **본 저장소 미포함** |
 
-**Windows (PowerShell) 예시:**
+Google Console **승인된 리디렉션 URI** 예시:
+
+- `http://localhost:5173/auth/callback` (로컬)
+- 배포 URL `/auth/callback` (운영)
+
+### 4. Backend 환경 변수 설정 및 실행
+
+`backend/application.yml`은 `jdbc:postgresql://localhost:5432/capston`을 사용합니다.
+
+**Windows (PowerShell)**
 
 ```powershell
 cd backend
@@ -121,12 +172,12 @@ $env:GOOGLE_CLIENT_ID="your-google-client-id"
 $env:GOOGLE_CLIENT_SECRET="your-google-client-secret"
 $env:REDIRECT_URI="http://localhost:5173/auth/callback"
 $env:GEMINI_API_KEY="your-gemini-api-key"
-$env:NLP_ENABLED="false"   # NLP 서버 없이 Gemini만 사용할 때
+$env:NLP_ENABLED="false"
 
 .\gradlew.bat bootRun
 ```
 
-**macOS / Linux:**
+**macOS / Linux**
 
 ```bash
 cd backend
@@ -142,40 +193,7 @@ export NLP_ENABLED=false
 ./gradlew bootRun
 ```
 
-백엔드 기본 포트: **http://localhost:8080**
-
-### 5. 프론트엔드 설정 및 실행
-
-```bash
-cd front/WebPage
-cp .env.example .env   # Windows: copy .env.example .env
-```
-
-`.env` 파일 예시 (로컬 개발):
-
-```env
-# 비워두면 Vite proxy가 localhost:8080으로 API 전달
-VITE_API_BASE_URL=
-
-VITE_GOOGLE_CLIENT_ID=your-google-client-id
-# 비우면 자동으로 http://localhost:5173/auth/callback 사용
-VITE_GOOGLE_REDIRECT_URI=
-```
-
-```bash
-npm install
-npm run dev
-```
-
-프론트엔드: **http://localhost:5173**
-
-> Google Cloud Console의 **승인된 리디렉션 URI**에 `http://localhost:5173/auth/callback`을 반드시 등록하세요.
-
----
-
-## 환경 변수
-
-### Backend (`application.yml` → 환경 변수)
+→ **http://localhost:8080**
 
 | 변수 | 필수 | 기본값 | 설명 |
 |------|:----:|--------|------|
@@ -184,82 +202,123 @@ npm run dev
 | `JWT_SECRET` | ✅ | — | JWT 서명 시크릿 |
 | `GOOGLE_CLIENT_ID` | ✅ | — | Google OAuth Client ID |
 | `GOOGLE_CLIENT_SECRET` | ✅ | — | Google OAuth Client Secret |
-| `REDIRECT_URI` | ✅ | — | OAuth 콜백 URI (프론트와 동일) |
+| `REDIRECT_URI` | ✅ | — | OAuth 콜백 URI |
 | `GEMINI_API_KEY` | ✅ | — | Gemini API 키 |
-| `CLASSROOM_REDIRECT_URI` | | `REDIRECT_URI`와 동일 | Classroom OAuth용 (별도 scope) |
-| `FRONTEND_BASE_URL` | | `http://localhost:5173` | Classroom 과제 공유 URL origin |
-| `NLP_SERVER_URL` | | `http://localhost:8000` | FastAPI NLP 서버 URL |
-| `NLP_ENABLED` | | `true` | `false`면 NLP 호출 생략, Gemini만 사용 |
-
-DB 연결 URL은 `application.yml`에 `jdbc:postgresql://localhost:5432/capston`으로 고정되어 있습니다. 호스트·DB명 변경 시 `application.yml`을 수정하세요.
+| `NLP_ENABLED` | | `true` | `false`면 NLP 생략, Gemini만 사용 |
+| `NLP_SERVER_URL` | | `http://localhost:8000` | NLP FastAPI URL |
+| `FRONTEND_BASE_URL` | | `http://localhost:5173` | Classroom 공유 URL origin |
 
 Redis는 별도 설정 없이 **localhost:6379**를 사용합니다.
 
-### Frontend (`.env`)
-
-| 변수 | 필수 | 설명 |
-|------|:----:|------|
-| `VITE_API_BASE_URL` | | API 서버 URL. 로컬 개발 시 **비워두면** Vite proxy 사용 |
-| `VITE_GOOGLE_CLIENT_ID` | ✅ | Google 로그인 Client ID |
-| `VITE_GOOGLE_REDIRECT_URI` | | OAuth 리디렉션 URI (미설정 시 `origin/auth/callback`) |
-
----
-
-## 빌드 및 실행
-
-### Backend
-
-```bash
-cd backend
-
-# 빌드 (테스트 포함)
-./gradlew build          # Windows: gradlew.bat build
-
-# 테스트 제외 빌드 (CI와 동일)
-./gradlew build -x test
-
-# JAR 실행
-./gradlew bootJar
-java -jar build/libs/backend-0.0.1-SNAPSHOT.jar
-```
-
-Gradle Wrapper(`gradlew`, `gradle/wrapper/`)가 포함되어 있어 **별도 Gradle 설치 없이** 빌드할 수 있습니다.
-
-### Frontend
+### 5. Frontend 환경 변수 설정 및 실행
 
 ```bash
 cd front/WebPage
+cp .env.example .env    # Windows: copy .env.example .env
+```
 
+`.env` (로컬 개발 예시):
+
+```env
+VITE_API_BASE_URL=
+VITE_GOOGLE_CLIENT_ID=your-google-client-id
+VITE_GOOGLE_REDIRECT_URI=
+```
+
+`VITE_API_BASE_URL`을 비우면 Vite dev server가 API를 `localhost:8080`으로 프록시합니다.
+
+```bash
 npm install
-npm run build      # dist/ 생성
-npm run preview    # 빌드 결과 미리보기
-npm run lint       # ESLint
+npm run dev
+```
+
+→ **http://localhost:5173**
+
+---
+
+## How to Test
+
+### 1. 자동화 테스트 (Backend)
+
+JUnit 5 + Spring Boot Test + Mockito 기반 테스트 코드가 `backend/src/test/`에 있습니다.
+
+```bash
+cd backend
+./gradlew test          # Windows: gradlew.bat test
+```
+
+| 테스트 파일 | 내용 | 현재 상태 |
+|-------------|------|-----------|
+| `BackendApplicationTests.java` | 컨텍스트 로드 | 주석 처리됨 |
+| `GameServiceTest.java` | GameService 단위 테스트 | 주석 처리됨 |
+| `GameControllerIntegrationTest.java` | GameController 통합 테스트 | 주석 처리됨 |
+
+> 현재 테스트 클래스가 **전부 주석 처리**되어 있어 `./gradlew test`는 테스트 없이 통과합니다. 테스트를 활성화하려면 `application-test.yml` 및 `TestRedisConfig` 주석을 해제하고 Redis autoconfigure exclude 설정을 적용해야 합니다.
+
+### 2. 자동화 테스트 (Frontend)
+
+프론트엔드 단위/E2E 테스트 프레임워크(Jest, Vitest, Cypress 등)는 **미구성**입니다.
+
+```bash
+cd front/WebPage
+npm run lint    # ESLint 정적 분석만 가능
+```
+
+### 3. 수동 기능 테스트 (E2E)
+
+아래 순서로 전체 흐름을 검증할 수 있습니다.
+
+1. **인프라 확인**
+   - PostgreSQL·Redis 실행
+   - Backend `bootRun` → `http://localhost:8080/nlp/status` 응답 확인
+   - Frontend `npm run dev` → `http://localhost:5173` 접속
+
+2. **로그인**
+   - Google 로그인 → 온보딩(이름·학년 등) 완료 → `/main` 진입
+
+3. **게임 생성**
+   - `/create-game` → 유형(GRAMMAR/VOCAB) 선택
+   - [샘플 텍스트](#description-of-sample-data-if-any) 입력 또는 PDF/TXT 업로드
+   - 문제 유형·개수 설정 → AI 문제 생성
+
+4. **게임 플레이**
+   - `/play`에서 Phaser 미니게임 실행, 답안 제출
+
+5. **분석**
+   - `/analyze`, `/wrong-answers`에서 오답·범위별 통계 확인
+
+6. **API 직접 호출** (토큰 필요 시 로그인 후 `localStorage.accessToken` 사용)
+
+```bash
+# NLP 서버 상태 (인증 불필요)
+curl http://localhost:8080/nlp/status
 ```
 
 ---
 
-## 샘플 데이터 및 테스트 방법
+## Description of Sample Data (if any)
 
-### 포함된 데이터 (저장소 내)
+저장소에 **DB 시드 SQL·샘플 PDF 파일은 포함되어 있지 않습니다.** 아래 정적 에셋과 README 내 테스트용 텍스트를 사용하세요.
 
-| 종류 | 위치 | 설명 |
+### 포함된 샘플·프로토 데이터
+
+| 종류 | 경로 | 설명 |
 |------|------|------|
-| **게임 에셋** | `front/WebPage/public/Game/**/assets/` | Phaser 게임용 PNG, MP3 (MainGame + MiniGame 6종) |
-| **UI 이미지** | `front/WebPage/src/assets/images/` | 로고, 게임 아이콘, Google 로고 |
-| **DB 스키마** | JPA `ddl-auto: update` | 마이그레이션 SQL 없음 — 앱 기동 시 자동 생성 |
-| **환경 변수 예시** | `front/WebPage/.env.example` | 프론트 설정 템플릿 |
+| **Phaser 게임 에셋** | `front/WebPage/public/Game/**/assets/images/` | 배경·캐릭터·UI PNG |
+| **게임 사운드** | `front/WebPage/public/Game/**/assets/sounds/` | BGM·효과음 MP3 |
+| **UI 이미지** | `front/WebPage/src/assets/images/` | Learning Village 로고, 게임 아이콘, Google 로고 |
+| **환경 변수 템플릿** | `front/WebPage/.env.example` | 프론트 `.env` 작성용 |
 
-### 포함되지 않은 데이터
+### 미포함 데이터 (런타임 생성)
 
-| 종류 | 대안 |
-|------|------|
-| **학습 자료 (PDF/TXT)** | 게임 생성 시 직접 업로드 또는 텍스트 입력 |
-| **DB 시드 데이터** | Google 로그인 후 온보딩·게임 생성으로 데이터 생성 |
-| **NLP RAG 코퍼스/모델** | 별도 FastAPI NLP 서버 필요 (미포함) |
+| 종류 | 생성 방법 |
+|------|-----------|
+| 사용자·게임·문제 DB 레코드 | Google 로그인 → 게임 생성·플레이 시 JPA가 자동 저장 |
+| 학습 소스(PDF/TXT) | 사용자 업로드 또는 텍스트 직접 입력 |
 
-### 학습 자료 테스트용 샘플 텍스트
+### 테스트용 학습 텍스트 (복사·붙여넣기)
 
-게임 생성 2단계에서 **텍스트 직접 입력**으로 아래 내용을 붙여넣어 테스트할 수 있습니다.
+게임 생성 2단계 **텍스트 직접 입력**에 사용:
 
 ```text
 The present perfect tense is used to describe actions that happened at an unspecified time in the past.
@@ -268,143 +327,138 @@ They have never visited Japan.
 I have already finished my homework.
 ```
 
-또는 임의의 영어 PDF·TXT 파일을 업로드하세요. 지원 형식: **PDF, TXT** (`GameSourceService`).
-
-### NLP 서버 상태 확인
-
-백엔드 기동 후:
-
-```bash
-curl http://localhost:8080/nlp/status
-```
-
-응답 예시:
-
-```json
-{
-  "nlpEnabled": true,
-  "serverUrl": "http://localhost:8000",
-  "nlpHealthy": false,
-  "mode": "Fallback (Gemini Direct)"
-}
-```
-
-NLP 서버가 없어도 **영문법(GRAMMAR) 게임은 Gemini fallback**으로 문제가 생성됩니다.
+지원 업로드 형식: **PDF, TXT** (`GameSourceService` — PDF는 Apache PDFBox로 텍스트 추출).
 
 ---
 
-## 주요 기능 및 API 개요
+## Database or Data Used
 
-### 사용자 흐름
+### RDBMS: PostgreSQL
 
-```
-로그인(Google OAuth) → 온보딩 → 메인
-  → 게임 생성(유형·자료·설정) → AI 문제 생성 → Phaser 게임 플레이
-  → 학습 분석 / 오답 노트 → 복습 게임 생성
-  → 마이페이지(코인·스트릭·캐릭터)
-```
+| 항목 | 값 |
+|------|-----|
+| **DB 이름** | `capston` |
+| **JDBC URL** | `jdbc:postgresql://localhost:5432/capston` |
+| **스키마 관리** | JPA `ddl-auto: update` (앱 기동 시 테이블 자동 생성/갱신) |
+| **마이그레이션 SQL** | 없음 (Flyway/Liquibase 미사용) |
 
-### 게임 유형
+### 주요 테이블 (Entity)
 
-| `GameType` | 문제 생성 방식 |
-|------------|----------------|
-| `GRAMMAR` | NLP RAG 서버 우선 → 실패 시 Gemini |
-| `VOCAB` | Gemini 직접 호출 |
+| 테이블 | Entity | 설명 |
+|--------|--------|------|
+| `users` | `User` | Google OAuth 사용자, 프로필, 코인, 캐릭터 상태, Classroom refresh token |
+| `games` | `Game` | 게임 메타(제목, 유형, 공개 여부, 좋아요 수, 미리보기 캐시) |
+| `game_sources` | `GameSource` | 업로드 파일 메타 + 추출된 학습 텍스트 |
+| `game_allowed_problem_types` | (ElementCollection) | 게임별 허용 문제 유형 |
+| `problems` | `Problem` | AI 생성 문제(질문, 보기, 정답, scope, 해설) |
+| `problem_attempts` | `ProblemAttempt` | 사용자별 답안·정오 기록 |
+| `game_likes` | `GameLike` | 게임 좋아요 |
+| `user_play_dates` | `UserPlayDate` | 스트릭(연속 학습일) 기록 |
 
-### 문제 유형 (`ProblemType`)
+### Cache: Redis
 
-- `MULTIPLE_CHOICE` — 5지선다
-- `OX` — O/X
-- `SHORT_ANSWER` — 단답형
+| 용도 | 키 패턴 |
+|------|---------|
+| Refresh Token 저장 | `refresh:{userId}` |
+| Access Token 블랙리스트 | `blacklist:{accessToken}` |
+
+기본 연결: `localhost:6379` (Spring Boot Redis autoconfigure)
+
+### 외부 API·서비스 데이터
+
+| 서비스 | 용도 |
+|--------|------|
+| **Google Gemini API** | 문제 생성, 학습 미리보기, 해설 생성 |
+| **Google OAuth / Classroom API** | 로그인, 수업 연동·게임 공유 |
+| **NLP FastAPI 서버** (선택) | 영문법 RAG 기반 문제 생성 — 별도 배포, DB 미포함 |
+
+---
+
+## Description of Used Open Source (if any)
+
+본 프로젝트는 아래 오픈소스 라이브러리·프레임워크를 사용합니다.
+
+### Backend (Java / Gradle)
+
+| 라이브러리 | 버전 | 라이선스 | 용도 |
+|------------|------|----------|------|
+| [Spring Boot](https://spring.io/projects/spring-boot) | 3.3.4 | Apache 2.0 | 웹 프레임워크 |
+| [Spring Security](https://spring.io/projects/spring-security) | (Boot BOM) | Apache 2.0 | 인증·인가 |
+| [Spring Data JPA](https://spring.io/projects/spring-data-jpa) | (Boot BOM) | Apache 2.0 | ORM |
+| [Spring WebFlux](https://docs.spring.io/spring-framework/reference/web/webflux.html) | (Boot BOM) | Apache 2.0 | NLP·Gemini HTTP 클라이언트 |
+| [Spring Data Redis](https://spring.io/projects/spring-data-redis) | (Boot BOM) | Apache 2.0 | Redis 연동 |
+| [Spring Session Data Redis](https://spring.io/projects/spring-session) | (Boot BOM) | Apache 2.0 | 세션·토큰 저장 |
+| [PostgreSQL JDBC Driver](https://jdbc.postgresql.org/) | (Boot BOM) | BSD-2-Clause | PostgreSQL 연결 |
+| [JJWT](https://github.com/jwtk/jjwt) | 0.11.5 | Apache 2.0 | JWT 생성·검증 |
+| [Lombok](https://projectlombok.org/) | (Boot BOM) | MIT | 보일러플레이트 코드 감소 |
+| [Apache PDFBox](https://pdfbox.apache.org/) | 3.0.3 | Apache 2.0 | PDF 텍스트 추출 |
+| [H2 Database](https://www.h2database.com/) | (test) | MPL 2.0 / EPL 1.0 | 테스트용 인메모리 DB (설정 주석 상태) |
+| [JUnit 5](https://junit.org/junit5/) | (Boot BOM) | EPL 2.0 | 단위·통합 테스트 |
+
+### Frontend (JavaScript / npm)
+
+| 라이브러리 | 버전 | 라이선스 | 용도 |
+|------------|------|----------|------|
+| [React](https://react.dev/) | ^19.2.0 | MIT | UI |
+| [React DOM](https://react.dev/) | ^19.2.0 | MIT | DOM 렌더링 |
+| [React Router](https://reactrouter.com/) | ^7.13.0 | MIT | SPA 라우팅 |
+| [Phaser](https://phaser.io/) | ^3.90.0 | MIT | HTML5 게임 엔진 |
+| [Vite](https://vitejs.dev/) | ^7.3.1 | MIT | 빌드·개발 서버 |
+| [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react) | ^5.1.1 | MIT | React Fast Refresh |
+| [ESLint](https://eslint.org/) | ^9.39.1 | MIT | 코드 린트 |
+
+### 인프라·런타임 (설치 대상)
+
+| 소프트웨어 | 라이선스 | 용도 |
+|------------|----------|------|
+| [PostgreSQL](https://www.postgresql.org/) | PostgreSQL License | 주 데이터베이스 |
+| [Redis](https://redis.io/) | BSD 3-Clause | 토큰 캐시 |
+| [OpenJDK](https://openjdk.org/) | GPL v2 + Classpath | Java 17 런타임 |
+| [Node.js](https://nodejs.org/) | MIT 등 | 프론트 빌드·실행 |
+
+### 외부 SaaS API (오픈소스 아님)
+
+- **Google Gemini API** — AI 문제·해설 생성
+- **Google OAuth 2.0 / Google Classroom API** — 인증·수업 연동
+
+---
+
+## 부록
 
 ### REST API 요약
 
 | Prefix | 주요 엔드포인트 |
 |--------|------------------|
 | `/auth` | `POST /google`, `POST /refresh`, `GET /me`, `POST /logout` |
-| `/games` | CRUD, 소스 업로드, `POST /{id}/generate/preview`, `POST /{id}/generate/problems`, 답안 제출, 좋아요 |
-| `/users/me` | 프로필, 코인, 스트릭, 캐릭터(간식·놀기·공부), 내 게임 목록 |
-| `/analysis/me` | 학습 개요·상세, 오답 목록, 복습 게임 생성 |
-| `/classrooms` | Google Classroom 연동, 게임 공유 |
-| `/nlp/status` | NLP 서버 헬스체크 (인증 불필요) |
+| `/games` | CRUD, 소스 업로드, 문제 생성, 답안 제출, 좋아요 |
+| `/users/me` | 프로필, 코인, 스트릭, 캐릭터, 내 게임 |
+| `/analysis/me` | 학습 분석, 오답, 복습 게임 |
+| `/classrooms` | Classroom 연동, 게임 공유 |
+| `/nlp/status` | NLP 헬스체크 (인증 불필요) |
 
-### 프론트 라우트
+### 배포
 
-| 경로 | 페이지 |
-|------|--------|
-| `/` | 로그인 |
-| `/auth/callback` | OAuth 콜백 |
-| `/onboarding`, `/signup` | 온보딩·회원가입 |
-| `/main` | 메인 (스트릭, 최근 게임) |
-| `/create-game` | 게임 생성 마법사 |
-| `/play` | Phaser 게임 플레이 |
-| `/analyze`, `/wrong-answers` | 학습 분석 |
-| `/mypage` | 마이페이지 |
+- **Frontend:** Vercel (`front/WebPage/vercel.json`)
+- **Backend:** GitHub Actions → EC2 (`.github/workflows/deploy.yml`, `develop` 브랜치)
+- **운영 API 예시:** `https://capston.p-e.kr`
 
-### 백엔드 패키지 구조
+### 트러블슈팅
 
-```
-growth._OK.backend
-├── auth/          # Google OAuth, JWT, Token(Redis)
-├── user/          # 사용자, 코인, 스트릭, 캐릭터
-├── game/          # 게임·문제·소스·Gemini·NLP Client
-├── analysis/      # 학습 분석·복습 게임
-├── classroom/     # Google Classroom
-└── global/        # Security, CORS, Exception, Config
-```
+| 증상 | 확인 |
+|------|------|
+| Google 로그인 실패 | Client ID·Redirect URI가 Console·`.env`·`REDIRECT_URI`와 동일한지 |
+| 401 오류 | Redis 실행, `JWT_SECRET` 설정 |
+| DB 연결 실패 | PostgreSQL 실행, `capston` DB 존재 |
+| 문제 생성 실패 | `GEMINI_API_KEY`, 학습 소스 비어 있지 않은지 |
+| NLP 미사용 | `GET /nlp/status` → `nlpHealthy: false` (Gemini fallback 정상) |
 
----
+### 팀 문서
 
-## 배포
+- [`docs/GrounRule.MD`](docs/GrounRule.MD) — 협업 규칙·코드 컨벤션
 
-### Frontend (Vercel)
+### 알려진 제한
 
-- `front/WebPage/vercel.json` — SPA rewrite 설정
-- 환경 변수: `VITE_API_BASE_URL`, `VITE_GOOGLE_CLIENT_ID`, `VITE_GOOGLE_REDIRECT_URI`
-- CORS 허용 origin: `https://2026-growth-front-deploy.vercel.app` (`CorsConfig`)
-
-### Backend (GitHub Actions → EC2)
-
-`develop` 브랜치 push 시 `.github/workflows/deploy.yml` 실행:
-
-1. GitHub Secret `APPLICATION_YML`로 `application.yml` 생성
-2. `./gradlew build -x test`
-3. JAR를 EC2에 SCP 후 `java -jar`로 재기동
-
-운영 API 예시: `https://capston.p-e.kr`
-
----
-
-## 트러블슈팅
-
-| 증상 | 확인 사항 |
-|------|-----------|
-| Google 로그인 실패 | Client ID, Redirect URI가 Google Console·`.env`·백엔드 `REDIRECT_URI`와 **완전히 동일**한지 확인 |
-| 401 / 인증 오류 | Redis 실행 여부, JWT_SECRET 설정 |
-| DB 연결 실패 | PostgreSQL 실행, `capston` DB 존재, `DB_NAME`/`DB_PASSWORD` |
-| 문제 생성 실패 | `GEMINI_API_KEY` 유효성, 학습 소스(텍스트) 비어 있지 않은지 |
-| 영문법 게임이 Gemini만 사용 | `GET /nlp/status`에서 `nlpHealthy: false` — NLP 서버 미기동 또는 `NLP_ENABLED=false` |
-| CORS 오류 | 프론트 origin이 `CorsConfig` 허용 목록에 있는지 확인 |
-| 프론트 API 404 | 로컬 개발 시 `VITE_API_BASE_URL`을 비우고 Vite dev server 사용 |
-
----
-
-## 제한 사항 및 알려진 이슈
-
-1. **NLP FastAPI 서버 미포함** — 영문법 RAG 파이프라인용 별도 저장소/서버가 필요합니다. 없으면 Gemini fallback으로 동작합니다.
-2. **자동 설치 스크립트 없음** — PostgreSQL·Redis·환경 변수는 수동 설정이 필요합니다 (본 README의 절차 참고).
-3. **Backend `.env.example` 없음** — 환경 변수는 위 [환경 변수](#환경-변수) 표를 참고하세요.
-4. **학습 자료 샘플 파일 미포함** — 테스트용 텍스트는 [샘플 데이터](#샘플-데이터-및-테스트-방법) 절의 예시를 사용하세요.
-5. **`application.yml`은 git에 포함** — 실제 시크릿은 환경 변수로 주입하며, 운영 배포는 GitHub Secrets 사용.
-
----
-
-## 팀 문서
-
-협업 규칙 및 코드 컨벤션: [`docs/GrounRule.MD`](docs/GrounRule.MD)
-
----
-
-## 라이선스
-
-본 프로젝트는 capstone 과제용 저장소입니다. 상세 라이선스는 팀/기관 정책을 따릅니다.
+1. NLP FastAPI 서버는 **본 저장소에 미포함** (Gemini fallback으로 동작)
+2. Backend 자동화 테스트는 **현재 주석 처리** 상태
+3. 학습 PDF/TXT 샘플 파일·DB seed SQL **미포함**
+4. 자동 설치 스크립트 없음 — [How to Install](#how-to-install) 절차 참고
