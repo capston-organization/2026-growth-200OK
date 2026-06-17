@@ -165,14 +165,16 @@ const AnalyzePage = () => {
       return;
     }
 
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    };
+
     try {
       setIsCreating(true);
       const res = await fetch(apiUrl("/analysis/me/review-games"), {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify({
           category: activeCategory,
           scope,
@@ -186,12 +188,89 @@ const AnalyzePage = () => {
       }
 
       const data = await res.json();
+      const gameId = data?.gameId;
+      if (!gameId) {
+        alert("복습 게임 정보를 받지 못했어요. 잠시 후 다시 시도해주세요.");
+        return;
+      }
+
+      // 복습 게임 API는 gameId만 만들고 문제는 생성하지 않음 → 일반 게임 만들기와 동일 파이프라인
+      const qs = new URLSearchParams({
+        category: activeCategory,
+        scope,
+      });
+      const wrongRes = await fetch(
+        apiUrl(`/analysis/me/wrong-answers?${qs}`),
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      const wrongPayload = wrongRes.ok ? await wrongRes.json() : null;
+      const wrongItems = Array.isArray(wrongPayload?.items)
+        ? wrongPayload.items
+        : [];
+
+      const categoryLabel =
+        CATEGORY_LABEL_SHORT[activeCategory] || activeCategory;
+      const sourceBody =
+        wrongItems.length > 0
+          ? wrongItems
+              .map(
+                (item, i) =>
+                  `${i + 1}. ${item.question || "문제"}\n   정답: ${item.answer || ""}`,
+              )
+              .join("\n\n")
+          : `${categoryLabel} · ${scope}\n이 범위에서 틀렸던 개념을 복습합니다.`;
+
+      const textRes = await fetch(apiUrl(`/games/${gameId}/sources/text`), {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          text: `[복습 소스: ${scope}]\n${sourceBody}`,
+        }),
+      });
+      if (!textRes.ok) {
+        throw new Error("복습 소스 등록 실패");
+      }
+
+      const previewRes = await fetch(
+        apiUrl(`/games/${gameId}/generate/preview`),
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      if (!previewRes.ok) {
+        throw new Error("학습 미리보기 생성 실패");
+      }
+      const previewData = await previewRes.json();
+
+      const problemRes = await fetch(
+        apiUrl(`/games/${gameId}/generate/problems`),
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            problemCount: reviewProblemCount,
+            problemTypes: ["SHORT_ANSWER", "OX", "MULTIPLE_CHOICE"],
+          }),
+        },
+      );
+      if (!problemRes.ok) {
+        throw new Error("문제 생성 실패");
+      }
+      const problemData = await problemRes.json();
+      const problems = problemData?.problems;
+
+      if (!Array.isArray(problems) || problems.length === 0) {
+        throw new Error("생성된 문제가 없음");
+      }
+
       navigate("/play", {
         state: {
           userName,
           source: "analyze",
-          status: data?.status || "PREPARING",
-          gameId: data?.gameId || null,
+          gameId,
+          previewData,
+          problems,
           scope,
         },
       });
