@@ -7,6 +7,12 @@ import LearningVillageLogoImage from "../assets/images/Learning_Village_Logo_Ima
 import LearningVillageLogoText from "../assets/images/Learning_Village_Logo_TextOnly.png";
 
 const SOURCE_REQUIRED_MSG = "텍스트를 입력하거나 파일을 업로드해주세요.";
+const INVALID_SOURCE_FILE_MSG = "PDF 또는 텍스트 파일만 업로드 가능합니다.";
+
+const isAllowedSourceFile = (file) => {
+  const name = (file?.name || "").toLowerCase();
+  return name.endsWith(".pdf") || name.endsWith(".txt");
+};
 
 const GameCreationPage = () => {
   const navigate = useNavigate();
@@ -34,10 +40,27 @@ const GameCreationPage = () => {
 
   const handleFileChange = (e) => {
     const selectedFiles = Array.from(e.target.files);
-    if (selectedFiles.length > 0) {
-      // 기존 파일 목록에 새로 선택한 파일 객체(File)를 추가
-      setFiles([...files, ...selectedFiles]);
+    if (selectedFiles.length === 0) return;
+
+    const validFiles = [];
+    let hasInvalid = false;
+
+    selectedFiles.forEach((file) => {
+      if (isAllowedSourceFile(file)) {
+        validFiles.push(file);
+      } else {
+        hasInvalid = true;
+      }
+    });
+
+    if (hasInvalid) {
+      window.alert(INVALID_SOURCE_FILE_MSG);
     }
+    if (validFiles.length > 0) {
+      setFiles((prev) => [...prev, ...validFiles]);
+    }
+
+    e.target.value = "";
   };
 
   // [Step 2] 파일 옆 X 버튼 클릭 시 삭제
@@ -70,10 +93,22 @@ const GameCreationPage = () => {
       if (data?.error === "GAME_SOURCE_NOT_SET") {
         return SOURCE_REQUIRED_MSG;
       }
+      if (data?.error === "INVALID_SOURCE_FILE") {
+        return INVALID_SOURCE_FILE_MSG;
+      }
       return data?.message || null;
     } catch {
       return null;
     }
+  };
+
+  const assertValidSourceFiles = () => {
+    const invalidFiles = files.filter((file) => !isAllowedSourceFile(file));
+    if (invalidFiles.length > 0) {
+      window.alert(INVALID_SOURCE_FILE_MSG);
+      return false;
+    }
+    return true;
   };
 
   // [공통] '다음 단계' 버튼 활성화 여부 체크 (유효성 검사)
@@ -143,6 +178,9 @@ const GameCreationPage = () => {
   const handleCreateGame = async () => {
     if (!hasLearningSource()) {
       alertSourceRequired();
+      return;
+    }
+    if (!assertValidSourceFiles()) {
       return;
     }
 
@@ -541,7 +579,7 @@ const GameCreationPage = () => {
                       onChange={handleFileChange}
                       style={{ display: "none" }}
                       multiple // 여러 개 선택 가능하게 하려면 유지
-                      accept=".pdf,.txt,.doc,.docx"
+                      accept=".pdf,.txt"
                     />
                   </div>
                 </div>
