@@ -5,6 +5,20 @@ import { useNavigate, useLocation } from "react-router-dom"; // 페이지 이동
 import { apiUrl } from "../config/api";
 import LearningVillageLogoImage from "../assets/images/Learning_Village_Logo_ImageOnly.png";
 import LearningVillageLogoText from "../assets/images/Learning_Village_Logo_TextOnly.png";
+import ShortAnswerIcon from "../assets/images/ShortAnswer_Icon.png";
+import OXIcon from "../assets/images/OX_Icon.png";
+import MultiChoiceIcon from "../assets/images/MultiChoice_Icon.png";
+
+const QUESTION_TYPE_TOP_ROW = [
+  { type: "단답식", icon: ShortAnswerIcon, alt: "단답식 문제 유형" },
+  { type: "OX", icon: OXIcon, alt: "OX 문제 유형" },
+];
+
+const QUESTION_TYPE_MULTIPLE_CHOICE = {
+  type: "객관식",
+  icon: MultiChoiceIcon,
+  alt: "객관식 문제 유형",
+};
 
 const SOURCE_REQUIRED_MSG = "텍스트를 입력하거나 파일을 업로드해주세요.";
 const INVALID_SOURCE_FILE_MSG = "PDF 또는 텍스트 파일만 업로드 가능합니다.";
@@ -381,21 +395,9 @@ const GameCreationPage = () => {
           </span>
           <span
             style={{ cursor: "pointer" }}
-            onClick={() => navigate("/main", { state: { userName } })}
-          >
-            공유하기
-          </span>
-          <span
-            style={{ cursor: "pointer" }}
             onClick={() => navigate("/analyze", { state: { userName } })}
           >
             분석하기
-          </span>
-          <span
-            style={{ cursor: "pointer" }}
-            onClick={() => navigate("/main", { state: { userName } })}
-          >
-            육성하기
           </span>
 
           <span
@@ -762,21 +764,7 @@ const GameCreationPage = () => {
                   justifyItems: "center",
                 }}
               >
-                {["단답식", "OX"].map((type) => (
-                  <div
-                    key={type}
-                    style={{
-                      ...cardStyle(selectedQuestions.includes(type)),
-                      margin: 0,
-                    }}
-                    onClick={() => toggleQuestion(type)}
-                  >
-                    <div style={{ fontSize: "80px", marginBottom: "10px" }}>
-                      ❓
-                    </div>
-                    <h4 style={{ fontSize: "28px", margin: 20 }}>{type}</h4>
-                  </div>
-                ))}
+                {QUESTION_TYPE_TOP_ROW.map((item) => renderQuestionTypeCard(item))}
                 <div
                   style={{
                     gridColumn: "1 / -1",
@@ -784,18 +772,7 @@ const GameCreationPage = () => {
                     justifyContent: "center",
                   }}
                 >
-                  <div
-                    style={{
-                      ...cardStyle(selectedQuestions.includes("객관식")),
-                      margin: 0,
-                    }}
-                    onClick={() => toggleQuestion("객관식")}
-                  >
-                    <div style={{ fontSize: "80px", marginBottom: "10px" }}>
-                      ❓
-                    </div>
-                    <h4 style={{ fontSize: "28px", margin: 20 }}>객관식</h4>
-                  </div>
+                  {renderQuestionTypeCard(QUESTION_TYPE_MULTIPLE_CHOICE)}
                 </div>
               </div>
             </div>

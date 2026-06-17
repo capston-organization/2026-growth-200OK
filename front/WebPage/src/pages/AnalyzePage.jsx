@@ -61,6 +61,40 @@ const safeParseJson = async (res, apiName) => {
   }
 };
 
+const normalizeScopeLabel = (value) => String(value ?? "").trim();
+
+/** 복습 게임 소스·생성 문제가 동일 scope인지 비교 */
+const matchesReviewScope = (problemScope, targetScope) => {
+  const ps = normalizeScopeLabel(problemScope);
+  const ts = normalizeScopeLabel(targetScope);
+  if (!ts) return true;
+  if (!ps || ps === "기타") return false;
+  return ps === ts || ps.includes(ts) || ts.includes(ps);
+};
+
+/** AI 문제 생성용 소스 — target scope만 출제하도록 명시 */
+const buildReviewSourceText = (scope, categoryLabel, wrongItems) => {
+  const scopeHeader = [
+    `[복습 전용 학습 범위] ${scope}`,
+    `※ 이 자료로 만들어지는 모든 문제는 반드시 「${scope}」 개념만 다룹니다.`,
+    `※ ${scope}와 무관한 다른 문법·어휘 주제는 절대 출제하지 마세요.`,
+    `※ 각 문제의 scope 필드는 반드시 "${scope}"(와 동일한 표현)이어야 합니다.`,
+    "",
+  ].join("\n");
+
+  if (wrongItems.length > 0) {
+    const body = wrongItems
+      .map(
+        (item, i) =>
+          `${i + 1}. [${scope}] ${item.question || "문제"}\n   정답: ${item.answer || ""}`,
+      )
+      .join("\n\n");
+    return `${scopeHeader}${body}`;
+  }
+
+  return `${scopeHeader}${categoryLabel} · ${scope}\n${scope} 핵심 규칙·예문만으로 복습 문제를 구성합니다.`;
+};
+
 const AnalyzePage = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -204,28 +238,22 @@ const AnalyzePage = () => {
         { headers: { Authorization: `Bearer ${token}` } },
       );
       const wrongPayload = wrongRes.ok ? await wrongRes.json() : null;
-      const wrongItems = Array.isArray(wrongPayload?.items)
-        ? wrongPayload.items
-        : [];
+      const wrongItems = (
+        Array.isArray(wrongPayload?.items) ? wrongPayload.items : []
+      ).filter((item) => matchesReviewScope(item?.scope, scope));
 
       const categoryLabel =
         CATEGORY_LABEL_SHORT[activeCategory] || activeCategory;
-      const sourceBody =
-        wrongItems.length > 0
-          ? wrongItems
-              .map(
-                (item, i) =>
-                  `${i + 1}. ${item.question || "문제"}\n   정답: ${item.answer || ""}`,
-              )
-              .join("\n\n")
-          : `${categoryLabel} · ${scope}\n이 범위에서 틀렸던 개념을 복습합니다.`;
+      const sourceText = buildReviewSourceText(
+        scope,
+        categoryLabel,
+        wrongItems,
+      );
 
       const textRes = await fetch(apiUrl(`/games/${gameId}/sources/text`), {
         method: "POST",
         headers,
-        body: JSON.stringify({
-          text: `[복습 소스: ${scope}]\n${sourceBody}`,
-        }),
+        body: JSON.stringify({ text: sourceText }),
       });
       if (!textRes.ok) {
         throw new Error("복습 소스 등록 실패");
@@ -338,12 +366,6 @@ const AnalyzePage = () => {
             게임 만들기
           </span>
           <span
-            style={{ cursor: "pointer" }}
-            onClick={() => navigate("/main", { state: { userName } })}
-          >
-            공유하기
-          </span>
-          <span
             style={{
               fontWeight: "bold",
               color: "#333",
@@ -354,12 +376,6 @@ const AnalyzePage = () => {
             onClick={() => navigate("/analyze", { state: { userName } })}
           >
             분석하기
-          </span>
-          <span
-            style={{ cursor: "pointer" }}
-            onClick={() => navigate("/main", { state: { userName } })}
-          >
-            육성하기
           </span>
           <span
             style={{
