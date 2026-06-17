@@ -20,6 +20,14 @@ const QUESTION_TYPE_MULTIPLE_CHOICE = {
   alt: "객관식 문제 유형",
 };
 
+const SOURCE_REQUIRED_MSG = "텍스트를 입력하거나 파일을 업로드해주세요.";
+const INVALID_SOURCE_FILE_MSG = "PDF 또는 텍스트 파일만 업로드 가능합니다.";
+
+const isAllowedSourceFile = (file) => {
+  const name = (file?.name || "").toLowerCase();
+  return name.endsWith(".pdf") || name.endsWith(".txt");
+};
+
 const GameCreationPage = () => {
   const navigate = useNavigate();
 
@@ -46,10 +54,27 @@ const GameCreationPage = () => {
 
   const handleFileChange = (e) => {
     const selectedFiles = Array.from(e.target.files);
-    if (selectedFiles.length > 0) {
-      // 기존 파일 목록에 새로 선택한 파일 객체(File)를 추가
-      setFiles([...files, ...selectedFiles]);
+    if (selectedFiles.length === 0) return;
+
+    const validFiles = [];
+    let hasInvalid = false;
+
+    selectedFiles.forEach((file) => {
+      if (isAllowedSourceFile(file)) {
+        validFiles.push(file);
+      } else {
+        hasInvalid = true;
+      }
+    });
+
+    if (hasInvalid) {
+      window.alert(INVALID_SOURCE_FILE_MSG);
     }
+    if (validFiles.length > 0) {
+      setFiles((prev) => [...prev, ...validFiles]);
+    }
+
+    e.target.value = "";
   };
 
   // [Step 2] 파일 옆 X 버튼 클릭 시 삭제
@@ -69,11 +94,40 @@ const GameCreationPage = () => {
     }
   };
 
+  const hasLearningSource = () =>
+    files.length > 0 || textInput.trim() !== "";
+
+  const alertSourceRequired = () => {
+    window.alert(SOURCE_REQUIRED_MSG);
+  };
+
+  const parseApiErrorBody = async (res) => {
+    try {
+      const data = await res.json();
+      if (data?.error === "GAME_SOURCE_NOT_SET") {
+        return SOURCE_REQUIRED_MSG;
+      }
+      if (data?.error === "INVALID_SOURCE_FILE") {
+        return INVALID_SOURCE_FILE_MSG;
+      }
+      return data?.message || null;
+    } catch {
+      return null;
+    }
+  };
+
+  const assertValidSourceFiles = () => {
+    const invalidFiles = files.filter((file) => !isAllowedSourceFile(file));
+    if (invalidFiles.length > 0) {
+      window.alert(INVALID_SOURCE_FILE_MSG);
+      return false;
+    }
+    return true;
+  };
+
   // [공통] '다음 단계' 버튼 활성화 여부 체크 (유효성 검사)
   const isNextButtonDisabled = () => {
     if (step === 1) return selectedType === null; // 유형을 안 골랐으면 버튼 끔
-    // 2단계: 파일이나 텍스트 둘 다 비어 있으면 다음으로 못 넘어감
-    if (step === 2) return files.length === 0 && textInput.trim() === "";
     if (step === 3) return gameName.trim() === ""; // 💡 게임 이름은 필수로 입력하게 설정
     if (step === 4) return selectedQuestions.length === 0; // 💡 기존 3단계를 4단계로 변경
     return false;
@@ -116,39 +170,34 @@ const GameCreationPage = () => {
     transition: "0.2s", // 클릭 시 부드럽게 변함
   });
 
-  const questionTypeCardStyle = (isSelected) => ({
-    ...cardStyle(isSelected),
-    backgroundColor: "#FFFFFF",
-    padding: "12px",
-    margin: 0,
-    overflow: "hidden",
-  });
-
-  const renderQuestionTypeCard = ({ type, icon, alt }) => (
-    <div
-      key={type}
-      style={questionTypeCardStyle(selectedQuestions.includes(type))}
-      onClick={() => toggleQuestion(type)}
-    >
-      <img
-        src={icon}
-        alt={alt}
-        style={{
-          width: "100%",
-          height: "100%",
-          maxWidth: "240px",
-          maxHeight: "240px",
-          objectFit: "contain",
-          display: "block",
-          pointerEvents: "none",
-          userSelect: "none",
-        }}
-      />
-    </div>
-  );
+  const handleStepAction = () => {
+    if (step === 2 && !hasLearningSource()) {
+      alertSourceRequired();
+      return;
+    }
+    if (step === 4) {
+      if (!hasLearningSource()) {
+        alertSourceRequired();
+        return;
+      }
+      handleCreateGame();
+      return;
+    }
+    if (!isNextButtonDisabled()) {
+      setStep(step + 1);
+    }
+  };
 
   // 💡 [새로 추가] 게임 생성 및 API 호출 함수
   const handleCreateGame = async () => {
+    if (!hasLearningSource()) {
+      alertSourceRequired();
+      return;
+    }
+    if (!assertValidSourceFiles()) {
+      return;
+    }
+
     setIsLoading(true); // 로딩 시작
     try {
       // 로컬 스토리지에서 액세스 토큰 가져오기 (로그인 후 저장된 토큰)
@@ -168,15 +217,12 @@ const GameCreationPage = () => {
           problemCount: problemCount,
         }),
       });
+      if (!createGameRes.ok) {
+        const message = await parseApiErrorBody(createGameRes);
+        throw new Error(message || "게임 생성에 실패했습니다.");
+      }
       const gameData = await createGameRes.json();
       const gameId = gameData.id;
-
-      // 1) 둘 다 완전히 비어 있으면 에러
-      if (files.length === 0 && textInput.trim() === "") {
-        throw new Error(
-          "학습할 소스(파일 또는 텍스트)가 최소 1개 이상 필요합니다.",
-        );
-      }
 
       // [2번 API] 소스 파일 업로드 (파일이 있을 때만)
       if (files.length > 0) {
@@ -191,7 +237,10 @@ const GameCreationPage = () => {
           body: formData,
         });
 
-        if (!sourceRes.ok) throw new Error("소스 파일 업로드 실패");
+        if (!sourceRes.ok) {
+          const message = await parseApiErrorBody(sourceRes);
+          throw new Error(message || "소스 파일 업로드에 실패했습니다.");
+        }
       }
 
       // [2-1번 API] 소스 텍스트 업로드 (직접 입력한 텍스트가 있을 때만)
@@ -208,7 +257,10 @@ const GameCreationPage = () => {
           },
         );
 
-        if (!textSourceRes.ok) throw new Error("소스 텍스트 업로드 실패");
+        if (!textSourceRes.ok) {
+          const message = await parseApiErrorBody(textSourceRes);
+          throw new Error(message || "소스 텍스트 업로드에 실패했습니다.");
+        }
       }
 
       // [3번 API] 미리보기 생성
@@ -219,6 +271,10 @@ const GameCreationPage = () => {
           headers: headers,
         },
       );
+      if (!previewRes.ok) {
+        const message = await parseApiErrorBody(previewRes);
+        throw new Error(message || "학습 미리보기 생성에 실패했습니다.");
+      }
       const previewData = await previewRes.json();
 
       // [4번 API] 문제 유형 설정
@@ -240,6 +296,10 @@ const GameCreationPage = () => {
           }),
         },
       );
+      if (!problemRes.ok) {
+        const message = await parseApiErrorBody(problemRes);
+        throw new Error(message || "문제 생성에 실패했습니다.");
+      }
       const problemData = await problemRes.json();
 
       // 모든 API 성공! 다음 페이지로 이동하면서 데이터를 통째로 넘김
@@ -253,7 +313,7 @@ const GameCreationPage = () => {
       });
     } catch (error) {
       console.error("API 에러:", error);
-      alert("게임 생성 중 오류가 발생했습니다.");
+      window.alert(error?.message || "게임 생성 중 오류가 발생했습니다.");
     } finally {
       setIsLoading(false); // 로딩 끝
     }
@@ -521,7 +581,7 @@ const GameCreationPage = () => {
                       onChange={handleFileChange}
                       style={{ display: "none" }}
                       multiple // 여러 개 선택 가능하게 하려면 유지
-                      accept=".pdf,.txt,.doc,.docx"
+                      accept=".pdf,.txt"
                     />
                   </div>
                 </div>
@@ -754,22 +814,17 @@ const GameCreationPage = () => {
 
             {/* [다음/완료] 버튼 */}
             <button
-              className={`btn-primary ${isNextButtonDisabled() ? "btn-disabled" : ""}`}
+              className={`btn-primary ${
+                step !== 2 && isNextButtonDisabled() ? "btn-disabled" : ""
+              }`}
               style={{
                 width: "180px",
                 marginTop: 0,
                 fontSize: "20px",
                 fontWeight: "bold",
               }}
-              disabled={isNextButtonDisabled() || isLoading}
-              onClick={() => {
-                // 💡 [수정] 4단계면 API 호출, 아니면 다음 단계로
-                if (step === 4) {
-                  handleCreateGame();
-                } else {
-                  setStep(step + 1);
-                }
-              }}
+              disabled={(step !== 2 && isNextButtonDisabled()) || isLoading}
+              onClick={handleStepAction}
             >
               {/* 로딩 중이면 텍스트 변경 */}
               {isLoading

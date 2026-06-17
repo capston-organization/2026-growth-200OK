@@ -17,48 +17,53 @@ jobs:
         working-directory: backend
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    - name: Set up JDK 17
-      uses: actions/setup-java@v3
-      with:
-        distribution: 'temurin'
-        java-version: '17'
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
 
-    - name: Create application.yml
-      env:
-        APPLICATION_YML: ${{ secrets.APPLICATION_YML }}
-      run: |
-        mkdir -p src/main/resources
-        printf '%s\n' "$APPLICATION_YML" > src/main/resources/application.yml
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: wrapper
 
-    - name: Build with Gradle
-      run: |
-        chmod +x ./gradlew
-        ./gradlew build -x test
+      - name: Create application.yml
+        env:
+          APPLICATION_YML: ${{ secrets.APPLICATION_YML }}
+        run: |
+          mkdir -p src/main/resources
+          printf '%s\n' "$APPLICATION_YML" > src/main/resources/application.yml
 
-    - name: Check build result
-      run: ls -al build/libs
+      - name: Build with Gradle
+        run: |
+          chmod +x ./gradlew
+          ./gradlew build -x test
 
-    - name: Copy jar to EC2
-      uses: appleboy/scp-action@v0.1.7
-      with:
-        host: ${{ secrets.EC2_HOST }}
-        username: ${{ secrets.EC2_USERNAME }}
-        key: ${{ secrets.EC2_SSH_KEY }}
-        source: "backend/build/libs/*.jar"
-        target: "/home/${{ secrets.EC2_USERNAME }}/app"
+      - name: Check build result
+        run: ls -al build/libs
 
-    - name: Deploy on EC2
-      uses: appleboy/ssh-action@v1.0.3
-      with:
-        host: ${{ secrets.EC2_HOST }}
-        username: ${{ secrets.EC2_USERNAME }}
-        key: ${{ secrets.EC2_SSH_KEY }}
-        timeout: 60s
-        request_pty: false
-        script: |
+      - name: Copy jar to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "backend/build/libs/*.jar"
+          target: "/home/${{ secrets.EC2_USERNAME }}/app"
+
+      - name: Deploy on EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          timeout: 60s
+          request_pty: false
+          script: |
             LIBS=/home/${{ secrets.EC2_USERNAME }}/app/backend/build/libs
             mkdir -p "$LIBS"
             cd "$LIBS"
