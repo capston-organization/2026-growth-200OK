@@ -361,21 +361,9 @@ const MyPage = () => {
           </span>
           <span
             style={{ cursor: "pointer" }}
-            onClick={() => navigate("/main", { state: { userName } })}
-          >
-            공유하기
-          </span>
-          <span
-            style={{ cursor: "pointer" }}
             onClick={() => navigate("/analyze", { state: { userName } })}
           >
             분석하기
-          </span>
-          <span
-            style={{ cursor: "pointer" }}
-            onClick={() => navigate("/main", { state: { userName } })}
-          >
-            육성하기
           </span>
           <span
             style={{
