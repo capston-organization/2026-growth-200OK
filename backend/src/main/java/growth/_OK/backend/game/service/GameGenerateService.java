@@ -16,6 +16,7 @@ import growth._OK.backend.global.exception.CapstonException;
 import growth._OK.backend.global.exception.ExceptionCode;
 import growth._OK.backend.user.domain.User;
 import growth._OK.backend.user.repository.UserRepository;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -101,6 +103,7 @@ public class GameGenerateService {
                 : game.getAllowedProblemTypes().isEmpty() ? List.of(ProblemType.MULTIPLE_CHOICE) : game.getAllowedProblemTypes();
 
         String sourceText = game.getSource().getExtractedText();
+        String targetScope = resolveTargetScopeHint(game.getLearningObjectives());
 
         // ── 영문법 vs 영단어 분기 ──────────────────────────────────────────────
         List<GeminiService.RawGeneratedProblem> rawList;
@@ -108,7 +111,18 @@ public class GameGenerateService {
         if (GameType.GRAMMAR.equals(game.getType())) {
             // 영문법 → FastAPI RAG 파이프라인 (NLP 서버 우선, 실패 시 Gemini fallback)
             log.info("[GameGenerateService] 영문법 게임 - FastAPI RAG 파이프라인 호출");
-            rawList = generateProblemsWithFallback(sourceText, count, types, game.getLearningObjectives());
+            rawList = generateProblemsWithFallback(
+                    sourceText,
+                    count,
+                    types,
+                    game.getLearningObjectives(),
+                    targetScope
+            );
+
+            // 복습 게임처럼 타깃 범위가 있으면 최종 결과도 한 번 더 제한
+            if (targetScope != null && !targetScope.isBlank()) {
+                rawList = filterByTargetScope(rawList, targetScope);
+            }
         } else {
             // 영단어 → GeminiService 직접 호출 (영단어 전용 프롬프트)
             log.info("[GameGenerateService] 영단어 게임 - Gemini 직접 호출");
@@ -171,19 +185,38 @@ public class GameGenerateService {
      * 2. 실패 시 → Gemini fallback
      */
     private List<GeminiService.RawGeneratedProblem> generateProblemsWithFallback(
-            String sourceText, int count, List<ProblemType> types, String learningObjectives) {
+            String sourceText,
+            int count,
+            List<ProblemType> types,
+            String learningObjectives,
+            String targetScope
+    ) {
+
+        List<String> grammarTags = (targetScope != null && !targetScope.isBlank())
+                ? List.of(targetScope)
+                : null;
+        String personalizationContext = appendScopeConstraint(learningObjectives, targetScope);
 
         try {
             List<GeminiService.RawGeneratedProblem> nlpResult = nlpClient.generateProblems(
                     sourceText,
-                    null,
+                    grammarTags,
                     count,
                     types,
-                    learningObjectives
+                    personalizationContext
             );
             if (nlpResult != null && !nlpResult.isEmpty()) {
-                log.info("[GameGenerateService] NLP 서버로 문제 {}개 생성 완료", nlpResult.size());
-                return nlpResult;
+                if (targetScope != null && !targetScope.isBlank()) {
+                    List<GeminiService.RawGeneratedProblem> scoped = filterByTargetScope(nlpResult, targetScope);
+                    log.info("[GameGenerateService] NLP 생성 {}개 중 scope '{}' 일치 {}개",
+                            nlpResult.size(), targetScope, scoped.size());
+                    if (!scoped.isEmpty()) {
+                        return scoped;
+                    }
+                } else {
+                    log.info("[GameGenerateService] NLP 서버로 문제 {}개 생성 완료", nlpResult.size());
+                    return nlpResult;
+                }
             }
         } catch (Exception e) {
             log.warn("[GameGenerateService] NLP 서버 호출 실패, Gemini fallback: {}", e.getMessage());
@@ -223,6 +256,91 @@ public class GameGenerateService {
         } catch (Exception e) {
             return List.of();
         }
+    }
+
+    private String appendScopeConstraint(String learningObjectives, String targetScope) {
+        String base = learningObjectives != null ? learningObjectives : "";
+        if (targetScope == null || targetScope.isBlank()) {
+            return base;
+        }
+        return (base + """
+
+                [SCOPE_STRICT]
+                - 이번 생성은 '%s' 범위만 다룹니다.
+                - '%s' 이외의 문법 주제(예: 주어-동사 수일치, 시제 등)는 출제하지 마세요.
+                - 모든 문제의 scope는 반드시 '%s' 또는 '%s'의 하위 개념이어야 합니다.
+                """.formatted(targetScope, targetScope, targetScope, targetScope)).trim();
+    }
+
+    private static List<GeminiService.RawGeneratedProblem> filterByTargetScope(
+            List<GeminiService.RawGeneratedProblem> problems,
+            String targetScope
+    ) {
+        if (problems == null || problems.isEmpty() || targetScope == null || targetScope.isBlank()) {
+            return problems == null ? List.of() : problems;
+        }
+
+        String target = normalizeForMatch(targetScope);
+        List<GeminiService.RawGeneratedProblem> filtered = problems.stream()
+                .filter(p -> {
+                    String scope = normalizeForMatch(p.scope);
+                    String question = normalizeForMatch(p.question);
+                    return (!scope.isBlank() && (scope.contains(target) || target.contains(scope)))
+                            || (!question.isBlank() && question.contains(target));
+                })
+                .collect(Collectors.toCollection(ArrayList::new));
+
+        if (filtered.isEmpty()) {
+            return List.of();
+        }
+
+        // 저장 시 분석 일관성을 위해 scope를 타깃으로 정규화
+        for (GeminiService.RawGeneratedProblem p : filtered) {
+            p.scope = targetScope;
+        }
+        return filtered;
+    }
+
+    private static String normalizeForMatch(String value) {
+        if (value == null) return "";
+        return value.replace(" ", "")
+                .replace("-", "")
+                .replace("_", "")
+                .toLowerCase(Locale.ROOT)
+                .trim();
+    }
+
+    private String resolveTargetScopeHint(String learningObjectives) {
+        if (learningObjectives == null || learningObjectives.isBlank()) {
+            return null;
+        }
+
+        String text = learningObjectives.trim();
+
+        // reviewProfile JSON에 targetScope가 있으면 최우선 사용
+        int jsonStart = text.indexOf('{');
+        if (jsonStart >= 0) {
+            String candidate = text.substring(jsonStart).trim();
+            try {
+                JsonNode node = objectMapper.readTree(candidate);
+                String fromJson = node.path("targetScope").asText("").trim();
+                if (!fromJson.isBlank()) {
+                    return fromJson;
+                }
+            } catch (Exception ignored) {
+                // reviewProfile 포맷이 아닐 수 있으므로 무시
+            }
+        }
+
+        // "<scope> 중심 오답 복습" 형태 지원
+        int marker = text.indexOf("중심 오답 복습");
+        if (marker > 0) {
+            String scope = text.substring(0, marker).trim();
+            if (!scope.isBlank()) {
+                return scope;
+            }
+        }
+        return null;
     }
 
     private User findUser(CustomUserDetails userDetails) {
