@@ -27,6 +27,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.HashSet;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -144,6 +146,16 @@ public class GameGenerateService {
             rawList = geminiService.generateProblemsFromSource(sourceText, count, types, game.getLearningObjectives());
         }
 
+        rawList = topUpGeneratedProblems(
+                rawList,
+                game.getType(),
+                sourceText,
+                count,
+                types,
+                game.getLearningObjectives(),
+                targetScope
+        );
+
         if (rawList.size() > count) {
             rawList = new ArrayList<>(rawList.subList(0, count));
         }
@@ -167,19 +179,9 @@ public class GameGenerateService {
             saved.add(problemRepository.save(problem));
         }
 
-        // 부족한 문제 패딩
-        for (int i = rawList.size(); i < count; i++) {
-            Problem problem = Problem.builder()
-                    .game(game)
-                    .sortOrder(i + 1)
-                    .question("추가 문제 " + (i + 1))
-                    .optionsJson("[\"①\",\"②\",\"③\",\"④\",\"⑤\"]")
-                    .correctAnswer("①")
-                    .type(types.isEmpty() ? ProblemType.MULTIPLE_CHOICE : types.get(i % types.size()))
-                    .scope("기타")
-                    .explanation(null)
-                    .build();
-            saved.add(problemRepository.save(problem));
+        if (saved.size() < count) {
+            log.warn("[GameGenerateService] 요청 {}개 중 {}개만 생성되었습니다. 더미 문제는 저장하지 않습니다.",
+                    count, saved.size());
         }
 
         return saved.stream()
@@ -248,6 +250,78 @@ public class GameGenerateService {
             }
         }
         return extractGrammarTags(learningObjectives);
+    }
+
+    private List<GeminiService.RawGeneratedProblem> topUpGeneratedProblems(
+            List<GeminiService.RawGeneratedProblem> initial,
+            GameType gameType,
+            String sourceText,
+            int targetCount,
+            List<ProblemType> types,
+            String learningObjectives,
+            String targetScope
+    ) {
+        List<GeminiService.RawGeneratedProblem> merged = sanitizeProblems(initial);
+        if (merged.size() >= targetCount) {
+            return merged;
+        }
+
+        // 중복 문제를 줄이기 위해 question 기준으로 dedupe key 관리
+        Set<String> seen = new HashSet<>();
+        for (GeminiService.RawGeneratedProblem p : merged) {
+            seen.add(normalizeForMatch(p.question));
+        }
+
+        // 최대 2회 추가 시도: 1차(엄격), 2차(완화)
+        for (int attempt = 0; attempt < 2 && merged.size() < targetCount; attempt++) {
+            int remaining = targetCount - merged.size();
+            List<GeminiService.RawGeneratedProblem> extra;
+
+            if (GameType.GRAMMAR.equals(gameType)) {
+                String scopeForAttempt = (attempt == 0) ? targetScope : null;
+                extra = generateProblemsWithFallback(
+                        sourceText,
+                        remaining,
+                        types,
+                        learningObjectives,
+                        scopeForAttempt
+                );
+                if (scopeForAttempt != null && !scopeForAttempt.isBlank()) {
+                    extra = filterByTargetScope(extra, scopeForAttempt);
+                }
+            } else {
+                extra = geminiService.generateProblemsFromSource(sourceText, remaining, types, learningObjectives);
+            }
+
+            for (GeminiService.RawGeneratedProblem p : sanitizeProblems(extra)) {
+                String key = normalizeForMatch(p.question);
+                if (key.isBlank() || seen.contains(key)) {
+                    continue;
+                }
+                seen.add(key);
+                merged.add(p);
+                if (merged.size() >= targetCount) {
+                    break;
+                }
+            }
+        }
+
+        return merged;
+    }
+
+    private static List<GeminiService.RawGeneratedProblem> sanitizeProblems(
+            List<GeminiService.RawGeneratedProblem> problems
+    ) {
+        if (problems == null || problems.isEmpty()) {
+            return new ArrayList<>();
+        }
+        return problems.stream()
+                .filter(p -> p != null
+                        && p.question != null
+                        && !p.question.isBlank()
+                        && p.correctAnswer != null
+                        && !p.correctAnswer.isBlank())
+                .collect(Collectors.toCollection(ArrayList::new));
     }
 
     /**
