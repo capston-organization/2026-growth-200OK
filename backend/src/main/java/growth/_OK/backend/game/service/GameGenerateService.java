@@ -24,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -37,6 +38,20 @@ public class GameGenerateService {
     private final GeminiService geminiService;
     private final NlpClient nlpClient;
     private final ObjectMapper objectMapper;
+
+    // scope(한국어) → grammar_tag 매핑
+    private static final Map<String, String> SCOPE_TO_TAG = Map.ofEntries(
+            Map.entry("수일치", "subject_verb_agreement"),
+            Map.entry("현재시제", "tense_present"),
+            Map.entry("과거시제", "tense_past"),
+            Map.entry("조동사", "auxiliary_verb"),
+            Map.entry("전치사", "preposition"),
+            Map.entry("관사", "article"),
+            Map.entry("비교급", "comparative"),
+            Map.entry("to부정사", "to_infinitive"),
+            Map.entry("수동태", "passive_voice"),
+            Map.entry("문장구조", "basic_word_order")
+    );
 
     @Transactional
     public GamePreviewResponseDto generatePreview(Long gameId, CustomUserDetails userDetails) {
@@ -108,7 +123,9 @@ public class GameGenerateService {
         if (GameType.GRAMMAR.equals(game.getType())) {
             // 영문법 → FastAPI RAG 파이프라인 (NLP 서버 우선, 실패 시 Gemini fallback)
             log.info("[GameGenerateService] 영문법 게임 - FastAPI RAG 파이프라인 호출");
-            rawList = generateProblemsWithFallback(sourceText, count, types, game.getLearningObjectives());
+            // learningObjectives에서 scope → grammar_tag 매핑 (복습 게임 지원)
+            List<String> grammarTags = extractGrammarTags(game.getLearningObjectives());
+            rawList = generateProblemsWithFallback(sourceText, count, types, game.getLearningObjectives(), grammarTags);
         } else {
             // 영단어 → GeminiService 직접 호출 (영단어 전용 프롬프트)
             log.info("[GameGenerateService] 영단어 게임 - Gemini 직접 호출");
@@ -171,12 +188,12 @@ public class GameGenerateService {
      * 2. 실패 시 → Gemini fallback
      */
     private List<GeminiService.RawGeneratedProblem> generateProblemsWithFallback(
-            String sourceText, int count, List<ProblemType> types, String learningObjectives) {
+            String sourceText, int count, List<ProblemType> types, String learningObjectives, List<String> grammarTags) {
 
         try {
             List<GeminiService.RawGeneratedProblem> nlpResult = nlpClient.generateProblems(
                     sourceText,
-                    null,
+                    grammarTags,
                     count,
                     types,
                     learningObjectives
@@ -194,6 +211,23 @@ public class GameGenerateService {
     }
 
     // ── 유틸 ─────────────────────────────────────────────────────────────────
+
+    /**
+     * learningObjectives에서 한국어 scope를 찾아 grammar_tag로 변환.
+     * 복습 게임에서 취약 문법 태그를 FastAPI에 전달하기 위함.
+     */
+    private List<String> extractGrammarTags(String learningObjectives) {
+        if (learningObjectives == null || learningObjectives.isBlank()) {
+            return null;
+        }
+        List<String> tags = new ArrayList<>();
+        for (Map.Entry<String, String> entry : SCOPE_TO_TAG.entrySet()) {
+            if (learningObjectives.contains(entry.getKey())) {
+                tags.add(entry.getValue());
+            }
+        }
+        return tags.isEmpty() ? null : tags;
+    }
 
     private static ProblemType parseProblemType(String type) {
         if (type == null) return ProblemType.MULTIPLE_CHOICE;
