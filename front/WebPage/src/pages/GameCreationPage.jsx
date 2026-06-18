@@ -170,6 +170,37 @@ const GameCreationPage = () => {
     transition: "0.2s", // 클릭 시 부드럽게 변함
   });
 
+  const questionTypeCardStyle = (isSelected) => ({
+    ...cardStyle(isSelected),
+    backgroundColor: "#FFFFFF",
+    padding: "12px",
+    margin: 0,
+    overflow: "hidden",
+  });
+
+  const renderQuestionTypeCard = ({ type, icon, alt }) => (
+    <div
+      key={type}
+      style={questionTypeCardStyle(selectedQuestions.includes(type))}
+      onClick={() => toggleQuestion(type)}
+    >
+      <img
+        src={icon}
+        alt={alt}
+        style={{
+          width: "100%",
+          height: "100%",
+          maxWidth: "240px",
+          maxHeight: "240px",
+          objectFit: "contain",
+          display: "block",
+          pointerEvents: "none",
+          userSelect: "none",
+        }}
+      />
+    </div>
+  );
+
   const handleStepAction = () => {
     if (step === 2 && !hasLearningSource()) {
       alertSourceRequired();
