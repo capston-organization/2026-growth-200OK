@@ -26,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -39,6 +40,20 @@ public class GameGenerateService {
     private final GeminiService geminiService;
     private final NlpClient nlpClient;
     private final ObjectMapper objectMapper;
+
+    // scope(한국어) -> grammar_tag 매핑
+    private static final Map<String, String> SCOPE_TO_TAG = Map.ofEntries(
+            Map.entry("수일치", "subject_verb_agreement"),
+            Map.entry("현재시제", "tense_present"),
+            Map.entry("과거시제", "tense_past"),
+            Map.entry("조동사", "auxiliary_verb"),
+            Map.entry("전치사", "preposition"),
+            Map.entry("관사", "article"),
+            Map.entry("비교급", "comparative"),
+            Map.entry("to부정사", "to_infinitive"),
+            Map.entry("수동태", "passive_voice"),
+            Map.entry("문장구조", "basic_word_order")
+    );
 
     @Transactional
     public GamePreviewResponseDto generatePreview(Long gameId, CustomUserDetails userDetails) {
@@ -191,10 +206,7 @@ public class GameGenerateService {
             String learningObjectives,
             String targetScope
     ) {
-
-        List<String> grammarTags = (targetScope != null && !targetScope.isBlank())
-                ? List.of(targetScope)
-                : null;
+        List<String> grammarTags = resolveGrammarTags(learningObjectives, targetScope);
         String personalizationContext = appendScopeConstraint(learningObjectives, targetScope);
 
         try {
@@ -223,10 +235,51 @@ public class GameGenerateService {
         }
 
         log.info("[GameGenerateService] Gemini fallback으로 문제 생성");
-        return geminiService.generateProblemsFromSource(sourceText, count, types, learningObjectives);
+        return geminiService.generateProblemsFromSource(sourceText, count, types, personalizationContext);
     }
 
     // ── 유틸 ─────────────────────────────────────────────────────────────────
+
+    private List<String> resolveGrammarTags(String learningObjectives, String targetScope) {
+        if (targetScope != null && !targetScope.isBlank()) {
+            String mappedTag = mapScopeToTag(targetScope);
+            if (mappedTag != null) {
+                return List.of(mappedTag);
+            }
+        }
+        return extractGrammarTags(learningObjectives);
+    }
+
+    /**
+     * learningObjectives에서 한국어 scope를 찾아 grammar_tag로 변환.
+     * 복습 게임에서 취약 문법 태그를 FastAPI에 전달하기 위함.
+     */
+    private List<String> extractGrammarTags(String learningObjectives) {
+        if (learningObjectives == null || learningObjectives.isBlank()) {
+            return null;
+        }
+        List<String> tags = new ArrayList<>();
+        for (Map.Entry<String, String> entry : SCOPE_TO_TAG.entrySet()) {
+            if (learningObjectives.contains(entry.getKey())) {
+                tags.add(entry.getValue());
+            }
+        }
+        return tags.isEmpty() ? null : tags;
+    }
+
+    private String mapScopeToTag(String scope) {
+        if (scope == null || scope.isBlank()) {
+            return null;
+        }
+        String normalized = normalizeForMatch(scope);
+        for (Map.Entry<String, String> entry : SCOPE_TO_TAG.entrySet()) {
+            String key = normalizeForMatch(entry.getKey());
+            if (normalized.equals(key) || normalized.contains(key) || key.contains(normalized)) {
+                return entry.getValue();
+            }
+        }
+        return null;
+    }
 
     private static ProblemType parseProblemType(String type) {
         if (type == null) return ProblemType.MULTIPLE_CHOICE;

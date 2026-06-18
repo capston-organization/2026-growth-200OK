@@ -61,6 +61,40 @@ const safeParseJson = async (res, apiName) => {
   }
 };
 
+const normalizeScopeLabel = (value) => String(value ?? "").trim();
+
+/** 복습 게임 소스·생성 문제가 동일 scope인지 비교 */
+const matchesReviewScope = (problemScope, targetScope) => {
+  const ps = normalizeScopeLabel(problemScope);
+  const ts = normalizeScopeLabel(targetScope);
+  if (!ts) return true;
+  if (!ps || ps === "기타") return false;
+  return ps === ts || ps.includes(ts) || ts.includes(ps);
+};
+
+/** AI 문제 생성용 소스 — target scope만 출제하도록 명시 */
+const buildReviewSourceText = (scope, categoryLabel, wrongItems) => {
+  const scopeHeader = [
+    `[복습 전용 학습 범위] ${scope}`,
+    `※ 이 자료로 만들어지는 모든 문제는 반드시 「${scope}」 개념만 다룹니다.`,
+    `※ ${scope}와 무관한 다른 문법·어휘 주제는 절대 출제하지 마세요.`,
+    `※ 각 문제의 scope 필드는 반드시 "${scope}"(와 동일한 표현)이어야 합니다.`,
+    "",
+  ].join("\n");
+
+  if (wrongItems.length > 0) {
+    const body = wrongItems
+      .map(
+        (item, i) =>
+          `${i + 1}. [${scope}] ${item.question || "문제"}\n   정답: ${item.answer || ""}`,
+      )
+      .join("\n\n");
+    return `${scopeHeader}${body}`;
+  }
+
+  return `${scopeHeader}${categoryLabel} · ${scope}\n${scope} 핵심 규칙·예문만으로 복습 문제를 구성합니다.`;
+};
+
 const AnalyzePage = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -69,7 +103,6 @@ const AnalyzePage = () => {
   // 현재 선택된 분석 카테고리: WORD(영단어) / GRAMMAR(영문법)
   const [activeCategory, setActiveCategory] = useState("WORD");
 
-  const [weakTop3, setWeakTop3] = useState([]);
   const [scopeWrongRates, setScopeWrongRates] = useState(
     INITIAL_SCOPE_WRONG_RATES,
   );
@@ -83,12 +116,21 @@ const AnalyzePage = () => {
     () => scopeWrongRates[activeCategory] || [],
     [activeCategory, scopeWrongRates],
   );
+  const currentTop3 = useMemo(
+    () =>
+      currentWrongRates
+        .slice(0, 3)
+        .map((item) => normalizeScopeLabel(item?.scope))
+        .filter(Boolean),
+    [currentWrongRates],
+  );
   const hasAnyWrongData = useMemo(() => {
     return (
       (scopeWrongRates.WORD && scopeWrongRates.WORD.length > 0) ||
       (scopeWrongRates.GRAMMAR && scopeWrongRates.GRAMMAR.length > 0)
     );
   }, [scopeWrongRates]);
+  const hasCurrentWrongData = currentTop3.length > 0;
 
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
@@ -109,9 +151,6 @@ const AnalyzePage = () => {
 
         if (overviewRes.ok) {
           const overview = await safeParseJson(overviewRes, "analysisOverview");
-          if (overview?.weakTop3?.length) {
-            setWeakTop3(overview.weakTop3.slice(0, 3));
-          }
           if (Array.isArray(overview?.scopeWrongRates)) {
             const grouped = { WORD: [], GRAMMAR: [] };
             overview.scopeWrongRates.forEach((row) => {
@@ -165,14 +204,16 @@ const AnalyzePage = () => {
       return;
     }
 
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    };
+
     try {
       setIsCreating(true);
       const res = await fetch(apiUrl("/analysis/me/review-games"), {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify({
           category: activeCategory,
           scope,
@@ -186,12 +227,83 @@ const AnalyzePage = () => {
       }
 
       const data = await res.json();
+      const gameId = data?.gameId;
+      if (!gameId) {
+        alert("복습 게임 정보를 받지 못했어요. 잠시 후 다시 시도해주세요.");
+        return;
+      }
+
+      // 복습 게임 API는 gameId만 만들고 문제는 생성하지 않음 → 일반 게임 만들기와 동일 파이프라인
+      const qs = new URLSearchParams({
+        category: activeCategory,
+        scope,
+      });
+      const wrongRes = await fetch(
+        apiUrl(`/analysis/me/wrong-answers?${qs}`),
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      const wrongPayload = wrongRes.ok ? await wrongRes.json() : null;
+      const wrongItems = (
+        Array.isArray(wrongPayload?.items) ? wrongPayload.items : []
+      ).filter((item) => matchesReviewScope(item?.scope, scope));
+
+      const categoryLabel =
+        CATEGORY_LABEL_SHORT[activeCategory] || activeCategory;
+      const sourceText = buildReviewSourceText(
+        scope,
+        categoryLabel,
+        wrongItems,
+      );
+
+      const textRes = await fetch(apiUrl(`/games/${gameId}/sources/text`), {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ text: sourceText }),
+      });
+      if (!textRes.ok) {
+        throw new Error("복습 소스 등록 실패");
+      }
+
+      const previewRes = await fetch(
+        apiUrl(`/games/${gameId}/generate/preview`),
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      if (!previewRes.ok) {
+        throw new Error("학습 미리보기 생성 실패");
+      }
+      const previewData = await previewRes.json();
+
+      const problemRes = await fetch(
+        apiUrl(`/games/${gameId}/generate/problems`),
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            problemCount: reviewProblemCount,
+            problemTypes: ["SHORT_ANSWER", "OX", "MULTIPLE_CHOICE"],
+          }),
+        },
+      );
+      if (!problemRes.ok) {
+        throw new Error("문제 생성 실패");
+      }
+      const problemData = await problemRes.json();
+      const problems = problemData?.problems;
+
+      if (!Array.isArray(problems) || problems.length === 0) {
+        throw new Error("생성된 문제가 없음");
+      }
+
       navigate("/play", {
         state: {
           userName,
           source: "analyze",
-          status: data?.status || "PREPARING",
-          gameId: data?.gameId || null,
+          gameId,
+          previewData,
+          problems,
           scope,
         },
       });
@@ -259,12 +371,6 @@ const AnalyzePage = () => {
             게임 만들기
           </span>
           <span
-            style={{ cursor: "pointer" }}
-            onClick={() => navigate("/main", { state: { userName } })}
-          >
-            공유하기
-          </span>
-          <span
             style={{
               fontWeight: "bold",
               color: "#333",
@@ -275,12 +381,6 @@ const AnalyzePage = () => {
             onClick={() => navigate("/analyze", { state: { userName } })}
           >
             분석하기
-          </span>
-          <span
-            style={{ cursor: "pointer" }}
-            onClick={() => navigate("/main", { state: { userName } })}
-          >
-            육성하기
           </span>
           <span
             style={{
@@ -666,8 +766,8 @@ const AnalyzePage = () => {
               </div>
               {/* 랭킹 리스트 */}
 
-              {hasAnyWrongData &&
-                weakTop3.map((title, index) => (
+              {hasCurrentWrongData &&
+                currentTop3.map((title, index) => (
                 <div
                   key={title}
                   style={{
@@ -725,7 +825,7 @@ const AnalyzePage = () => {
                   </button>
                 </div>
                 ))}
-              {!hasAnyWrongData && (
+              {!hasCurrentWrongData && (
                 <div
                   style={{
                     background: "#FFF8FA",
@@ -932,7 +1032,7 @@ const AnalyzePage = () => {
               메인으로 돌아가기
             </button>
 
-            {hasAnyWrongData && weakTop3.length > 0 && (
+            {hasCurrentWrongData && (
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                 <select
                   value={reviewProblemCount}
@@ -963,12 +1063,12 @@ const AnalyzePage = () => {
                     cursor: "pointer",
                     color: "#D36BA3",
                   }}
-                  onClick={() => handleCreateReviewGame(weakTop3[0])}
+                  onClick={() => handleCreateReviewGame(currentTop3[0])}
                   disabled={isCreating}
                 >
                   {isCreating
                     ? "복습 게임 생성 중..."
-                    : `${weakTop3[0]} ${reviewProblemCount}문제 복습 게임 만들기`}
+                    : `${currentTop3[0]} ${reviewProblemCount}문제 복습 게임 만들기`}
                 </button>
               </div>
             )}

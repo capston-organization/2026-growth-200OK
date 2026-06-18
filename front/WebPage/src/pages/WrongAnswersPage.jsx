@@ -171,21 +171,9 @@ const WrongAnswersPage = () => {
           </span>
           <span
             style={{ cursor: "pointer" }}
-            onClick={() => navigate("/main", { state: { userName } })}
-          >
-            공유하기
-          </span>
-          <span
-            style={{ cursor: "pointer" }}
             onClick={() => navigate("/analyze", { state: { userName } })}
           >
             분석하기
-          </span>
-          <span
-            style={{ cursor: "pointer" }}
-            onClick={() => navigate("/main", { state: { userName } })}
-          >
-            육성하기
           </span>
           <span
             style={{
@@ -408,12 +396,6 @@ const WrongAnswersPage = () => {
                     }}
                   >
                     {row.question || "(문항 없음)"}
-                  </div>
-                  <div style={{ fontSize: "16px", color: "#555" }}>
-                    <strong style={{ color: "#D36BA3" }}>내가 쓴 답</strong>{" "}
-                    {row.answer != null && row.answer !== ""
-                      ? row.answer
-                      : "—"}
                   </div>
                 </li>
               ))}
