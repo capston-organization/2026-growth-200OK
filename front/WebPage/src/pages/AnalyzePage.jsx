@@ -103,7 +103,6 @@ const AnalyzePage = () => {
   // 현재 선택된 분석 카테고리: WORD(영단어) / GRAMMAR(영문법)
   const [activeCategory, setActiveCategory] = useState("WORD");
 
-  const [weakTop3, setWeakTop3] = useState([]);
   const [scopeWrongRates, setScopeWrongRates] = useState(
     INITIAL_SCOPE_WRONG_RATES,
   );
@@ -117,12 +116,21 @@ const AnalyzePage = () => {
     () => scopeWrongRates[activeCategory] || [],
     [activeCategory, scopeWrongRates],
   );
+  const currentTop3 = useMemo(
+    () =>
+      currentWrongRates
+        .slice(0, 3)
+        .map((item) => normalizeScopeLabel(item?.scope))
+        .filter(Boolean),
+    [currentWrongRates],
+  );
   const hasAnyWrongData = useMemo(() => {
     return (
       (scopeWrongRates.WORD && scopeWrongRates.WORD.length > 0) ||
       (scopeWrongRates.GRAMMAR && scopeWrongRates.GRAMMAR.length > 0)
     );
   }, [scopeWrongRates]);
+  const hasCurrentWrongData = currentTop3.length > 0;
 
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
@@ -143,9 +151,6 @@ const AnalyzePage = () => {
 
         if (overviewRes.ok) {
           const overview = await safeParseJson(overviewRes, "analysisOverview");
-          if (overview?.weakTop3?.length) {
-            setWeakTop3(overview.weakTop3.slice(0, 3));
-          }
           if (Array.isArray(overview?.scopeWrongRates)) {
             const grouped = { WORD: [], GRAMMAR: [] };
             overview.scopeWrongRates.forEach((row) => {
@@ -761,8 +766,8 @@ const AnalyzePage = () => {
               </div>
               {/* 랭킹 리스트 */}
 
-              {hasAnyWrongData &&
-                weakTop3.map((title, index) => (
+              {hasCurrentWrongData &&
+                currentTop3.map((title, index) => (
                 <div
                   key={title}
                   style={{
@@ -820,7 +825,7 @@ const AnalyzePage = () => {
                   </button>
                 </div>
                 ))}
-              {!hasAnyWrongData && (
+              {!hasCurrentWrongData && (
                 <div
                   style={{
                     background: "#FFF8FA",
@@ -1027,7 +1032,7 @@ const AnalyzePage = () => {
               메인으로 돌아가기
             </button>
 
-            {hasAnyWrongData && weakTop3.length > 0 && (
+            {hasCurrentWrongData && (
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                 <select
                   value={reviewProblemCount}
@@ -1058,12 +1063,12 @@ const AnalyzePage = () => {
                     cursor: "pointer",
                     color: "#D36BA3",
                   }}
-                  onClick={() => handleCreateReviewGame(weakTop3[0])}
+                  onClick={() => handleCreateReviewGame(currentTop3[0])}
                   disabled={isCreating}
                 >
                   {isCreating
                     ? "복습 게임 생성 중..."
-                    : `${weakTop3[0]} ${reviewProblemCount}문제 복습 게임 만들기`}
+                    : `${currentTop3[0]} ${reviewProblemCount}문제 복습 게임 만들기`}
                 </button>
               </div>
             )}
