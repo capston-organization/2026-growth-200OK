@@ -6,11 +6,11 @@
 
 **Learning Village**는 AI 기반 영어 학습 게임 플랫폼입니다.
 
-사용자가 PDF·텍스트 학습 자료를 업로드하면 **Google Gemini API**(및 선택적 NLP RAG 서버)가 O/X, 5지선다, 단답형 문제를 생성하고, **Phaser** 미니게임으로 학습합니다. Google OAuth 로그인, 학습 분석·오답 노트, Google Classroom 연동, 코인·스트릭·캐릭터 육성 등 게이미피케이션 기능을 제공합니다.
+사용자가 PDF·텍스트 학습 자료를 업로드하면 **Google Gemini API**(및 선택적 NLP RAG 서버)가 O/X, 5지선다, 단답형 문제를 생성하고, **Phaser** 미니게임으로 학습합니다. Google OAuth 로그인, 학습 분석·오답 노트, 스트릭 기능, 그리고 게이미피케이션 기능 등을 제공합니다.
 
 | 항목 | 내용 |
 |------|------|
-| **대상 사용자** | 영어 학습자(학생), 교사(Google Classroom 연동) |
+| **대상 사용자** | 영어를 학습하고 싶은 초/중등 학생 |
 | **핵심 기능** | AI 문제 생성, Phaser 게임 플레이, 학습 분석, 복습 게임 |
 | **저장소** | `git clone` 후 Gradle Wrapper·npm으로 빌드·실행 가능 |
 
@@ -24,6 +24,7 @@
 2026-growth-200OK/
 ├── backend/                 # Spring Boot REST API (Java 17)
 ├── front/WebPage/           # React + Vite 프론트엔드 + Phaser 게임
+├── ai/                      # FastAPI 기반 Grammar RAG Engine (선택 실행)
 ├── docs/GrounRule.MD        # 팀 협업 규칙
 └── .github/workflows/       # CI/CD (develop → EC2)
 ```
@@ -35,10 +36,9 @@ Spring Boot 3.3.4 기반 REST API. 패키지는 도메인별로 분리되어 있
 | 패키지 | 역할 |
 |--------|------|
 | `auth/` | Google OAuth 2.0, JWT 발급·갱신, Redis 기반 Refresh Token·블랙리스트 |
-| `user/` | 사용자 프로필, 온보딩, 코인, 스트릭, 캐릭터(간식·놀기·공부) |
-| `game/` | 게임 CRUD, PDF/TXT 소스 업로드, Gemini·NLP 문제 생성, 답안 제출, 좋아요 |
+| `user/` | 사용자 프로필, 온보딩, 스트릭 |
+| `game/` | 게임 CRUD, PDF/TXT 소스 업로드, Gemini·NLP 문제 생성, 답안 제출 |
 | `analysis/` | 학습 개요·상세 분석, 오답 목록, 오답 기반 복습 게임 생성 |
-| `classroom/` | Google Classroom OAuth 연동, 수업 공유 |
 | `global/` | Security, CORS, 전역 예외 처리, 설정(`application.yml`) |
 
 **주요 진입점**
@@ -80,6 +80,20 @@ React 19 + Vite 7 SPA. Phaser 3 미니게임은 `public/Game/`에 HTML/JS로 분
 | `/analyze`, `/wrong-answers` | 학습 분석 |
 | `/mypage` | 마이페이지 |
 
+### NLP 서버 (`ai/`)
+
+FastAPI 기반 Grammar RAG Engine입니다. Backend의 `GRAMMAR` 문제 생성 시 우선 호출됩니다.
+
+| 경로 | 설명 |
+|------|------|
+| `app/main.py` | FastAPI 엔트리포인트 |
+| `app/api/` | `parse`, `generate/problems`, `corpus/*` 등 API 라우터 |
+| `app/nlp/` | Stanza 파싱, rule tagging, 문제 생성 빌더 |
+| `workers/` | Celery 작업 정의 (`corpus build` 비동기 처리) |
+| `evaluate_stanza_accuracy.py` | Stanza 정확도 평가 스크립트 |
+| `evaluate_rule_precision.py` | 문법 rule Precision/Recall/F1 평가 스크립트 |
+| `.env.example` | `DATABASE_URL`, `GEMINI_API_KEY`, `REDIS_URL` 템플릿 |
+
 ---
 
 ## How to Build
@@ -117,6 +131,29 @@ npm run lint       # ESLint
 
 **요구 사항:** Node.js 18 이상 권장
 
+### AI (`ai/`)
+
+```bash
+cd ai
+
+# 로컬 실행용 의존성 설치
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+
+# Stanza 모델 다운로드(최초 1회)
+python -c "import stanza; stanza.download('en')"
+```
+
+선택: Docker 이미지 빌드
+
+```bash
+cd ai
+docker build -t learning-village-nlp:local .
+```
+
+**요구 사항:** Python 3.10+ (Docker 사용 시 Python 로컬 설치 없이 가능)
+
 ---
 
 ## How to Install
@@ -150,7 +187,7 @@ docker run -d --name redis -p 6379:6379 redis:7-alpine
 |--------|------|------|
 | Google OAuth | 로그인 | [Google Cloud Console](https://console.cloud.google.com/) |
 | Gemini API | 문제·해설 생성 | [Google AI Studio](https://aistudio.google.com/) |
-| NLP 서버 (선택) | 영문법 RAG | 별도 FastAPI 서버 — **본 저장소 미포함** |
+| NLP 서버 (선택) | 영문법 RAG | 본 저장소 `ai/` 디렉터리 FastAPI 서버 |
 
 Google Console **승인된 리디렉션 URI** 예시:
 
@@ -234,6 +271,53 @@ npm run dev
 
 → **http://localhost:5173**
 
+### 6. AI(`ai`) 환경 변수 설정 및 실행 (선택)
+
+```bash
+cd ai
+cp .env.example .env      # Windows: copy .env.example .env
+```
+
+`.env` 예시:
+
+```env
+DATABASE_URL=postgresql://postgres:비밀번호@localhost:5432/capston
+GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_MODEL=gemini-2.5-flash
+DEFAULT_MAX_SENTENCES=5000
+REDIS_URL=redis://localhost:6379/0
+```
+
+실행:
+
+```bash
+cd ai
+uvicorn app.main:app --reload --port 8000
+```
+
+확인:
+- API 문서: `http://localhost:8000/docs`
+- 헬스체크: `GET http://localhost:8000/health`
+- Backend 연동 상태: `GET http://localhost:8080/nlp/status`
+
+선택(비동기 corpus 작업 사용 시): Celery worker
+
+```bash
+cd ai
+celery -A workers.celery_app:celery_app worker --loglevel=info
+```
+
+---
+
+## NLP 평가 결과 요약 (ai)
+
+상세 실험 절차와 스크립트는 `ai/README.md`를 참고하세요.
+
+- **Stanza Parsing Accuracy (UD English EWT)**  
+  POS 97.92%, UAS 92.71%, LAS 94.31%
+- **Grammar Rule Precision (10개 rule, UD EWT)**  
+  Precision/Recall/F1 전 항목 100%
+
 ---
 
 ## How to Test
@@ -269,7 +353,30 @@ cd front/WebPage
 npm run lint    # ESLint 정적 분석만 가능
 ```
 
-### 3. 수동 기능 테스트 (E2E)
+### 3. 자동/반자동 테스트 (AI)
+
+```bash
+cd ai
+
+# 서버 스모크 테스트
+curl http://localhost:8000/health
+curl http://localhost:8000/
+
+# corpus 동작 확인(소량 동기)
+curl -X POST http://localhost:8000/api/corpus/build/sync \
+  -H "Content-Type: application/json" \
+  -d '{"dataset_name":"open_subtitles","max_sentences":100}'
+
+# 평가 스크립트(선택)
+python evaluate_stanza_accuracy.py
+python evaluate_rule_precision.py
+```
+
+참고:
+- 평가 스크립트는 UD English EWT 및 HuggingFace 데이터 접근이 필요할 수 있습니다.
+- `ai/README.md`에 상세 측정 방법과 결과가 정리되어 있습니다.
+
+### 4. 수동 기능 테스트 (E2E)
 
 아래 순서로 전체 흐름을 검증할 수 있습니다.
 
@@ -313,6 +420,8 @@ curl http://localhost:8080/nlp/status
 | **게임 사운드** | `front/WebPage/public/Game/**/assets/sounds/` | BGM·효과음 MP3 |
 | **UI 이미지** | `front/WebPage/src/assets/images/` | Learning Village 로고, 게임 아이콘, Google 로고 |
 | **환경 변수 템플릿** | `front/WebPage/.env.example` | 프론트 `.env` 작성용 |
+| **NLP 환경 변수 템플릿** | `ai/.env.example` | NLP `.env` 작성용 |
+| **NLP 평가 스크립트** | `ai/evaluate_*.py` | 파서/룰 정량 평가 스크립트 |
 
 ### 미포함 데이터 (런타임 생성)
 
@@ -320,6 +429,7 @@ curl http://localhost:8080/nlp/status
 |------|-----------|
 | 사용자·게임·문제 DB 레코드 | Google 로그인 → 게임 생성·플레이 시 JPA가 자동 저장 |
 | 학습 소스(PDF/TXT) | 사용자 업로드 또는 텍스트 직접 입력 |
+| UD/HuggingFace 평가·코퍼스 데이터 | 평가/코퍼스 빌드 시 외부에서 다운로드 후 사용 |
 
 ### 테스트용 학습 텍스트 (복사·붙여넣기)
 
@@ -375,7 +485,8 @@ I have already finished my homework.
 |--------|------|
 | **Google Gemini API** | 문제 생성, 학습 미리보기, 해설 생성 |
 | **Google OAuth / Classroom API** | 로그인, 수업 연동·게임 공유 |
-| **NLP FastAPI 서버** (선택) | 영문법 RAG 기반 문제 생성 — 별도 배포, DB 미포함 |
+| **NLP FastAPI 서버** (선택) | 영문법 RAG 기반 문제 생성 (`ai/`에서 로컬 실행 가능) |
+| **HuggingFace Datasets** (선택) | NLP corpus 구축용 원천 문장 데이터 |
 
 ---
 
@@ -412,6 +523,19 @@ I have already finished my homework.
 | [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react) | ^5.1.1 | MIT | React Fast Refresh |
 | [ESLint](https://eslint.org/) | ^9.39.1 | MIT | 코드 린트 |
 
+### AI / NLP (Python / pip)
+
+| 라이브러리 | 버전 | 라이선스 | 용도 |
+|------------|------|----------|------|
+| [FastAPI](https://fastapi.tiangolo.com/) | 0.136.1 | MIT | NLP API 서버 |
+| [Uvicorn](https://www.uvicorn.org/) | 0.46.0 | BSD-3-Clause | ASGI 서버 |
+| [Stanza](https://stanfordnlp.github.io/stanza/) | 1.11.1 | Apache 2.0 | 문장 파싱/품사/의존구문 |
+| [PyTorch (CPU)](https://pytorch.org/) | 2.11.0+cpu | BSD-style | Stanza 실행 런타임 |
+| [Celery](https://docs.celeryq.dev/) | >=5.3.0 | BSD-3-Clause | 비동기 작업 큐 |
+| [Redis-py](https://redis.readthedocs.io/) | >=5.0.0 | MIT | Celery broker/캐시 연동 |
+| [psycopg2-binary](https://www.psycopg.org/) | >=2.9.10 | LGPL with exceptions | PostgreSQL 연결 |
+| [datasets](https://huggingface.co/docs/datasets/) | >=2.14.0 | Apache 2.0 | 코퍼스 데이터 로딩 |
+
 ### 인프라·런타임 (설치 대상)
 
 | 소프트웨어 | 라이선스 | 용도 |
@@ -445,7 +569,7 @@ I have already finished my homework.
 
 - **Frontend:** Vercel (`front/WebPage/vercel.json`)
 - **Backend:** GitHub Actions → EC2 (`.github/workflows/deploy.yml`, `develop` 브랜치)
-- **운영 API 예시:** `https://capston.p-e.kr`
+- **AI (NLP):** GitHub Actions → EC2 (`ai/.github/workflows/deploy-nlp.yml`, `main`/`develop` 브랜치, Docker 우선 배포)
 
 ### 트러블슈팅
 
@@ -453,7 +577,6 @@ I have already finished my homework.
 |------|------|
 | Google 로그인 실패 | Client ID·Redirect URI가 Console·`.env`·`REDIRECT_URI`와 동일한지 |
 | 401 오류 | Redis 실행, `JWT_SECRET` 설정 |
-| DB 연결 실패 | PostgreSQL 실행, `capston` DB 존재 |
 | 문제 생성 실패 | `GEMINI_API_KEY`, 학습 소스 비어 있지 않은지 |
 | NLP 미사용 | `GET /nlp/status` → `nlpHealthy: false` (Gemini fallback 정상) |
 
@@ -461,9 +584,8 @@ I have already finished my homework.
 
 - [`docs/GrounRule.MD`](docs/GrounRule.MD) — 협업 규칙·코드 컨벤션
 
-### 알려진 제한
+### 기타 
 
-1. NLP FastAPI 서버는 **본 저장소에 미포함** (Gemini fallback으로 동작)
-2. Frontend 자동화 테스트 **미구성** (Backend JUnit 10건은 `./gradlew test`로 실행 가능)
-3. 학습 PDF/TXT 샘플 파일·DB seed SQL **미포함**
-4. 자동 설치 스크립트 없음 — [How to Install](#how-to-install) 절차 참고
+1. NLP FastAPI 서버는 선택 구성입니다. 미실행 시 Gemini fallback으로 동작합니다.
+2. 학습 PDF/TXT 샘플 파일·DB seed SQL은 **의도적으로 미포함**했습니다. 사용자(교사/학습자)가 목적에 맞는 자체 학습 자료와 DB 상태로 바로 구성할 수 있도록 하기 위함입니다.
+3. 자동 설치 스크립트(원클릭)는 없으며, [How to Install](#how-to-install) 절차를 순서대로 수행해야 합니다.
