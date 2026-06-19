@@ -21,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -60,6 +61,13 @@ public class GameController {
                                                       @RequestBody GameUpdateRequestDto request) {
         GameResponseDto updated = gameService.updateGame(gameId, request, user);
         return ResponseEntity.ok(updated);
+    }
+
+    @DeleteMapping("/{gameId}")
+    public ResponseEntity<Void> deleteGame(@PathVariable Long gameId,
+                                           @AuthenticationPrincipal CustomUserDetails user) {
+        gameService.deleteGame(gameId, user);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{gameId}/sources")
@@ -102,7 +110,7 @@ public class GameController {
         if (request.getCorrect() == null) {
             return ResponseEntity.badRequest().build();
         }
-        problemAttemptService.submitAnswer(gameId, problemId, request.getCorrect(), user);
+        problemAttemptService.submitAnswer(gameId, problemId, request, user);
         return ResponseEntity.noContent().build();
     }
 

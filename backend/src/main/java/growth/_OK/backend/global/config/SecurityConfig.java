@@ -40,7 +40,7 @@ public class SecurityConfig {
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/auth/google",  "/error").permitAll() // 추후 변경 예정
+                        .requestMatchers("/auth/google", "/auth/refresh", "/error", "/nlp/status", "/nlp/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(
