@@ -1,99 +1,7 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { apiUrl } from "../config/api";
 import LearningVillageLogoImage from "../assets/images/Learning_Village_Logo_ImageOnly.png";
 import LearningVillageLogoText from "../assets/images/Learning_Village_Logo_TextOnly.png";
-
-const RANK_COLORS = ["#FF8E99", "#FFB3BA", "#FFE0E5"];
-const INITIAL_SCOPE_WRONG_RATES = { WORD: [], GRAMMAR: [] };
-const CATEGORY_STYLE = {
-  WORD: {
-    label: "영단어",
-    panelBg: "#EDE7F6",
-    barColor: "linear-gradient(135deg, rgba(103,58,183,0.45), rgba(156,39,176,0.8))",
-    toggleBorder: "2px solid #B39DDB",
-    toggleBg: "#EDE7F6",
-  },
-  GRAMMAR: {
-    label: "영문법",
-    panelBg: "#FFF9C4",
-    barColor: "linear-gradient(135deg, rgba(255,193,7,0.45), rgba(255,160,0,0.85))",
-    toggleBorder: "2px solid #FFECB3",
-    toggleBg: "#FFF8E1",
-  },
-};
-
-const normalizeCategoryFromRow = (row) => {
-  const raw = row?.category;
-  if (raw === "GRAMMAR") return "GRAMMAR";
-  if (raw === "WORD" || raw === "VOCAB") return "WORD";
-  return null;
-};
-
-const CATEGORY_LABEL_SHORT = {
-  WORD: "영단어",
-  GRAMMAR: "영문법",
-};
-
-const safeParseJson = async (res, apiName) => {
-  const contentType = res.headers.get("content-type") || "";
-  const rawText = await res.text();
-
-  if (!contentType.includes("application/json")) {
-    console.warn(`[${apiName}] JSON이 아닌 응답 수신`, {
-      status: res.status,
-      contentType,
-      preview: rawText.slice(0, 120),
-      url: res.url,
-    });
-    return null;
-  }
-
-  try {
-    return JSON.parse(rawText);
-  } catch {
-    console.warn(`[${apiName}] JSON 파싱 실패`, {
-      status: res.status,
-      preview: rawText.slice(0, 120),
-      url: res.url,
-    });
-    return null;
-  }
-};
-
-const normalizeScopeLabel = (value) => String(value ?? "").trim();
-
-/** 복습 게임 소스·생성 문제가 동일 scope인지 비교 */
-const matchesReviewScope = (problemScope, targetScope) => {
-  const ps = normalizeScopeLabel(problemScope);
-  const ts = normalizeScopeLabel(targetScope);
-  if (!ts) return true;
-  if (!ps || ps === "기타") return false;
-  return ps === ts || ps.includes(ts) || ts.includes(ps);
-};
-
-/** AI 문제 생성용 소스 — target scope만 출제하도록 명시 */
-const buildReviewSourceText = (scope, categoryLabel, wrongItems) => {
-  const scopeHeader = [
-    `[복습 전용 학습 범위] ${scope}`,
-    `※ 이 자료로 만들어지는 모든 문제는 반드시 「${scope}」 개념만 다룹니다.`,
-    `※ ${scope}와 무관한 다른 문법·어휘 주제는 절대 출제하지 마세요.`,
-    `※ 각 문제의 scope 필드는 반드시 "${scope}"(와 동일한 표현)이어야 합니다.`,
-    "",
-  ].join("\n");
-
-  if (wrongItems.length > 0) {
-    const body = wrongItems
-      .map(
-        (item, i) =>
-          `${i + 1}. [${scope}] ${item.question || "문제"}\n   정답: ${item.answer || ""}`,
-      )
-      .join("\n\n");
-    return `${scopeHeader}${body}`;
-  }
-
-  return `${scopeHeader}${categoryLabel} · ${scope}\n${scope} 핵심 규칙·예문만으로 복습 문제를 구성합니다.`;
-};
 
 const AnalyzePage = () => {
   const navigate = useNavigate();
@@ -103,216 +11,13 @@ const AnalyzePage = () => {
   // 현재 선택된 분석 카테고리: WORD(영단어) / GRAMMAR(영문법)
   const [activeCategory, setActiveCategory] = useState("WORD");
 
-  const [scopeWrongRates, setScopeWrongRates] = useState(
-    INITIAL_SCOPE_WRONG_RATES,
-  );
-  const [isLoading, setIsLoading] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
-  const [reviewProblemCount, setReviewProblemCount] = useState(10);
-  const [detail, setDetail] = useState(null);
-
-  const current = CATEGORY_STYLE[activeCategory];
-  const currentWrongRates = useMemo(
-    () => scopeWrongRates[activeCategory] || [],
-    [activeCategory, scopeWrongRates],
-  );
-  const currentTop3 = useMemo(
-    () =>
-      currentWrongRates
-        .slice(0, 3)
-        .map((item) => normalizeScopeLabel(item?.scope))
-        .filter(Boolean),
-    [currentWrongRates],
-  );
-  const hasAnyWrongData = useMemo(() => {
-    return (
-      (scopeWrongRates.WORD && scopeWrongRates.WORD.length > 0) ||
-      (scopeWrongRates.GRAMMAR && scopeWrongRates.GRAMMAR.length > 0)
-    );
-  }, [scopeWrongRates]);
-  const hasCurrentWrongData = currentTop3.length > 0;
-
-  useEffect(() => {
-    const token = localStorage.getItem("accessToken");
-    if (!token) return;
-
-    const commonHeaders = {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    };
-
-    const fetchAnalyzeData = async () => {
-      try {
-        setIsLoading(true);
-        const overviewRes = await fetch(apiUrl("/analysis/me/overview"), {
-          method: "GET",
-          headers: commonHeaders,
-        });
-
-        if (overviewRes.ok) {
-          const overview = await safeParseJson(overviewRes, "analysisOverview");
-          if (Array.isArray(overview?.scopeWrongRates)) {
-            const grouped = { WORD: [], GRAMMAR: [] };
-            overview.scopeWrongRates.forEach((row) => {
-              const category = normalizeCategoryFromRow(row);
-              if (!category) return;
-              grouped[category] = Array.isArray(row.scopes) ? row.scopes : [];
-            });
-            setScopeWrongRates(grouped);
-          }
-        }
-
-      } catch (e) {
-        console.error("Failed to fetch analyze data:", e);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchAnalyzeData();
-  }, []);
+  const wordTopics = ["뜻 맞추기", "맥락에 맞는 단어 찾기", "동의어 찾기"];
+  const grammarTopics = ["조건문", "가주어 it", "소유격"];
+  const currentTopics = activeCategory === "WORD" ? wordTopics : grammarTopics;
+  const rankColors = ["#FF8E99", "#FFB3BA", "#FFE0E5"];
 
   const handleBack = () => {
     navigate("/main", { state: { userName } });
-  };
-
-  const handleClickWrongAnswers = (scope) => {
-    navigate("/wrong-answers", {
-      state: {
-        userName,
-        filterCategory: activeCategory,
-        filterScope: scope,
-      },
-    });
-  };
-
-  const handleOpenWrongAnswersPage = () => {
-    navigate("/wrong-answers", {
-      state: {
-        userName,
-        filterCategory: activeCategory,
-        filterScope: "",
-      },
-    });
-  };
-
-  const handleCreateReviewGame = async (scope) => {
-    if (isCreating) return;
-    const token = localStorage.getItem("accessToken");
-    if (!token) {
-      navigate("/");
-      return;
-    }
-
-    const headers = {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    };
-
-    try {
-      setIsCreating(true);
-      const res = await fetch(apiUrl("/analysis/me/review-games"), {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          category: activeCategory,
-          scope,
-          problemCount: reviewProblemCount,
-        }),
-      });
-
-      if (!res.ok) {
-        alert("복습 게임 생성에 실패했어요. 잠시 후 다시 시도해주세요.");
-        return;
-      }
-
-      const data = await res.json();
-      const gameId = data?.gameId;
-      if (!gameId) {
-        alert("복습 게임 정보를 받지 못했어요. 잠시 후 다시 시도해주세요.");
-        return;
-      }
-
-      // 복습 게임 API는 gameId만 만들고 문제는 생성하지 않음 → 일반 게임 만들기와 동일 파이프라인
-      const qs = new URLSearchParams({
-        category: activeCategory,
-        scope,
-      });
-      const wrongRes = await fetch(
-        apiUrl(`/analysis/me/wrong-answers?${qs}`),
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-      const wrongPayload = wrongRes.ok ? await wrongRes.json() : null;
-      const wrongItems = (
-        Array.isArray(wrongPayload?.items) ? wrongPayload.items : []
-      ).filter((item) => matchesReviewScope(item?.scope, scope));
-
-      const categoryLabel =
-        CATEGORY_LABEL_SHORT[activeCategory] || activeCategory;
-      const sourceText = buildReviewSourceText(
-        scope,
-        categoryLabel,
-        wrongItems,
-      );
-
-      const textRes = await fetch(apiUrl(`/games/${gameId}/sources/text`), {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ text: sourceText }),
-      });
-      if (!textRes.ok) {
-        throw new Error("복습 소스 등록 실패");
-      }
-
-      const previewRes = await fetch(
-        apiUrl(`/games/${gameId}/generate/preview`),
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
-      if (!previewRes.ok) {
-        throw new Error("학습 미리보기 생성 실패");
-      }
-      const previewData = await previewRes.json();
-
-      const problemRes = await fetch(
-        apiUrl(`/games/${gameId}/generate/problems`),
-        {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            problemCount: reviewProblemCount,
-            problemTypes: ["SHORT_ANSWER", "OX", "MULTIPLE_CHOICE"],
-          }),
-        },
-      );
-      if (!problemRes.ok) {
-        throw new Error("문제 생성 실패");
-      }
-      const problemData = await problemRes.json();
-      const problems = problemData?.problems;
-
-      if (!Array.isArray(problems) || problems.length === 0) {
-        throw new Error("생성된 문제가 없음");
-      }
-
-      navigate("/play", {
-        state: {
-          userName,
-          source: "analyze",
-          gameId,
-          previewData,
-          problems,
-          scope,
-        },
-      });
-    } catch (e) {
-      console.error("Failed to create review game:", e);
-      alert("복습 게임 생성 중 오류가 발생했어요.");
-    } finally {
-      setIsCreating(false);
-    }
   };
 
   return (
@@ -371,6 +76,12 @@ const AnalyzePage = () => {
             게임 만들기
           </span>
           <span
+            style={{ cursor: "pointer" }}
+            onClick={() => navigate("/main", { state: { userName } })}
+          >
+            공유하기
+          </span>
+          <span
             style={{
               fontWeight: "bold",
               color: "#333",
@@ -381,6 +92,12 @@ const AnalyzePage = () => {
             onClick={() => navigate("/analyze", { state: { userName } })}
           >
             분석하기
+          </span>
+          <span
+            style={{ cursor: "pointer" }}
+            onClick={() => navigate("/main", { state: { userName } })}
+          >
+            육성하기
           </span>
           <span
             style={{
@@ -473,252 +190,7 @@ const AnalyzePage = () => {
               marginBottom: "32px",
             }}
           >
-            {isLoading
-              ? "분석 데이터를 불러오는 중이에요..."
-              : hasAnyWrongData
-                ? "가장 취약한 범위를 확인하고, 바로 복습 게임을 만들 수 있어요."
-                : "아직 오답 데이터가 없어요. 게임을 플레이하면 분석이 시작됩니다."}
-          </div>
-
-          {/* 개인 상세 분석 지표 (/analysis/me/detail) */}
-          <div
-            style={{
-              marginBottom: "28px",
-              padding: "22px 24px",
-              borderRadius: "20px",
-              border: "2px solid #E1BEE7",
-              background: "linear-gradient(135deg, #F3E5F5 0%, #FFFFFF 55%)",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: "12px",
-                marginBottom: "16px",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: "26px",
-                  fontWeight: "700",
-                  color: "#6A1B9A",
-                }}
-              >
-                개인 상세 분석 지표
-              </div>
-              <button
-                type="button"
-                onClick={handleOpenWrongAnswersPage}
-                style={{
-                  borderRadius: "18px",
-                  border: "2px solid #CE93D8",
-                  background: "#FFFFFF",
-                  padding: "8px 18px",
-                  fontSize: "17px",
-                  fontWeight: "600",
-                  cursor: "pointer",
-                  color: "#7B1FA2",
-                }}
-              >
-                틀린 문제 목록 보기
-              </button>
-            </div>
-
-            {isLoading && !detail ? (
-              <div style={{ fontSize: "18px", color: "#777" }}>
-                상세 지표를 불러오는 중이에요…
-              </div>
-            ) : detail ? (
-              <>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-                    gap: "12px",
-                    marginBottom: "20px",
-                  }}
-                >
-                  {[
-                    { label: "총 시도 수", value: detail.totalAttempts },
-                    { label: "총 오답 수", value: detail.totalWrongCount },
-                    { label: "오답률", value: `${detail.wrongRate ?? 0}%` },
-                  ].map((cell) => (
-                    <div
-                      key={cell.label}
-                      style={{
-                        background: "rgba(255,255,255,0.85)",
-                        borderRadius: "14px",
-                        padding: "12px 14px",
-                        border: "1px solid #E1BEE7",
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontSize: "14px",
-                          color: "#666",
-                          marginBottom: "6px",
-                        }}
-                      >
-                        {cell.label}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: "22px",
-                          fontWeight: "700",
-                          color: "#333",
-                        }}
-                      >
-                        {cell.value}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div
-                  style={{
-                    fontSize: "20px",
-                    fontWeight: "700",
-                    marginBottom: "10px",
-                    color: "#4A148C",
-                  }}
-                >
-                  학습 범위(scope)별 인사이트
-                </div>
-                {Array.isArray(detail.scopeInsights) &&
-                detail.scopeInsights.length > 0 ? (
-                  <div style={{ overflowX: "auto" }}>
-                    <table
-                      style={{
-                        width: "100%",
-                        borderCollapse: "collapse",
-                        fontSize: "16px",
-                        background: "#FFFFFF",
-                        borderRadius: "12px",
-                        overflow: "hidden",
-                      }}
-                    >
-                      <thead>
-                        <tr style={{ background: "#EDE7F6" }}>
-                          <th
-                            style={{
-                              textAlign: "left",
-                              padding: "10px 12px",
-                              borderBottom: "1px solid #D1C4E9",
-                            }}
-                          >
-                            과목
-                          </th>
-                          <th
-                            style={{
-                              textAlign: "left",
-                              padding: "10px 12px",
-                              borderBottom: "1px solid #D1C4E9",
-                            }}
-                          >
-                            범위
-                          </th>
-                          <th
-                            style={{
-                              textAlign: "right",
-                              padding: "10px 12px",
-                              borderBottom: "1px solid #D1C4E9",
-                            }}
-                          >
-                            시도
-                          </th>
-                          <th
-                            style={{
-                              textAlign: "right",
-                              padding: "10px 12px",
-                              borderBottom: "1px solid #D1C4E9",
-                            }}
-                          >
-                            오답
-                          </th>
-                          <th
-                            style={{
-                              textAlign: "right",
-                              padding: "10px 12px",
-                              borderBottom: "1px solid #D1C4E9",
-                            }}
-                          >
-                            오답률
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {detail.scopeInsights.map((row, idx) => (
-                          <tr key={`${row.scope}-${row.category}-${idx}`}>
-                            <td
-                              style={{
-                                padding: "10px 12px",
-                                borderBottom: "1px solid #EEE",
-                              }}
-                            >
-                              {CATEGORY_LABEL_SHORT[row.category] ||
-                                row.category}
-                            </td>
-                            <td
-                              style={{
-                                padding: "10px 12px",
-                                borderBottom: "1px solid #EEE",
-                              }}
-                            >
-                              {row.scope}
-                            </td>
-                            <td
-                              style={{
-                                textAlign: "right",
-                                padding: "10px 12px",
-                                borderBottom: "1px solid #EEE",
-                              }}
-                            >
-                              {row.attemptCount}
-                            </td>
-                            <td
-                              style={{
-                                textAlign: "right",
-                                padding: "10px 12px",
-                                borderBottom: "1px solid #EEE",
-                              }}
-                            >
-                              {row.wrongCount}
-                            </td>
-                            <td
-                              style={{
-                                textAlign: "right",
-                                padding: "10px 12px",
-                                borderBottom: "1px solid #EEE",
-                              }}
-                            >
-                              {row.wrongRate}%
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div
-                    style={{
-                      padding: "16px",
-                      color: "#777",
-                      background: "#FAFAFA",
-                      borderRadius: "12px",
-                    }}
-                  >
-                    아직 범위별 인사이트 데이터가 없어요.
-                  </div>
-                )}
-              </>
-            ) : (
-              <div style={{ fontSize: "18px", color: "#777" }}>
-                상세 지표를 불러오지 못했어요. 잠시 후 다시 시도해주세요.
-              </div>
-            )}
+            총 3분 동안 플레이했어요!
           </div>
 
           {/* 본문 2단 레이아웃 */}
@@ -752,7 +224,7 @@ const AnalyzePage = () => {
                   }}
                 >
                   <span>✔</span>
-                  <span>취약한 학습 범위</span>
+                  <span>취약한 학습 내용 랭킹</span>
                 </div>
                 <span
                   style={{
@@ -766,15 +238,14 @@ const AnalyzePage = () => {
               </div>
               {/* 랭킹 리스트 */}
 
-              {hasCurrentWrongData &&
-                currentTop3.map((title, index) => (
+              {currentTopics.map((title, index) => (
                 <div
                   key={title}
                   style={{
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
-                    background: RANK_COLORS[index],
+                    background: rankColors[index],
                     borderRadius: "16px",
                     padding: "12px 18px",
                     marginBottom: "10px",
@@ -818,31 +289,16 @@ const AnalyzePage = () => {
                       cursor: "pointer",
                     }}
                     onClick={() => {
-                      handleCreateReviewGame(title);
+                      navigate("/create-game", { state: { userName } });
                     }}
                   >
-                    복습 게임 생성하기
+                    관련 게임 생성하기
                   </button>
                 </div>
-                ))}
-              {!hasCurrentWrongData && (
-                <div
-                  style={{
-                    background: "#FFF8FA",
-                    border: "1px dashed #F8BBD0",
-                    borderRadius: "16px",
-                    padding: "18px",
-                    fontSize: "20px",
-                    color: "#777",
-                    textAlign: "center",
-                  }}
-                >
-                  오답이 생기면 취약한 학습 범위 TOP3가 표시됩니다.
-                </div>
-              )}
+              ))}
             </div>
 
-            {/* 오른쪽: 슬라이더 + 오답률 그래프 */}
+            {/* 오른쪽: 슬라이더 + 그래프 이미지 플레이스홀더 */}
             <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
               {/* 상단 슬라이더(카테고리 토글) */}
               <div
@@ -859,12 +315,10 @@ const AnalyzePage = () => {
                     borderRadius: "16px",
                     border:
                       activeCategory === "WORD"
-                        ? CATEGORY_STYLE.WORD.toggleBorder
+                        ? "2px solid #B39DDB"
                         : "1px solid #DDD",
                     backgroundColor:
-                      activeCategory === "WORD"
-                        ? CATEGORY_STYLE.WORD.toggleBg
-                        : "white",
+                      activeCategory === "WORD" ? "#EDE7F6" : "white",
                     fontSize: "20px",
                     fontWeight: "600",
                     cursor: "pointer",
@@ -879,12 +333,10 @@ const AnalyzePage = () => {
                     borderRadius: "16px",
                     border:
                       activeCategory === "GRAMMAR"
-                        ? CATEGORY_STYLE.GRAMMAR.toggleBorder
+                        ? "2px solid #FFECB3"
                         : "1px solid #DDD",
                     backgroundColor:
-                      activeCategory === "GRAMMAR"
-                        ? CATEGORY_STYLE.GRAMMAR.toggleBg
-                        : "white",
+                      activeCategory === "GRAMMAR" ? "#FFF8E1" : "white",
                     fontSize: "20px",
                     fontWeight: "600",
                     cursor: "pointer",
@@ -895,114 +347,45 @@ const AnalyzePage = () => {
                 </button>
               </div>
 
-              {/* 그래프 영역 (학습 범위별 오답률, 클릭 시 틀린 문제 페이지로 이동) */}
+              {/* 그래프 영역 (카테고리에 따라 색/모양 변경) */}
               <div
                 style={{
                   flex: 1,
-                  background: current.panelBg,
+                  background: activeCategory === "WORD" ? "#EDE7F6" : "#FFF9C4",
                   borderRadius: "24px",
                   minHeight: "260px",
-                  padding: "18px 16px",
+                  position: "relative",
+                  overflow: "hidden",
                 }}
               >
-                  {hasAnyWrongData ? (
-                    <>
-                      <div
-                        style={{
-                          fontSize: "20px",
-                          fontWeight: "700",
-                          marginBottom: "14px",
-                          color: "#4A4A4A",
-                        }}
-                      >
-                        학습 범위별 오답률 그래프 ({current.label})
-                      </div>
-
-                      <div
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "12px",
-                        }}
-                      >
-                        {currentWrongRates.map((item) => (
-                          <button
-                            key={item.scope}
-                            onClick={() => handleClickWrongAnswers(item.scope)}
-                            style={{
-                              border: "none",
-                              width: "100%",
-                              background: "rgba(255, 255, 255, 0.72)",
-                              borderRadius: "14px",
-                              padding: "10px 12px",
-                              cursor: "pointer",
-                              textAlign: "left",
-                            }}
-                          >
-                            <div
-                              style={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                                marginBottom: "8px",
-                              }}
-                            >
-                              <span
-                                style={{
-                                  fontSize: "18px",
-                                  fontWeight: "600",
-                                  color: "#333",
-                                }}
-                              >
-                                {item.scope}
-                              </span>
-                              <span
-                                style={{
-                                  fontSize: "18px",
-                                  fontWeight: "700",
-                                  color: "#555",
-                                }}
-                              >
-                                {item.wrongRate}%
-                              </span>
-                            </div>
-                            <div
-                              style={{
-                                height: "12px",
-                                borderRadius: "999px",
-                                background: "rgba(255,255,255,0.65)",
-                                overflow: "hidden",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: `${item.wrongRate}%`,
-                                  height: "100%",
-                                  borderRadius: "999px",
-                                  background: current.barColor,
-                                }}
-                              />
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  ) : (
-                    <div
-                      style={{
-                        minHeight: "230px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: "22px",
-                        fontWeight: "600",
-                        color: "#777",
-                        textAlign: "center",
-                      }}
-                    >
-                      아직 오답 데이터가 없어서 그래프를 표시하지 않아요.
-                    </div>
-                  )}
+                {/* 간단한 더미 그래프 모양 */}
+                {activeCategory === "WORD" ? (
+                  <div
+                    style={{
+                      position: "absolute",
+                      left: "10%",
+                      right: "10%",
+                      bottom: "18%",
+                      height: "40%",
+                      borderRadius: "16px",
+                      background:
+                        "linear-gradient(135deg, rgba(103,58,183,0.4), rgba(156,39,176,0.7))",
+                    }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      position: "absolute",
+                      left: "12%",
+                      right: "12%",
+                      bottom: "20%",
+                      height: "40%",
+                      borderRadius: "16px",
+                      background:
+                        "linear-gradient(135deg, rgba(255,193,7,0.4), rgba(255,160,0,0.8))",
+                    }}
+                  />
+                )}
               </div>
             </div>
           </div>
@@ -1012,8 +395,7 @@ const AnalyzePage = () => {
             style={{
               marginTop: "40px",
               display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
+              justifyContent: "flex-start",
             }}
           >
             <button
@@ -1029,49 +411,8 @@ const AnalyzePage = () => {
               }}
               onClick={handleBack}
             >
-              메인으로 돌아가기
+              게임 통계 출력하기
             </button>
-
-            {hasCurrentWrongData && (
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <select
-                  value={reviewProblemCount}
-                  onChange={(e) => setReviewProblemCount(Number(e.target.value))}
-                  style={{
-                    borderRadius: "16px",
-                    border: "2px solid #F8BBD0",
-                    background: "white",
-                    padding: "10px 12px",
-                    fontSize: "18px",
-                    fontWeight: "600",
-                    color: "#555",
-                  }}
-                >
-                  <option value={5}>5문제</option>
-                  <option value={10}>10문제</option>
-                  <option value={15}>15문제</option>
-                  <option value={20}>20문제</option>
-                </select>
-                <button
-                  style={{
-                    borderRadius: "24px",
-                    border: "2px solid #F8BBD0",
-                    background: "#FFE4F1",
-                    padding: "12px 28px",
-                    fontSize: "22px",
-                    fontWeight: "700",
-                    cursor: "pointer",
-                    color: "#D36BA3",
-                  }}
-                  onClick={() => handleCreateReviewGame(currentTop3[0])}
-                  disabled={isCreating}
-                >
-                  {isCreating
-                    ? "복습 게임 생성 중..."
-                    : `${currentTop3[0]} ${reviewProblemCount}문제 복습 게임 만들기`}
-                </button>
-              </div>
-            )}
           </div>
         </div>
       </div>

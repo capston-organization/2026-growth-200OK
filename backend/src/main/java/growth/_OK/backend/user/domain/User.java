@@ -55,9 +55,6 @@ public class User extends BaseEntity {
     @Column(name = "google_classroom_refresh_token", length = 2048)
     private String googleClassroomRefreshToken;
 
-    @Column(nullable = false)
-    private boolean onboardingCompleted = false;
-
     @Builder
     public User(String username, String providerId, String profileImage, Provider provider, Role role) {
         this.name = username;
@@ -97,7 +94,6 @@ public class User extends BaseEntity {
         if (birthDate != null) this.birthDate = birthDate;
         if (school != null) this.school = school;
         if (gender != null) this.gender = gender;
-        this.onboardingCompleted = hasRequiredOnboardingFields();
     }
 
     public void addCoins(int amount) {
@@ -123,12 +119,6 @@ public class User extends BaseEntity {
 
     public void setGoogleClassroomRefreshToken(String googleClassroomRefreshToken) {
         this.googleClassroomRefreshToken = googleClassroomRefreshToken;
-    }
-
-    private boolean hasRequiredOnboardingFields() {
-        return this.name != null && !this.name.isBlank()
-                && this.birthYear != null
-                && this.grade != null && !this.grade.isBlank();
     }
 
 }

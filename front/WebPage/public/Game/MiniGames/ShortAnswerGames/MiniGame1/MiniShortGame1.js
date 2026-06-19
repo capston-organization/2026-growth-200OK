@@ -10,13 +10,6 @@ const MINI_SHORT_GAME1_MOCK_PROBLEMS = [
     question: "I have ___ umbrella.",
     correctAnswer: "an",
   },
-  {
-    id: 9502,
-    type: "SHORT_ANSWER",
-    question:
-      "Choose the correct article: She wants to become ___ honest person who always tells the truth to everyone in the classroom.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    correctAnswer: "an",
-  },
 ];
 
 if (typeof window !== "undefined") {
@@ -580,8 +573,8 @@ class MiniShortGame1 extends Phaser.Scene {
       /_+/,
       this.userInputValue,
     );
+    this.myTextObj.setText(completedSentence);
     this.myTextObj.setColor("#0000ff"); // 파란색 텍스트
-    this._fitMyBubbleText(completedSentence);
 
     // 버튼 비활성화
     this.sendBtnBg.setTint(0xaaaaaa);
@@ -602,8 +595,8 @@ class MiniShortGame1 extends Phaser.Scene {
 
     // ★ [핵심] 오답 시 빈칸을 '?'로 변경하여 표시
     const failedSentence = this.problemData.displaySentence.replace(/_+/, "?");
+    this.myTextObj.setText(failedSentence);
     this.myTextObj.setColor("#ff0000"); // 빨간색 텍스트
-    this._fitMyBubbleText(failedSentence);
 
     // ★ 실패 연출 시퀀스 실행
     this.playResultSequence(false);
@@ -674,74 +667,6 @@ class MiniShortGame1 extends Phaser.Scene {
   }
 
   // =================================================================
-  // [Layout] 말풍선 텍스트 — MiniMultiGame1과 동일한 shrink-to-fit
-  // =================================================================
-  _fitTextToBox(
-    textObj,
-    content,
-    {
-      maxWidth,
-      maxHeight,
-      baseFontSize,
-      strokePad = 0,
-      minFontSize = 8,
-      absoluteMinFontSize = 6,
-    },
-  ) {
-    const text = String(content ?? "");
-    const fitHeight = Math.max(8, maxHeight - strokePad);
-    const floor = Math.min(minFontSize, absoluteMinFontSize);
-
-    textObj.setWordWrapWidth(maxWidth, true);
-
-    const measureHeight = () => {
-      const stroke = Number(textObj.style?.strokeThickness) || 0;
-      return textObj.height + stroke * 2;
-    };
-
-    let fontSize = Math.ceil(baseFontSize);
-    while (fontSize >= floor) {
-      textObj.setFontSize(`${fontSize}px`);
-      textObj.setText(text);
-      if (measureHeight() <= fitHeight) return;
-      fontSize -= 1;
-    }
-
-    textObj.setFontSize(`${floor}px`);
-    textObj.setText(text);
-  }
-
-  _fitOtherBubbleText(content) {
-    if (!this.otherText) return;
-    const m = this._bubbleMetrics;
-    if (!m) return;
-
-    this._fitTextToBox(this.otherText, content, {
-      maxWidth: m.innerWidth,
-      maxHeight: m.innerHeight,
-      baseFontSize: m.baseFontSize,
-      minFontSize: 10,
-      absoluteMinFontSize: 8,
-    });
-    this.otherText.setPosition(m.otherX, m.otherY * 1.075).setOrigin(0.5, 0.5);
-  }
-
-  _fitMyBubbleText(content) {
-    if (!this.myTextObj) return;
-    const m = this._bubbleMetrics;
-    if (!m) return;
-
-    this._fitTextToBox(this.myTextObj, content, {
-      maxWidth: m.innerWidth,
-      maxHeight: m.innerHeight,
-      baseFontSize: m.baseFontSize,
-      minFontSize: 10,
-      absoluteMinFontSize: 8,
-    });
-    this.myTextObj.setPosition(m.myX, m.myY * 1.4).setOrigin(0.5, 0.5);
-  }
-
-  // =================================================================
   // [System] 반응형 레이아웃 재계산 (핵심 수정)
   // =================================================================
   refreshLayout() {
@@ -776,6 +701,7 @@ class MiniShortGame1 extends Phaser.Scene {
     const bubbleHeight = phoneHeight * 0.18;
     const padding = 20 * this.globalScale; // 패딩도 스케일 적용
 
+    const fontSizeMain = `${28 * this.globalScale}px`;
     const fontSizeInput = `${28 * this.globalScale}px`;
 
     // (1) 상대방 말풍선 (상단)
@@ -786,6 +712,11 @@ class MiniShortGame1 extends Phaser.Scene {
       .setPosition(otherX, otherY)
       .setDisplaySize(bubbleWidth, bubbleHeight);
 
+    this.otherText
+      .setPosition(otherX, otherY * 1.075)
+      .setFontSize(fontSizeMain)
+      .setWordWrapWidth(bubbleWidth - padding * 2);
+
     // (2) 내 말풍선 (중단)
     const myX = phoneWidth / 2.3 - padding - bubbleWidth / 2;
     const myY = otherY + bubbleHeight + padding;
@@ -794,23 +725,10 @@ class MiniShortGame1 extends Phaser.Scene {
       .setPosition(myX, myY)
       .setDisplaySize(bubbleWidth, bubbleHeight);
 
-    this._bubbleMetrics = {
-      bubbleWidth,
-      bubbleHeight,
-      padding,
-      innerWidth: Math.max(40, bubbleWidth - padding * 2),
-      innerHeight: Math.max(24, bubbleHeight * 0.68),
-      otherX,
-      otherY,
-      myX,
-      myY,
-      baseFontSize: 28 * this.globalScale,
-    };
-
-    this._fitOtherBubbleText(this.problemData?.question ?? "");
-    this._fitMyBubbleText(
-      this.myTextObj?.text ?? this.problemData?.displaySentence ?? "",
-    );
+    this.myTextObj
+      .setPosition(myX, myY * 1.4)
+      .setFontSize(fontSizeMain)
+      .setWordWrapWidth(bubbleWidth - padding * 2);
 
     // (3) 결과 이모지 말풍선 (하단)
     const emoWidth = bubbleWidth * 0.5;

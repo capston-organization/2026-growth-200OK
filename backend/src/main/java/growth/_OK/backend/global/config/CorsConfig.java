@@ -17,8 +17,9 @@ public class CorsConfig {
         CorsConfiguration configuration = new CorsConfiguration();
 
         configuration.setAllowedOrigins(Arrays.asList(
-                "http://localhost:5173",
-                "https://2026-growth-front-deploy.vercel.app"
+                "http://localhost:3000",
+                "http://localhost:5173"
+                // "https://example.vercel.app"
         ));
         configuration.setAllowedMethods(List.of("*"));
         configuration.setAllowedHeaders(List.of("*"));

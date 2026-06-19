@@ -19,6 +19,4 @@ public interface GameLikeRepository extends JpaRepository<GameLike, Long> {
     List<GameLike> findByUser(User user);
 
     void deleteByGameAndUser(Game game, User user);
-
-    void deleteByGame(Game game);
 }

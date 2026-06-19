@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
+      // 🚨 기존 '/auth' 에서 아래처럼 더 구체적으로 바꿔주세요!
       "/auth/google": {
         target: "http://localhost:8080",
         changeOrigin: true,
@@ -15,22 +16,10 @@ export default defineConfig({
         changeOrigin: true,
       },
       "/games": {
-        target: "http://localhost:8080",
+        target: "http://localhost:8080", // 실제 백엔드 주소
         changeOrigin: true,
       },
       "/users": {
-        target: "http://localhost:8080",
-        changeOrigin: true,
-      },
-      "/analysis": {
-        target: "http://localhost:8080",
-        changeOrigin: true,
-      },
-      "/classroom": {
-        target: "http://localhost:8080",
-        changeOrigin: true,
-      },
-      "/nlp": {
         target: "http://localhost:8080",
         changeOrigin: true,
       },

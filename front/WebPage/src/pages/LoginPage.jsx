@@ -1,42 +1,10 @@
 // src/pages/LoginPage.jsx
-import React, { useEffect } from "react";
+import React from "react";
 // useNavigate: React Router에서 제공하는 '페이지 이동'을 담당하는 함수(Hook)입니다.
-import { useNavigate } from "react-router-dom";
-import { apiUrl } from "../config/api";
 import LearningVillageLogo from "../assets/images/Learning_Village_Logo.png";
 import GoogleLogo from "../assets/images/google_logo.png";
 
 const LoginPage = () => {
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    const token = localStorage.getItem("accessToken");
-    if (!token) return;
-
-    const resolveOnboarding = async () => {
-      try {
-        const res = await fetch(apiUrl("/auth/me"), {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        if (!res.ok) return;
-        const me = await res.json().catch(() => null);
-        if (!me) return;
-        if (me.onboardingCompleted) {
-          navigate("/main", { state: { userName: me.name || "사용자" } });
-        } else {
-          navigate("/onboarding", { state: { userName: me.name || "사용자" } });
-        }
-      } catch (e) {
-        console.error("Failed to resolve onboarding route:", e);
-      }
-    };
-
-    resolveOnboarding();
-  }, [navigate]);
-
   // ==========================================
   // 🏃‍♂️ 1단계: 구글 로그인 창으로 이동시키는 함수
   // ==========================================

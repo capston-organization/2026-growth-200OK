@@ -11,5 +11,4 @@ import java.util.List;
 public interface ProblemRepository extends JpaRepository<Problem, Long> {
     List<Problem> findByGameOrderBySortOrderAsc(Game game);
     List<Problem> findByGame_IdOrderBySortOrderAsc(Long gameId);
-    void deleteByGame(Game game);
 }

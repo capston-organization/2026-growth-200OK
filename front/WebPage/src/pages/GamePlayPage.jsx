@@ -702,13 +702,7 @@ const GamePlayPage = () => {
               flexShrink: 0,
             }}
           >
-            <button style={buttonStyle} onClick={() => {
-              if (!gameProblems.length) {
-                alert("플레이할 문제가 없습니다. 게임을 다시 생성해주세요.");
-                return;
-              }
-              setPhase("GAME");
-            }}>
+            <button style={buttonStyle} onClick={() => setPhase("GAME")}>
               게임 시작
             </button>
           </div>
@@ -726,7 +720,6 @@ const GamePlayPage = () => {
     // iframe onLoad 직후 Phaser create()보다 먼저일 수 있어, MainGame1에서 메시지를 버퍼링함.
     // 그래도 짧은 지연으로 몇 번 더내면(이미 처리됐으면 게임 쪽에서 무시) 안정적임.
     const handleIframeLoad = () => {
-      if (!gameProblems.length) return;
       const token = localStorage.getItem("accessToken");
       const payload = {
         type: "START_GAME",

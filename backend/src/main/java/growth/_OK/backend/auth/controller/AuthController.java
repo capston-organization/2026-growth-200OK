@@ -1,7 +1,6 @@
 package growth._OK.backend.auth.controller;
 
 import growth._OK.backend.auth.dto.request.GoogleCodeRequest;
-import growth._OK.backend.auth.dto.response.LoginResponseDto;
 import growth._OK.backend.auth.dto.response.TokenResponse;
 import growth._OK.backend.auth.jwt.CustomUserDetails;
 import growth._OK.backend.auth.service.AuthService;
@@ -24,9 +23,9 @@ public class AuthController {
     private final UserService userService;
 
     @PostMapping("/google")
-    public ResponseEntity<LoginResponseDto> loginOrRegister(@RequestBody GoogleCodeRequest request, HttpServletResponse response) {
-        LoginResponseDto loginResponse = authService.googleLogin(request, response);
-        return ResponseEntity.ok(loginResponse);
+    public ResponseEntity<Void> loginOrRegister(@RequestBody GoogleCodeRequest request, HttpServletResponse response) {
+        authService.googleLogin(request, response);
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping("/refresh")

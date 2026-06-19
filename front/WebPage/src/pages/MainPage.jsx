@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { apiUrl } from "../config/api";
 import LearningVillageLogoImage from "../assets/images/Learning_Village_Logo_ImageOnly.png";
@@ -11,16 +11,6 @@ import GameIcon4 from "../assets/images/GameIcon4.png";
 import GameIcon5 from "../assets/images/GameIcon5.png";
 import GameIcon6 from "../assets/images/GameIcon6.png";
 import GameIcon7 from "../assets/images/GameIcon7.png";
-
-const RANK_COLORS = ["#FF8E99", "#FFB3BA", "#FFE0E5"];
-const INITIAL_SCOPE_WRONG_RATES = { WORD: [], GRAMMAR: [] };
-
-const normalizeCategoryFromRow = (row) => {
-  const raw = row?.category;
-  if (raw === "GRAMMAR") return "GRAMMAR";
-  if (raw === "WORD" || raw === "VOCAB") return "WORD";
-  return null;
-};
 
 const MainPage = () => {
   const navigate = useNavigate();
@@ -46,18 +36,6 @@ const MainPage = () => {
   const [greetingMessage, setGreetingMessage] =
     useState("집중 모드 ON! 오늘도 파이팅!");
   const [isGreetingLoading, setIsGreetingLoading] = useState(false);
-
-  const [weakTop3, setWeakTop3] = useState([]);
-  const [scopeWrongRates, setScopeWrongRates] = useState(
-    INITIAL_SCOPE_WRONG_RATES,
-  );
-
-  const hasAnyWrongData = useMemo(() => {
-    return (
-      (scopeWrongRates.WORD && scopeWrongRates.WORD.length > 0) ||
-      (scopeWrongRates.GRAMMAR && scopeWrongRates.GRAMMAR.length > 0)
-    );
-  }, [scopeWrongRates]);
 
   const gameCardIcons = [
     GameIcon1,
@@ -187,36 +165,9 @@ const MainPage = () => {
       }
     };
 
-    const fetchAnalysisOverview = async () => {
-      try {
-        const res = await fetch(apiUrl("/analysis/me/overview"), {
-          method: "GET",
-          headers: commonHeaders,
-        });
-        if (!res.ok) return;
-
-        const overview = await safeParseJson(res, "analysisOverview");
-        if (overview?.weakTop3?.length) {
-          setWeakTop3(overview.weakTop3.slice(0, 3));
-        }
-        if (Array.isArray(overview?.scopeWrongRates)) {
-          const grouped = { WORD: [], GRAMMAR: [] };
-          overview.scopeWrongRates.forEach((row) => {
-            const category = normalizeCategoryFromRow(row);
-            if (!category) return;
-            grouped[category] = Array.isArray(row.scopes) ? row.scopes : [];
-          });
-          setScopeWrongRates(grouped);
-        }
-      } catch (e) {
-        console.error("Failed to fetch analysis overview:", e);
-      }
-    };
-
     fetchGreeting();
     fetchStreak();
     fetchRecentGames();
-    fetchAnalysisOverview();
   }, []);
 
   return (
@@ -282,9 +233,21 @@ const MainPage = () => {
           </span>
           <span
             style={{ cursor: "pointer" }}
+            onClick={() => navigate("/main", { state: { userName } })}
+          >
+            공유하기
+          </span>
+          <span
+            style={{ cursor: "pointer" }}
             onClick={() => navigate("/analyze", { state: { userName } })}
           >
             분석하기
+          </span>
+          <span
+            style={{ cursor: "pointer" }}
+            onClick={() => navigate("/main", { state: { userName } })}
+          >
+            육성하기
           </span>
           <span
             style={{
@@ -493,29 +456,25 @@ const MainPage = () => {
               </span>
             </div>
 
-            {hasAnyWrongData &&
-              weakTop3.map((title, index) => (
-                <div
-                  key={title}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    background: RANK_COLORS[index],
-                    borderRadius: "16px",
-                    padding: "12px 18px",
-                    marginBottom: "10px",
-                    color: "#333",
-                  }}
-                >
+            {["which/who/that의 구분", "동의어 맞추기", "it ~ to v 문법"].map(
+              (title, index) => {
+                // 순위에 따른 배경색 지정 (진한색 -> 중간색 -> 연한색)
+                const bgColors = ["#FF8E99", "#FFB3BA", "#FFE0E5"];
+
+                return (
                   <div
+                    key={title}
                     style={{
                       display: "flex",
                       alignItems: "center",
-                      gap: "12px",
+                      background: bgColors[index], // ✨ 고정된 색상 대신 변수 사용!
+                      borderRadius: "12px",
+                      padding: "10px 16px",
+                      marginBottom: index === 2 ? 0 : 10,
+                      color: index === 2 ? "#333" : "white", // ✨ 가장 연한 배경엔 글씨를 어둡게!
                     }}
                   >
-                    <span
+                    <div
                       style={{
                         fontSize: "24px",
                         width: "32px",
@@ -524,49 +483,24 @@ const MainPage = () => {
                       }}
                     >
                       {index + 1}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: "24px",
-                        fontWeight: "600",
-                      }}
+                    </div>
+                    <div
+                      style={{ flex: 1, fontSize: "20px", fontWeight: "600" }}
                     >
                       {title}
-                    </span>
+                    </div>
+                    <div
+                      style={{
+                        width: "32px",
+                        textAlign: "center",
+                        fontSize: "20px",
+                      }}
+                    >
+                      🔍
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    style={{
-                      borderRadius: "20px",
-                      border: "2px solid #FF8E99",
-                      background: "white",
-                      padding: "6px 14px",
-                      fontSize: "18px",
-                      fontWeight: "600",
-                      cursor: "pointer",
-                    }}
-                    onClick={() =>
-                      navigate("/analyze", { state: { userName } })
-                    }
-                  >
-                    복습 게임 생성하기
-                  </button>
-                </div>
-              ))}
-            {!hasAnyWrongData && (
-              <div
-                style={{
-                  background: "#FFF8FA",
-                  border: "1px dashed #F8BBD0",
-                  borderRadius: "16px",
-                  padding: "18px",
-                  fontSize: "20px",
-                  color: "#777",
-                  textAlign: "center",
-                }}
-              >
-                오답이 생기면 취약한 학습 범위 TOP3가 표시됩니다.
-              </div>
+                );
+              },
             )}
 
             <div
@@ -577,14 +511,12 @@ const MainPage = () => {
               }}
             >
               <button
-                type="button"
                 className="btn-primary"
                 style={{
                   marginTop: 0,
                   fontSize: "20px",
                   padding: "8px 16px",
                 }}
-                onClick={() => navigate("/analyze", { state: { userName } })}
               >
                 게임으로 공부하기
               </button>

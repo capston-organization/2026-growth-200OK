@@ -4,7 +4,6 @@ import growth._OK.backend.auth.jwt.CustomUserDetails;
 import growth._OK.backend.game.domain.Problem;
 import growth._OK.backend.game.domain.ProblemAttempt;
 import growth._OK.backend.game.dto.ResponseDto.ProblemWithStatusDto;
-import growth._OK.backend.game.dto.requestDto.SubmitAnswerRequestDto;
 import growth._OK.backend.game.repository.ProblemAttemptRepository;
 import growth._OK.backend.game.repository.ProblemRepository;
 import growth._OK.backend.global.exception.CapstonException;
@@ -31,7 +30,7 @@ public class ProblemAttemptService {
     private final UserStreakService userStreakService;
 
     @Transactional
-    public void submitAnswer(Long gameId, Long problemId, SubmitAnswerRequestDto request, CustomUserDetails userDetails) {
+    public void submitAnswer(Long gameId, Long problemId, Boolean correct, CustomUserDetails userDetails) {
         User user = findUser(userDetails);
         Problem problem = findProblem(problemId);
         if (!problem.getGame().getId().equals(gameId)) {
@@ -42,13 +41,8 @@ public class ProblemAttemptService {
         problemAttemptRepository.save(ProblemAttempt.builder()
                 .user(user)
                 .problem(problem)
-                .correct(Boolean.TRUE.equals(request.getCorrect()))
+                .correct(Boolean.TRUE.equals(correct))
                 .attemptOrder(nextOrder)
-                .responseTimeMs(request.getResponseTimeMs())
-                .hintUsed(Boolean.TRUE.equals(request.getHintUsed()))
-                .explanationOpened(Boolean.TRUE.equals(request.getExplanationOpened()))
-                .chosenAnswer(request.getChosenAnswer())
-                .submittedText(request.getSubmittedText())
                 .build());
         userStreakService.recordPlayToday(user.getUserId());
     }

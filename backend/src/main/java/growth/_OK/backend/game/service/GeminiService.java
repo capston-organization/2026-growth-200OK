@@ -83,12 +83,7 @@ public class GeminiService {
         }
     }
 
-    public List<RawGeneratedProblem> generateProblemsFromSource(
-            String sourceText,
-            int count,
-            List<ProblemType> types,
-            String personalizationContext
-    ) {
+    public List<RawGeneratedProblem> generateProblemsFromSource(String sourceText, int count, List<ProblemType> types) {
         if (sourceText == null || sourceText.isBlank()) {
             throw new CapstonException(ExceptionCode.SOURCE_CONTENT_EMPTY);
         }
@@ -99,40 +94,16 @@ public class GeminiService {
                 ? List.of("MULTIPLE_CHOICE", "OX", "SHORT_ANSWER")
                 : types.stream().map(Enum::name).collect(Collectors.toList());
         String typeStr = String.join(", ", typeNames);
-
-        String contextBlock = (personalizationContext != null && !personalizationContext.isBlank())
-                ? """
-                [개인화 컨텍스트]
-                %s
-                
-                위 컨텍스트를 반드시 반영해서, 취약 개념/낮은 정확도 유형 중심으로 문제를 구성하세요.
-                
-                """.formatted(personalizationContext)
-                : "";
-
-        // ── 영단어 전용 프롬프트 가이드 ──────────────────────────────────────────
-        String vocabGuide = """
-                [영단어 문제 생성 규칙 - 반드시 준수]
-                - 단어의 뜻을 묻는 문제 (예: "apple의 뜻은?" → 정답: 사과)
-                - 문맥에서 빈칸에 알맞은 단어 고르기 (예: "I ___ an apple every day." → 정답: eat)
-                - 동의어/반의어 문제 (예: "happy의 반의어는?" → 정답: sad)
-                - 영어 단어의 올바른 철자 고르기
-                - MULTIPLE_CHOICE 오답: 반드시 정답과 같은 품사의 단어로 구성 (명사 정답이면 오답도 명사)
-                - 오답은 발음이나 뜻이 헷갈릴 만한 단어로 구성
-                - 문제는 단어 암기와 활용에 집중. 문법 문제 금지.
-                
-                """;
-
         String prompt = """
-                아래 소스 텍스트를 바탕으로 정확히 %d개의 영단어 퀴즈 문제를 만들어 주세요.
+                아래 소스 텍스트를 바탕으로 정확히 %d개의 퀴즈 문제를 만들어 주세요.
                 
                 [문제 유형] (반드시 아래만 사용)
-                - SHORT_ANSWER: 단답형. 질문 80자 이내, 정답은 50자 이내(한 단어·짧은 구절).
+                - SHORT_ANSWER: 단답형. 질문 80자 이내, 정답은 50자 이내(한 단어·숫자·짧은 구절).
                 - OX: O/X. 질문 80자 이내, 정답은 "O" 또는 "X"만.
                 - MULTIPLE_CHOICE: 5지선다. 반드시 선택지를 정확히 5개만 만드세요. 4개나 6개 이상 금지.
                 
                 [글자 수 제한 - UI 표시를 위해 꼭 지켜주세요]
-                - question: 80자 이내로 짧고 명확하게.
+                - question: 단답형/객관식/OX 모두 80자 이내로 짧고 명확하게.
                 - MULTIPLE_CHOICE의 options: 각 선택지 50자 이내, 반드시 5개만. 기호(①②) 없이 내용만.
                 - SHORT_ANSWER의 correctAnswer: 50자 이내.
                 
@@ -140,18 +111,15 @@ public class GeminiService {
                 
                 [필드 규칙]
                 - question: 문제 지문 (한국어, 80자 이내)
-                - options: SHORT_ANSWER/OX면 빈 배열 []. MULTIPLE_CHOICE면 반드시 길이 5인 배열.
+                - options: SHORT_ANSWER/OX면 빈 배열 []. MULTIPLE_CHOICE면 반드시 길이 5인 배열 (5지선다만 허용).
                 - correctAnswer: 정답. OX면 "O" 또는 "X", 단답형이면 50자 이내, 객관식이면 5개 중 정답 선택지 문자열.
                 - type: SHORT_ANSWER, OX, MULTIPLE_CHOICE 중 하나
-                - scope: 학습 범위(예: 동의어, 반의어, 단어뜻) 2~12자
                 
                 JSON 배열만 출력하고 설명 금지. 선택지에 ①② 기호 붙이지 마세요.
-                마크다운(**,*,##) 절대 사용 금지. 일반 텍스트만.
                 
-                %s%s
                 소스 텍스트:
                 %s
-                """.formatted(count, typeStr, vocabGuide, contextBlock, truncated);
+                """.formatted(count, typeStr, truncated);
         String raw = geminiClient.generateText(prompt);
         return parseProblemsResponse(raw);
     }
@@ -161,8 +129,6 @@ public class GeminiService {
         public List<String> options;
         public String correctAnswer;
         public String type;
-        public String scope;
-        public String explanation;
     }
 
     private List<RawGeneratedProblem> parseProblemsResponse(String raw) {
@@ -178,7 +144,6 @@ public class GeminiService {
                 p.question = truncate((String) map.getOrDefault("question", ""), MAX_QUESTION_LENGTH);
                 p.correctAnswer = stripOptionSymbol((String) map.getOrDefault("correctAnswer", ""));
                 p.type = (String) map.getOrDefault("type", "MULTIPLE_CHOICE");
-                p.scope = truncate((String) map.getOrDefault("scope", "기타"), 30);
                 @SuppressWarnings("unchecked")
                 List<String> opt = (List<String>) map.get("options");
                 List<String> sanitized = opt != null
@@ -217,6 +182,7 @@ public class GeminiService {
     private static String stripOptionSymbol(String s) {
         if (s == null) return "";
         s = s.trim();
+        // ①~⑤, ⑴~⑽, 1. 2. 3. 4. 5., (1)~(5) 등 제거
         if (s.length() >= 1 && "①②③④⑤⑥⑦⑧⑨⑩⑴⑵⑶⑷⑸".indexOf(s.charAt(0)) >= 0) {
             s = s.substring(1).trim();
         } else if (s.length() >= 2 && s.charAt(1) == '.' && "12345".indexOf(s.charAt(0)) >= 0) {
@@ -229,7 +195,7 @@ public class GeminiService {
 
     public String generateExplanation(String question, List<String> options, String correctAnswer) {
         StringBuilder prompt = new StringBuilder();
-        prompt.append("다음 퀴즈 문제에 대한 정답 해설을 작성해 주세요. 학습자가 왜 이 정답이 맞는지, 오답이 왜 틀렸는지 이해할 수 있도록 2~5문장으로 설명해 주세요. 마크다운(**,*,##) 사용 금지. 일반 텍스트만.\n\n");
+        prompt.append("다음 퀴즈 문제에 대한 정답 해설을 작성해 주세요. 학습자가 왜 이 정답이 맞는지, 오답이 왜 틀렸는지 이해할 수 있도록 2~5문장으로 설명해 주세요. 수학/과학/영어 등은 풀이 과정이나 근거를 간단히 포함해 주세요.\n\n");
         prompt.append("【문제】\n").append(question).append("\n\n");
         if (options != null && !options.isEmpty()) {
             prompt.append("【선택지】\n").append(String.join("\n", options)).append("\n\n");
