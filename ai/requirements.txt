@@ -1,0 +1,28 @@
+# Web framework
+fastapi==0.136.1
+uvicorn==0.46.0
+pydantic==2.13.3
+python-dotenv==1.2.2
+
+# NLP
+stanza==1.11.1
+# CPU 전용 torch (EC2 GPU 없음 → GPU 버전 설치 시 디스크 2GB+ 초과)
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.11.0+cpu
+
+# Database (2.9.10+ 부터 Python 3.13 지원)
+psycopg2-binary>=2.9.10
+
+# HuggingFace — 버전 핀 제거, pip가 호환 버전 자동 선택
+datasets>=2.14.0
+huggingface-hub>=0.20.0
+
+# HTTP
+requests==2.33.1
+
+# Utilities
+tqdm==4.67.3
+
+# Celery + Redis
+celery>=5.3.0
+redis>=5.0.0

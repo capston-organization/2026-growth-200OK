@@ -1,0 +1,51 @@
+name: Deploy NLP Server to EC2
+
+on:
+  push:
+    branches: ["main", "develop"]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create .env on EC2 and deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.NLP_EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          timeout: 120s
+          script: |
+            set -e
+            cd ~/grammar-rag || (git clone https://github.com/${{ github.repository }} ~/grammar-rag && cd ~/grammar-rag)
+            git pull origin ${{ github.ref_name }}
+
+            # .env 생성
+            cat > ~/grammar-rag/.env << 'ENVEOF'
+            DATABASE_URL=${{ secrets.DATABASE_URL }}
+            GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+            GEMINI_MODEL=gemini-2.5-flash
+            ENVEOF
+
+            # Docker로 실행 (권장)
+            if command -v docker &> /dev/null; then
+              docker build -t grammar-rag:latest .
+              docker stop grammar-rag 2>/dev/null || true
+              docker rm grammar-rag 2>/dev/null || true
+              docker run -d \
+                --name grammar-rag \
+                --env-file .env \
+                -p 8000:8000 \
+                --restart unless-stopped \
+                grammar-rag:latest
+            else
+              # Docker 없을 때 직접 실행
+              pip install -r requirements.txt -q
+              pkill -f "uvicorn app.main" || true
+              nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 \
+                >> ~/grammar-rag/server.log 2>&1 &
+            fi
+
+            echo "Deploy complete: $(date)"
